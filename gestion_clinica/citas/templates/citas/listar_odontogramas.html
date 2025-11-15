@@ -1,0 +1,672 @@
+{% extends 'citas/base.html' %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Header con Stats a la Derecha -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-tooth"></i> Administrador de Odontogramas</h1>
+        <p class="page-subtitle">Gestiona las fichas odontológicas de tus pacientes</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon primary">
+                    <i class="fas fa-tooth"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.total_odontogramas }}</div>
+                    <div class="stat-label">Total Odontogramas</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.odontogramas_mes }}</div>
+                    <div class="stat-label">Este Mes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-tooth"></i> Historial de Fichas Odontológicas
+            </h2>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.875rem;">
+                Consulta y gestiona todas las fichas odontológicas que has creado
+            </p>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <form method="GET" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <div style="display: flex; gap: 16px; align-items: end;">
+            <div style="flex: 1;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Buscar:</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Nombre, email o motivo..." 
+                       style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+            </div>
+            <div>
+                <button type="submit" class="btn" style="padding: 8px 16px;">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </div>
+        </div>
+    </form>
+    
+    <!-- Lista de odontogramas -->
+    {% if odontogramas %}
+        <div style="display: grid; gap: 16px;">
+            {% for odontograma in odontogramas %}
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                    <div>
+                        <h3 style="margin: 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+                            {{ odontograma.paciente_nombre }}
+                        </h3>
+                        <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.875rem;">
+                            <i class="fas fa-envelope"></i> {{ odontograma.paciente_email }}
+                            {% if odontograma.paciente_telefono %}
+                                | <i class="fas fa-phone"></i> {{ odontograma.paciente_telefono }}
+                            {% endif %}
+                        </p>
+                        {% if odontograma.cita %}
+                        <div style="margin-top: 8px; padding: 8px 12px; background: #e0f2fe; border-left: 3px solid #0ea5e9; border-radius: 4px;">
+                            <div style="display: flex; align-items: center; gap: 6px; color: #0c4a6e; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">
+                                <i class="fas fa-calendar-check"></i> Cita Asociada
+                            </div>
+                            <div style="color: #075985; font-size: 0.75rem;">
+                                <i class="fas fa-calendar"></i> {{ odontograma.cita.fecha_hora|date:"d/m/Y H:i" }} | 
+                                <i class="fas fa-info-circle"></i> {{ odontograma.cita.get_estado_display }}
+                            </div>
+                        </div>
+                        {% else %}
+                        <div style="margin-top: 8px; padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px;">
+                            <div style="color: #92400e; font-size: 0.75rem;">
+                                <i class="fas fa-exclamation-triangle"></i> Ficha sin cita asociada (datos históricos)
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: #64748b; font-size: 0.875rem;">
+                            {{ odontograma.fecha_creacion|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <p style="margin: 0; color: #374151; font-size: 0.875rem;">
+                        <strong>Motivo:</strong> {{ odontograma.motivo_consulta|truncatechars:100 }}
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <span style="background: #f0f9ff; color: #0ea5e9; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                        Higiene: {{ odontograma.get_higiene_oral_display }}
+                    </span>
+                    <span style="background: #f0fdf4; color: #10b981; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                        Estado: {{ odontograma.get_estado_general_display }}
+                    </span>
+                    {% if odontograma.proxima_cita %}
+                    <span style="background: #fef3c7; color: #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                        <i class="fas fa-calendar"></i> {{ odontograma.proxima_cita|date:"d/m/Y" }}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a href="{% url 'detalle_odontograma' odontograma.id %}" class="btn btn-info preview-odontograma" data-url="{% url 'detalle_odontograma' odontograma.id %}" style="font-size: 0.75rem; padding: 6px 12px;">
+                        <i class="fas fa-eye"></i> Ver
+                    </a>
+                    <a href="{% url 'exportar_odontograma_pdf' odontograma.id %}" class="btn" style="background: #dc2626; color: white; font-size: 0.75rem; padding: 6px 12px;">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <a href="{% url 'editar_odontograma' odontograma.id %}" class="btn btn-warning" style="font-size: 0.75rem; padding: 6px 12px;">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                    <a href="{% url 'eliminar_odontograma' odontograma.id %}" class="btn btn-danger" style="font-size: 0.75rem; padding: 6px 12px;">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 48px 24px; color: #64748b;">
+            <i class="fas fa-tooth" style="font-size: 3rem; margin-bottom: 16px; color: #cbd5e1;"></i>
+            <h3 style="margin: 0 0 8px 0; color: #374151;">No hay fichas odontológicas</h3>
+            <p style="margin: 0 0 16px 0;">Aún no has creado ninguna ficha odontológica.</p>
+            <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; max-width: 500px; margin: 0 auto;">
+                <p style="margin: 0; color: #0c4a6e; font-size: 0.875rem;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Para crear una ficha:</strong> Ve a "Mis Citas" y selecciona una cita para crear su ficha odontológica.
+                </p>
+            </div>
+            <a href="{% url 'mis_citas_dentista' %}" class="btn btn-success" style="margin-top: 20px;">
+                <i class="fas fa-calendar-check"></i> Ir a Mis Citas
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Preview Odontograma (SOLO para ver detalles) -->
+<div id="preview-modal" class="preview-modal-overlay">
+    <div id="preview-backdrop" class="preview-modal-backdrop"></div>
+    <div class="preview-modal-container">
+        <div class="preview-modal-header">
+            <div class="preview-modal-title">
+                <i class="fas fa-tooth"></i>
+                <span>Vista Previa de Odontograma</span>
+            </div>
+            <button id="preview-close" class="preview-modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="preview-content" class="preview-modal-content">
+            <div class="preview-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Cargando…</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <style>
+/* Modal de Preview Odontograma */
+.preview-modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.preview-modal-overlay.active {
+    display: flex;
+}
+
+.preview-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.preview-modal-container {
+    position: relative;
+    width: min(800px, 90vw);
+    max-height: 85vh;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--primary-light);
+}
+
+.preview-modal-header {
+    background: linear-gradient(135deg, var(--primary-bg), var(--primary-lighter));
+    padding: 20px 24px;
+    border-bottom: 2px solid var(--primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.preview-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 18px;
+    color: #1e293b;
+}
+
+.preview-modal-title i {
+    color: var(--primary-color);
+    font-size: 20px;
+}
+
+.preview-modal-close {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 16px;
+}
+
+.preview-modal-close:hover {
+    background: var(--primary-dark);
+    transform: scale(1.1);
+}
+
+.preview-modal-content {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.preview-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #64748b;
+    padding: 40px;
+    font-size: 16px;
+}
+
+.preview-loading i {
+    font-size: 20px;
+}
+
+/* Estilos para contenido simplificado del preview */
+#preview-content .section {
+    margin-bottom: 20px;
+}
+
+#preview-content .info-card {
+    background: var(--primary-bg);
+    border: 1px solid var(--primary-light);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+#preview-content .info-card h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#preview-content .info-card h3 i {
+    color: var(--primary-color);
+}
+
+#preview-content .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+#preview-content .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#preview-content .info-label {
+    font-size: 12px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+#preview-content .info-value {
+    font-size: 14px;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+#preview-content .motivo-consulta {
+    background: white;
+    border: 1px solid var(--primary-light);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #374151;
+    line-height: 1.5;
+}
+
+#preview-content .text-content {
+    background: white;
+    border: 1px solid var(--primary-light);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #374151;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+#preview-content .info-value.highlight {
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 15px;
+}
+
+/* Ocultar secciones muy detalladas en preview */
+#preview-content .section > div:has(h3:contains("Odontograma Visual")),
+#preview-content .section > div:has(h3:contains("Plan de Tratamiento")),
+#preview-content .section > div:has(h3:contains("Observaciones")),
+#preview-content .section > div:has(h3:contains("Información del Sistema")) {
+    display: none;
+}
+
+/* Ocultar botones de acción */
+        #preview-content a.btn-warning, 
+        #preview-content a.btn-danger,
+        #preview-content a[href*="editar"],
+        #preview-content a[href*="eliminar"],
+#preview-content a[href*="actualizar_diente"],
+#preview-content .btn-close {
+    display: none !important;
+}
+
+#preview-content a {
+    pointer-events: none;
+    text-decoration: none;
+    color: inherit;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .preview-modal-container {
+        width: 95vw;
+        max-height: 90vh;
+    }
+    
+    .preview-modal-header {
+        padding: 16px;
+    }
+    
+    .preview-modal-content {
+        padding: 16px;
+    }
+}
+    </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    var links = document.querySelectorAll('.preview-odontograma');
+    var modal = document.getElementById('preview-modal');
+    var backdrop = document.getElementById('preview-backdrop');
+    var closeBtn = document.getElementById('preview-close');
+    var content = document.getElementById('preview-content');
+
+    function openModal(){ 
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeModal(){ 
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+        content.innerHTML = '<div class="preview-loading"><i class="fas fa-spinner fa-spin"></i><span>Cargando…</span></div>';
+        
+        // Remover estilos y scripts agregados dinámicamente
+        var dynamicStyles = document.querySelectorAll('style[data-modal-styles]');
+        dynamicStyles.forEach(function(style) {
+            style.remove();
+        });
+        
+        var dynamicScripts = document.querySelectorAll('script[data-modal-scripts]');
+        dynamicScripts.forEach(function(script) {
+            script.remove();
+        });
+    }
+
+    function sanitize(html){
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        var section = tmp.querySelector('.section') || tmp;
+        
+        // Crear contenido simplificado
+        var simplified = document.createElement('div');
+        
+        // Buscar información del paciente
+        var allDivs = section.querySelectorAll('div');
+        var pacienteInfo = null;
+        for (var i = 0; i < allDivs.length; i++) {
+            if (allDivs[i].textContent && allDivs[i].textContent.includes('Información del Paciente')) {
+                pacienteInfo = allDivs[i];
+                break;
+            }
+        }
+        
+        if (pacienteInfo) {
+            var pacienteCard = document.createElement('div');
+            pacienteCard.className = 'info-card';
+            pacienteCard.innerHTML = '<h3><i class="fas fa-user"></i> Información del Paciente</h3>';
+            var pacienteGrid = document.createElement('div');
+            pacienteGrid.className = 'info-grid';
+            
+            var htmlContent = pacienteInfo.innerHTML;
+            var nombreMatch = htmlContent.match(/<strong>Nombre:<\/strong>([^<]+)/);
+            var emailMatch = htmlContent.match(/<strong>Email:<\/strong>([^<]+)/);
+            var telefonoMatch = htmlContent.match(/<strong>Teléfono:<\/strong>([^<]+)/);
+            var fechaMatch = htmlContent.match(/<strong>Fecha de Nacimiento:<\/strong>([^<]+)/);
+            
+            if (nombreMatch) {
+                var item = document.createElement('div');
+                item.className = 'info-item';
+                item.innerHTML = '<span class="info-label">Nombre</span><span class="info-value">' + nombreMatch[1].trim() + '</span>';
+                pacienteGrid.appendChild(item);
+            }
+            if (emailMatch) {
+                var item = document.createElement('div');
+                item.className = 'info-item';
+                item.innerHTML = '<span class="info-label">Email</span><span class="info-value">' + emailMatch[1].trim() + '</span>';
+                pacienteGrid.appendChild(item);
+            }
+            if (telefonoMatch) {
+                var item = document.createElement('div');
+                item.className = 'info-item';
+                item.innerHTML = '<span class="info-label">Teléfono</span><span class="info-value">' + telefonoMatch[1].trim() + '</span>';
+                pacienteGrid.appendChild(item);
+            }
+            if (fechaMatch) {
+                var item = document.createElement('div');
+                item.className = 'info-item';
+                item.innerHTML = '<span class="info-label">Fecha de Nacimiento</span><span class="info-value">' + fechaMatch[1].trim() + '</span>';
+                pacienteGrid.appendChild(item);
+            }
+            
+            pacienteCard.appendChild(pacienteGrid);
+            simplified.appendChild(pacienteCard);
+        }
+        
+        // Buscar información clínica
+        var clinicaInfo = null;
+        for (var i = 0; i < allDivs.length; i++) {
+            if (allDivs[i].textContent && allDivs[i].textContent.includes('Información Clínica')) {
+                clinicaInfo = allDivs[i];
+                break;
+            }
+        }
+        
+        if (clinicaInfo) {
+            var htmlContent = clinicaInfo.innerHTML;
+            
+            // Motivo de consulta
+            var motivoMatch = htmlContent.match(/<strong>Motivo de Consulta:<\/strong>[\s\S]*?<p[^>]*>([^<]+)<\/p>/);
+            if (motivoMatch) {
+                var motivoCard = document.createElement('div');
+                motivoCard.className = 'info-card';
+                motivoCard.innerHTML = '<h3><i class="fas fa-stethoscope"></i> Motivo de Consulta</h3>';
+                var motivoDiv = document.createElement('div');
+                motivoDiv.className = 'motivo-consulta';
+                motivoDiv.textContent = motivoMatch[1].trim();
+                motivoCard.appendChild(motivoDiv);
+                simplified.appendChild(motivoCard);
+            }
+            
+            // Higiene oral y estado general
+            var higieneMatch = htmlContent.match(/<strong>Higiene Oral:<\/strong>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
+            var estadoMatch = htmlContent.match(/<strong>Estado General:<\/strong>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
+            
+            if (higieneMatch || estadoMatch) {
+                var estadoCard = document.createElement('div');
+                estadoCard.className = 'info-card';
+                estadoCard.innerHTML = '<h3><i class="fas fa-heartbeat"></i> Estado Clínico</h3>';
+                var estadoGrid = document.createElement('div');
+                estadoGrid.className = 'info-grid';
+                
+                if (higieneMatch) {
+                    var item = document.createElement('div');
+                    item.className = 'info-item';
+                    item.innerHTML = '<span class="info-label">Higiene Oral</span><span class="info-value">' + higieneMatch[1].trim() + '</span>';
+                    estadoGrid.appendChild(item);
+                }
+                if (estadoMatch) {
+                    var item = document.createElement('div');
+                    item.className = 'info-item';
+                    item.innerHTML = '<span class="info-label">Estado General</span><span class="info-value">' + estadoMatch[1].trim() + '</span>';
+                    estadoGrid.appendChild(item);
+                }
+                
+                estadoCard.appendChild(estadoGrid);
+                simplified.appendChild(estadoCard);
+            }
+            
+            // Antecedentes médicos
+            var antecedentesMatch = htmlContent.match(/<strong>Antecedentes Médicos:<\/strong>[\s\S]*?<p[^>]*>([^<]+)<\/p>/);
+            if (antecedentesMatch && antecedentesMatch[1].trim()) {
+                var antecedentesCard = document.createElement('div');
+                antecedentesCard.className = 'info-card';
+                antecedentesCard.innerHTML = '<h3><i class="fas fa-file-medical"></i> Antecedentes Médicos</h3>';
+                var antecedentesDiv = document.createElement('div');
+                antecedentesDiv.className = 'text-content';
+                antecedentesDiv.textContent = antecedentesMatch[1].trim();
+                antecedentesCard.appendChild(antecedentesDiv);
+                simplified.appendChild(antecedentesCard);
+            }
+            
+            // Alergias
+            var alergiasMatch = htmlContent.match(/<strong>Alergias:<\/strong>[\s\S]*?<p[^>]*>([^<]+)<\/p>/);
+            if (alergiasMatch && alergiasMatch[1].trim()) {
+                var alergiasCard = document.createElement('div');
+                alergiasCard.className = 'info-card';
+                alergiasCard.innerHTML = '<h3><i class="fas fa-exclamation-triangle"></i> Alergias</h3>';
+                var alergiasDiv = document.createElement('div');
+                alergiasDiv.className = 'text-content';
+                alergiasDiv.textContent = alergiasMatch[1].trim();
+                alergiasCard.appendChild(alergiasDiv);
+                simplified.appendChild(alergiasCard);
+            }
+            
+            // Medicamentos actuales
+            var medicamentosMatch = htmlContent.match(/<strong>Medicamentos Actuales:<\/strong>[\s\S]*?<p[^>]*>([^<]+)<\/p>/);
+            if (medicamentosMatch && medicamentosMatch[1].trim()) {
+                var medicamentosCard = document.createElement('div');
+                medicamentosCard.className = 'info-card';
+                medicamentosCard.innerHTML = '<h3><i class="fas fa-pills"></i> Medicamentos Actuales</h3>';
+                var medicamentosDiv = document.createElement('div');
+                medicamentosDiv.className = 'text-content';
+                medicamentosDiv.textContent = medicamentosMatch[1].trim();
+                medicamentosCard.appendChild(medicamentosDiv);
+                simplified.appendChild(medicamentosCard);
+            }
+        }
+        
+        // Buscar plan de tratamiento
+        var planInfo = null;
+        for (var i = 0; i < allDivs.length; i++) {
+            if (allDivs[i].textContent && allDivs[i].textContent.includes('Plan de Tratamiento')) {
+                planInfo = allDivs[i];
+                break;
+            }
+        }
+        
+        if (planInfo) {
+            var htmlContent = planInfo.innerHTML;
+            var planMatch = htmlContent.match(/<strong>Plan:<\/strong>[\s\S]*?<p[^>]*>([^<]+)<\/p>/);
+            var proximaCitaMatch = htmlContent.match(/<strong>Próxima Cita:<\/strong>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
+            
+            if (planMatch || proximaCitaMatch) {
+                var planCard = document.createElement('div');
+                planCard.className = 'info-card';
+                planCard.innerHTML = '<h3><i class="fas fa-clipboard-list"></i> Plan de Tratamiento</h3>';
+                
+                if (planMatch && planMatch[1].trim()) {
+                    var planDiv = document.createElement('div');
+                    planDiv.className = 'text-content';
+                    planDiv.style.marginBottom = '12px';
+                    planDiv.textContent = planMatch[1].trim();
+                    planCard.appendChild(planDiv);
+                }
+                
+                if (proximaCitaMatch) {
+                    var citaDiv = document.createElement('div');
+                    citaDiv.className = 'info-item';
+                    citaDiv.style.marginTop = '8px';
+                    citaDiv.innerHTML = '<span class="info-label">Próxima Cita</span><span class="info-value highlight">' + proximaCitaMatch[1].trim() + '</span>';
+                    planCard.appendChild(citaDiv);
+                }
+                
+                simplified.appendChild(planCard);
+            }
+        }
+        
+        // Buscar observaciones
+        var observacionesInfo = null;
+        for (var i = 0; i < allDivs.length; i++) {
+            if (allDivs[i].textContent && allDivs[i].textContent.includes('Observaciones')) {
+                observacionesInfo = allDivs[i];
+                break;
+            }
+        }
+        
+        if (observacionesInfo) {
+            var htmlContent = observacionesInfo.innerHTML;
+            var observacionesMatch = htmlContent.match(/<p[^>]*>([^<]+)<\/p>/);
+            if (observacionesMatch && observacionesMatch[1].trim()) {
+                var observacionesCard = document.createElement('div');
+                observacionesCard.className = 'info-card';
+                observacionesCard.innerHTML = '<h3><i class="fas fa-comment"></i> Observaciones</h3>';
+                var observacionesDiv = document.createElement('div');
+                observacionesDiv.className = 'text-content';
+                observacionesDiv.textContent = observacionesMatch[1].trim();
+                observacionesCard.appendChild(observacionesDiv);
+                simplified.appendChild(observacionesCard);
+            }
+        }
+        
+        return simplified.innerHTML;
+    }
+
+    links.forEach(function(a){
+        a.addEventListener('click', function(ev){
+            ev.preventDefault();
+            openModal();
+            fetch(a.dataset.url, {credentials:'same-origin'})
+                .then(function(res){ return res.text(); })
+                .then(function(html){ content.innerHTML = sanitize(html); })
+                .catch(function(){ content.innerHTML = '<div style="color:#b91c1c;">No se pudo cargar la vista previa.</div>'; });
+        });
+    });
+
+    // Clic en backdrop deshabilitado para evitar pérdida de datos
+    // backdrop.addEventListener('click', closeModal);
+    closeBtn.addEventListener('click', closeModal);
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
+});
+</script>
+
+{% endblock %}

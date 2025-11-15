@@ -1,0 +1,336 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Cambiar Contraseña - Clínica Dental{% endblock %}
+
+{% block page_title %}🔒 Cambiar Contraseña{% endblock %}
+{% block page_subtitle %}{{ personal.nombre_completo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <a href="{% url 'editar_personal' personal.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver a Detalles
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="password-card">
+                <div class="card-header">
+                    <i class="fas fa-lock"></i>
+                    <h3>Cambiar Contraseña</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Importante:</strong> La nueva contraseña debe tener al menos 8 caracteres.
+                    </div>
+
+                    <form method="POST" id="passwordForm">
+                        {% csrf_token %}
+                        
+                        <div class="form-group">
+                            <label for="nueva_contrasena">
+                                <i class="fas fa-key"></i> Nueva Contraseña
+                            </label>
+                            <input 
+                                type="password" 
+                                class="form-control" 
+                                id="nueva_contrasena" 
+                                name="nueva_contrasena" 
+                                required 
+                                minlength="8"
+                                placeholder="Ingrese la nueva contraseña"
+                            >
+                            <small class="form-text">Mínimo 8 caracteres</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="confirmar_contrasena">
+                                <i class="fas fa-check-circle"></i> Confirmar Contraseña
+                            </label>
+                            <input 
+                                type="password" 
+                                class="form-control" 
+                                id="confirmar_contrasena" 
+                                name="confirmar_contrasena" 
+                                required 
+                                minlength="8"
+                                placeholder="Confirme la nueva contraseña"
+                            >
+                            <small class="form-text">Debe coincidir con la nueva contraseña</small>
+                        </div>
+
+                        <div class="password-strength" id="passwordStrength" style="display: none;">
+                            <div class="strength-bar">
+                                <div class="strength-fill" id="strengthFill"></div>
+                            </div>
+                            <span class="strength-text" id="strengthText"></span>
+                        </div>
+
+                        <div class="form-actions">
+                            <a href="{% url 'editar_personal' personal.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Cambiar Contraseña
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.password-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.card-header i {
+    font-size: 1.5rem;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 32px;
+}
+
+.alert {
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.alert-info {
+    background: #eff6ff;
+    color: #1e40af;
+    border-left: 4px solid #3b82f6;
+}
+
+.alert i {
+    font-size: 1.2rem;
+    margin-top: 2px;
+}
+
+.form-group {
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-group label i {
+    color: #f59e0b;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.password-strength {
+    margin-bottom: 24px;
+}
+
+.strength-bar {
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.strength-fill {
+    height: 100%;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+}
+
+.strength-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 24px;
+    border-top: 2px solid #e5e7eb;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #d97706;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordInput = document.getElementById('nueva_contrasena');
+    const confirmInput = document.getElementById('confirmar_contrasena');
+    const strengthIndicator = document.getElementById('passwordStrength');
+    const strengthFill = document.getElementById('strengthFill');
+    const strengthText = document.getElementById('strengthText');
+    const form = document.getElementById('passwordForm');
+
+    // Verificar fortaleza de contraseña
+    passwordInput.addEventListener('input', function() {
+        const password = this.value;
+        if (password.length > 0) {
+            strengthIndicator.style.display = 'block';
+            const strength = calculatePasswordStrength(password);
+            updateStrengthIndicator(strength);
+        } else {
+            strengthIndicator.style.display = 'none';
+        }
+    });
+
+    function calculatePasswordStrength(password) {
+        let strength = 0;
+        
+        if (password.length >= 8) strength += 25;
+        if (password.length >= 12) strength += 25;
+        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 25;
+        if (/\d/.test(password)) strength += 15;
+        if (/[^a-zA-Z\d]/.test(password)) strength += 10;
+        
+        return Math.min(strength, 100);
+    }
+
+    function updateStrengthIndicator(strength) {
+        let color, text;
+        
+        if (strength < 40) {
+            color = '#ef4444';
+            text = 'Débil';
+        } else if (strength < 70) {
+            color = '#f59e0b';
+            text = 'Media';
+        } else {
+            color = '#10b981';
+            text = 'Fuerte';
+        }
+        
+        strengthFill.style.width = strength + '%';
+        strengthFill.style.background = color;
+        strengthText.textContent = text;
+        strengthText.style.color = color;
+    }
+
+    // Validar formulario
+    form.addEventListener('submit', function(e) {
+        const password = passwordInput.value;
+        const confirm = confirmInput.value;
+        
+        if (password !== confirm) {
+            e.preventDefault();
+            alert('Las contraseñas no coinciden. Por favor verifica e intenta nuevamente.');
+            confirmInput.focus();
+            return false;
+        }
+        
+        if (password.length < 8) {
+            e.preventDefault();
+            alert('La contraseña debe tener al menos 8 caracteres.');
+            passwordInput.focus();
+            return false;
+        }
+        
+        return true;
+    });
+});
+</script>
+{% endblock %}
+

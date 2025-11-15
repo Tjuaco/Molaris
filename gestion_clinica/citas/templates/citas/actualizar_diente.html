@@ -1,0 +1,104 @@
+{% extends 'citas/base.html' %}
+
+{% block page_title %}<i class="fas fa-tooth"></i> Actualizar Diente {{ numero_diente }}{% endblock %}
+{% block page_subtitle %}Modifica el estado del diente {{ numero_diente }} en el odontograma de {{ odontograma.paciente_nombre }}{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2><i class="fas fa-tooth"></i> Diente {{ numero_diente }}</h2>
+    
+    <form method="POST" style="max-width: 600px;">
+        {% csrf_token %}
+        
+        <!-- Información del Diente -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+                <i class="fas fa-tooth"></i> Estado del Diente {{ numero_diente }}
+            </h3>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Estado del Diente *</label>
+                <select name="estado" required style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    {% for value, label in estados_diente %}
+                    <option value="{{ value }}" {% if estado_diente and estado_diente.estado == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Observaciones del Diente</label>
+                <textarea name="observaciones" rows="3" placeholder="Observaciones específicas sobre este diente..."
+                          style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; resize: vertical;">{% if estado_diente %}{{ estado_diente.observaciones|default:'' }}{% endif %}</textarea>
+            </div>
+        </div>
+        
+        <!-- Información de Tratamiento -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+                <i class="fas fa-tools"></i> Información de Tratamiento
+            </h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Fecha de Tratamiento</label>
+                    <input type="date" name="fecha_tratamiento" 
+                           value="{% if estado_diente and estado_diente.fecha_tratamiento %}{{ estado_diente.fecha_tratamiento|date:'Y-m-d' }}{% endif %}"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Costo del Tratamiento</label>
+                    <input type="number" name="costo_tratamiento" step="0.01" min="0"
+                           value="{% if estado_diente and estado_diente.costo_tratamiento %}{{ estado_diente.costo_tratamiento }}{% endif %}"
+                           placeholder="0.00" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información del Paciente -->
+        <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+            <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 1rem; font-weight: 600;">
+                <i class="fas fa-user"></i> Paciente: {{ odontograma.paciente_nombre }}
+            </h4>
+            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">
+                <strong>Email:</strong> {{ odontograma.paciente_email }}
+                {% if odontograma.paciente_telefono %}
+                    | <strong>Teléfono:</strong> {{ odontograma.paciente_telefono }}
+                {% endif %}
+            </p>
+        </div>
+        
+        <!-- Estados de Dientes Actuales -->
+        {% if odontograma.dientes.all %}
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+                <i class="fas fa-list"></i> Otros Dientes Registrados
+            </h3>
+            
+            <div style="display: grid; gap: 8px;">
+                {% for diente in odontograma.dientes.all %}
+                    {% if diente.numero_diente != numero_diente %}
+                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 0.875rem;">
+                        <strong>Diente {{ diente.numero_diente }}:</strong> {{ diente.get_estado_display }}
+                        {% if diente.observaciones %}
+                            - {{ diente.observaciones|truncatechars:50 }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Botones -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <a href="{% url 'detalle_odontograma' odontograma.id %}" class="btn" style="background: #6b7280; color: white;">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-save"></i> Guardar Estado
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

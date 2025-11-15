@@ -1,0 +1,710 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Dashboard & Reportes - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-chart-line"></i> Dashboard & Reportes{% endblock %}
+{% block page_subtitle %}Estadísticas, gráficos y exportación de datos{% endblock %}
+
+{% block content %}
+<!-- Estadísticas y Exportación -->
+<div class="dashboard-top-grid">
+    <!-- Estadísticas Principales -->
+    <div class="stats-compact-section">
+        <h2><i class="fas fa-tachometer-alt"></i> Estadísticas Generales</h2>
+        <div class="stats-compact-grid">
+            <div class="stat-compact blue">
+                <i class="fas fa-calendar-check"></i>
+                <div>
+                    <h3>{{ total_citas }}</h3>
+                    <p>Citas <span>{{ citas_mes }} este mes</span></p>
+                </div>
+            </div>
+
+            <div class="stat-compact green">
+                <i class="fas fa-users"></i>
+                <div>
+                    <h3>{{ total_clientes }}</h3>
+                    <p>Clientes <span>{{ clientes_nuevos_mes }} nuevos</span></p>
+                </div>
+            </div>
+
+            <div class="stat-compact purple">
+                <i class="fas fa-user-md"></i>
+                <div>
+                    <h3>{{ total_personal }}</h3>
+                    <p>Personal Activo</p>
+                </div>
+            </div>
+
+            <div class="stat-compact orange">
+                <i class="fas fa-boxes"></i>
+                <div>
+                    <h3>{{ total_insumos }}</h3>
+                    <p>Insumos <span class="warning">{{ insumos_bajo_stock }} bajo</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exportación de Datos -->
+    <div class="export-compact-section">
+        <h2><i class="fas fa-file-excel"></i> Exportar Datos a Excel</h2>
+        <div class="export-compact-grid">
+            <a href="{% url 'exportar_excel_citas' %}" class="export-compact-btn blue">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Citas</span>
+                <i class="fas fa-download"></i>
+            </a>
+
+            <a href="{% url 'exportar_excel_clientes' %}" class="export-compact-btn green">
+                <i class="fas fa-users"></i>
+                <span>Clientes</span>
+                <i class="fas fa-download"></i>
+            </a>
+
+            <a href="{% url 'exportar_excel_insumos' %}" class="export-compact-btn orange">
+                <i class="fas fa-boxes"></i>
+                <span>Insumos</span>
+                <i class="fas fa-download"></i>
+            </a>
+
+            <a href="{% url 'exportar_excel_finanzas' %}" class="export-compact-btn purple">
+                <i class="fas fa-chart-pie"></i>
+                <span>Finanzas</span>
+                <i class="fas fa-download"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos -->
+<div class="charts-grid">
+    <!-- Gráfico de Citas por Estado -->
+    <div class="section chart-container">
+        <h2><i class="fas fa-chart-pie"></i> Citas por Estado</h2>
+        <canvas id="citasEstadoChart"></canvas>
+        <div class="chart-legend">
+            <div class="legend-item">
+                <span class="legend-color" style="background: #3b82f6;"></span>
+                <span>Disponibles: {{ citas_disponibles }}</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #10b981;"></span>
+                <span>Reservadas: {{ citas_reservadas }}</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #8b5cf6;"></span>
+                <span>Completadas: {{ citas_completadas }}</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #ef4444;"></span>
+                <span>Canceladas: {{ citas_canceladas }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de Tipos de Consulta -->
+    <div class="section chart-container">
+        <h2><i class="fas fa-tooth"></i> Tipos de Consulta Más Frecuentes</h2>
+        <canvas id="tiposConsultaChart"></canvas>
+    </div>
+</div>
+
+<!-- Gráficos de Tendencias -->
+<div class="section">
+    <h2><i class="fas fa-chart-line"></i> Tendencias de Citas</h2>
+    <div class="charts-row">
+        <div class="chart-half">
+            <h3>Citas por Día de la Semana</h3>
+            <canvas id="citasDiaChart"></canvas>
+        </div>
+        <div class="chart-half">
+            <h3>Citas por Mes (Últimos 6 meses)</h3>
+            <canvas id="citasMesChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Dentistas Más Activos -->
+<div class="section">
+    <h2><i class="fas fa-star"></i> Dentistas Más Activos</h2>
+    <div class="dentistas-ranking">
+        {% for dentista in dentistas_activos %}
+        <div class="ranking-item">
+            <div class="rank-number">{{ forloop.counter }}</div>
+            <div class="dentista-avatar-small">
+                {{ dentista.nombre_completo|first|upper }}
+            </div>
+            <div class="dentista-info-ranking">
+                <h4>{{ dentista.nombre_completo }}</h4>
+                <p>{{ dentista.especialidad|default:"Odontología General" }}</p>
+            </div>
+            <div class="dentista-stats">
+                <div class="stat-badge">
+                    <i class="fas fa-calendar-check"></i>
+                    {{ dentista.num_citas }} citas
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Dashboard Top Grid - Unifica Estadísticas y Exportación */
+    .dashboard-top-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+
+    .stats-compact-section h2,
+    .export-compact-section h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .stats-compact-section h2 i,
+    .export-compact-section h2 i {
+        font-size: 0.875rem;
+        color: #3b82f6;
+    }
+
+    /* Estadísticas Compactas */
+    .stats-compact-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .stat-compact {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-compact::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: currentColor;
+    }
+
+    .stat-compact:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-compact.blue { color: #3b82f6; }
+    .stat-compact.green { color: #10b981; }
+    .stat-compact.purple { color: #8b5cf6; }
+    .stat-compact.orange { color: #f59e0b; }
+
+    .stat-compact > i {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        background: currentColor;
+        color: white;
+        flex-shrink: 0;
+    }
+
+    .stat-compact > div {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .stat-compact h3 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 2px 0;
+        line-height: 1;
+    }
+
+    .stat-compact p {
+        color: #64748b;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .stat-compact span {
+        color: #94a3b8;
+        font-size: 0.7rem;
+        display: block;
+        margin-top: 2px;
+    }
+
+    .stat-compact span.warning {
+        color: #f59e0b;
+        font-weight: 600;
+    }
+
+    /* Exportación Compacta */
+    .export-compact-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .export-compact-btn {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .export-compact-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 3px;
+        background: currentColor;
+    }
+
+    .export-compact-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: currentColor;
+    }
+
+    .export-compact-btn.blue { color: #3b82f6; }
+    .export-compact-btn.green { color: #10b981; }
+    .export-compact-btn.orange { color: #f59e0b; }
+    .export-compact-btn.purple { color: #8b5cf6; }
+
+    .export-compact-btn > i:first-child {
+        font-size: 1rem;
+    }
+
+    .export-compact-btn > span {
+        flex: 1;
+        text-align: left;
+    }
+
+    .export-compact-btn > i:last-child {
+        font-size: 0.875rem;
+        opacity: 0.5;
+        transition: all 0.3s ease;
+    }
+
+    .export-compact-btn:hover > i:last-child {
+        opacity: 1;
+        transform: translateX(2px);
+    }
+
+    /* Charts */
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+
+    .chart-container {
+        position: relative;
+        min-height: 350px;
+    }
+
+    .chart-legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+
+    .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+    }
+
+    .charts-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 40px;
+    }
+
+    .chart-half h3 {
+        color: #1e293b;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+    }
+
+    /* Dentistas Ranking */
+    .dentistas-ranking {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .ranking-item {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all 0.3s ease;
+    }
+
+    .ranking-item:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        transform: translateX(4px);
+    }
+
+    .rank-number {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .dentista-avatar-small {
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .dentista-info-ranking {
+        flex: 1;
+    }
+
+    .dentista-info-ranking h4 {
+        color: #1e293b;
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+    }
+
+    .dentista-info-ranking p {
+        color: #64748b;
+        font-size: 0.875rem;
+        margin: 0;
+    }
+
+    .dentista-stats {
+        display: flex;
+        gap: 12px;
+    }
+
+    .stat-badge {
+        background: #eff6ff;
+        color: #3b82f6;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .dashboard-top-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .export-compact-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-compact-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .export-compact-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .charts-grid,
+        .charts-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .export-compact-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// Configuración global de Chart.js
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#64748b';
+
+// Gráfico de Citas por Estado (Donut)
+const ctx1 = document.getElementById('citasEstadoChart').getContext('2d');
+new Chart(ctx1, {
+    type: 'doughnut',
+    data: {
+        labels: ['Disponibles', 'Reservadas', 'Completadas', 'Canceladas'],
+        datasets: [{
+            data: [
+                {{ citas_disponibles }},
+                {{ citas_reservadas }},
+                {{ citas_completadas }},
+                {{ citas_canceladas }}
+            ],
+            backgroundColor: [
+                '#3b82f6',
+                '#10b981',
+                '#8b5cf6',
+                '#ef4444'
+            ],
+            borderWidth: 0,
+            hoverOffset: 10
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: '#1e293b',
+                padding: 12,
+                titleFont: { size: 14, weight: '600' },
+                bodyFont: { size: 13 },
+                cornerRadius: 8
+            }
+        },
+        cutout: '70%'
+    }
+});
+
+// Gráfico de Tipos de Consulta (Horizontal Bar)
+const ctx2 = document.getElementById('tiposConsultaChart').getContext('2d');
+new Chart(ctx2, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for tipo in tipos_consulta %}
+                '{{ tipo.tipo_consulta }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Cantidad',
+            data: [
+                {% for tipo in tipos_consulta %}
+                    {{ tipo.total }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#3b82f6',
+                '#10b981',
+                '#f59e0b',
+                '#8b5cf6',
+                '#06b6d4'
+            ],
+            borderRadius: 8,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: '#1e293b',
+                padding: 12,
+                cornerRadius: 8
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                grid: {
+                    display: false
+                }
+            },
+            y: {
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Citas por Día de la Semana
+const ctx3 = document.getElementById('citasDiaChart').getContext('2d');
+new Chart(ctx3, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for dia in citas_por_dia %}
+                '{{ dia.dia }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Citas',
+            data: [
+                {% for dia in citas_por_dia %}
+                    {{ dia.total }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: '#3b82f6',
+            borderRadius: 8,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: '#f1f5f9'
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Citas por Mes (Line)
+const ctx4 = document.getElementById('citasMesChart').getContext('2d');
+new Chart(ctx4, {
+    type: 'line',
+    data: {
+        labels: [
+            {% for mes in citas_por_mes %}
+                '{{ mes.mes }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Citas',
+            data: [
+                {% for mes in citas_por_mes %}
+                    {{ mes.total }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: '#f1f5f9'
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
+

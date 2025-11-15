@@ -1,0 +1,63 @@
+{% extends 'citas/base.html' %}
+
+{% block page_title %}<i class="fas fa-trash"></i> Eliminar Odontograma{% endblock %}
+{% block page_subtitle %}Confirma la eliminación del odontograma{% endblock %}
+
+{% block content %}
+<div class="section">
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 16px 0; color: #dc2626; font-size: 1.25rem; font-weight: 600;">
+            <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
+        </h2>
+        
+        <p style="margin: 0 0 16px 0; color: #374151; font-size: 1rem;">
+            ¿Estás seguro de que deseas eliminar el odontograma de <strong>{{ odontograma.paciente_nombre }}</strong>?
+        </p>
+        
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+            <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 0.875rem; font-weight: 600;">Información del Odontograma:</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.875rem; color: #64748b;">
+                <div>
+                    <strong>Paciente:</strong> {{ odontograma.paciente_nombre }}
+                </div>
+                <div>
+                    <strong>Email:</strong> {{ odontograma.paciente_email }}
+                </div>
+                <div>
+                    <strong>Creado:</strong> {{ odontograma.fecha_creacion|date:"d/m/Y H:i" }}
+                </div>
+                <div>
+                    <strong>Última actualización:</strong> {{ odontograma.fecha_actualizacion|date:"d/m/Y H:i" }}
+                </div>
+            </div>
+        </div>
+        
+        <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 12px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; color: #92400e; font-size: 0.875rem;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Advertencia:</strong> Esta acción no se puede deshacer. Se eliminarán todos los datos del odontograma incluyendo:
+            </div>
+            <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #92400e; font-size: 0.875rem;">
+                <li>Información del paciente</li>
+                <li>Estados de todos los dientes</li>
+                <li>Historial de tratamientos</li>
+                <li>Observaciones y notas</li>
+            </ul>
+        </div>
+    </div>
+    
+    <form method="POST" style="max-width: 600px;">
+        {% csrf_token %}
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <a href="{% url 'detalle_odontograma' odontograma.id %}" class="btn" style="background: #6b7280; color: white;">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás completamente seguro de que deseas eliminar este odontograma? Esta acción no se puede deshacer.')">
+                <i class="fas fa-trash"></i> Eliminar Definitivamente
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

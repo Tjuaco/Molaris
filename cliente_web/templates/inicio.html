@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clínica Dental - Sistema de Reservas Online</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.8rem;
+        }
+
+        .logo-text h1 {
+            color: #333;
+            font-size: 1.8rem;
+            margin: 0;
+        }
+
+        .logo-text p {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #3b82f6;
+            border: 2px solid #667eea;
+            padding: 10px 22px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+            color: white;
+        }
+
+        .hero h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            margin-bottom: 40px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            opacity: 0.95;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-hero {
+            padding: 16px 32px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-hero.primary {
+            background: white;
+            color: #3b82f6;
+        }
+
+        .btn-hero.primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-hero.secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-hero.secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 80px 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-title h3 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .section-title p {
+            font-size: 1.2rem;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border: 1px solid #f0f0f0;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            margin: 0 auto 25px;
+        }
+
+        .feature-card h4 {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: #666;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        /* How It Works */
+        .how-it-works {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+        }
+
+        .step {
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0 auto 20px;
+        }
+
+        .step h4 {
+            font-size: 1.3rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .step p {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        /* CTA Section */
+        .cta {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            text-align: center;
+            color: white;
+        }
+
+        .cta h3 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        .cta p {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.95;
+        }
+
+        /* Footer */
+        .footer {
+            background: #333;
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+        }
+
+        .footer p {
+            margin: 0;
+            opacity: 0.8;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .nav-buttons {
+                justify-content: center;
+            }
+
+            .hero h2 {
+                font-size: 2.2rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn-hero {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+
+            .section-title h3 {
+                font-size: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .steps {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 15px;
+            }
+
+            .hero {
+                padding: 60px 0;
+            }
+
+            .hero h2 {
+                font-size: 1.8rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .features {
+                padding: 60px 0;
+            }
+
+            .section-title h3 {
+                font-size: 1.8rem;
+            }
+
+            .feature-card {
+                padding: 30px 20px;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .feature-card, .step {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .feature-card:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .feature-card:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        .step:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .step:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        .step:nth-child(4) {
+            animation-delay: 0.6s;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="{% url 'inicio' %}" class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-tooth"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>Clínica Dental</h1>
+                        <p>Sistema de Reservas Online</p>
+                    </div>
+                </a>
+                <div class="nav-buttons">
+                    <a href="{% url 'login_cliente' %}" class="btn-primary">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Iniciar Sesión
+                    </a>
+                    <a href="{% url 'registro_cliente' %}" class="btn-secondary">
+                        <i class="fas fa-user-plus"></i>
+                        Registrarse
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h2>Reserva tu cita dental de manera remota</h2>
+            <p>Accede a nuestro sistema online para ver horarios disponibles y agendar tu atención dental desde la comodidad de tu casa. Sin llamadas, sin esperas, todo en tiempo real.</p>
+            <div class="hero-buttons">
+                <a href="{% url 'registro_cliente' %}" class="btn-hero primary">
+                    <i class="fas fa-calendar-plus"></i>
+                    Crear Cuenta
+                </a>
+                <a href="{% url 'login_cliente' %}" class="btn-hero secondary">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Ya tengo cuenta
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <div class="section-title">
+                <h3>¿Por qué usar nuestro sistema?</h3>
+                <p>Descubre las ventajas de reservar tus citas de manera online</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h4>24/7 Disponible</h4>
+                    <p>Reserva tu cita en cualquier momento del día o la noche, sin importar la hora. Nuestro sistema está siempre disponible para ti.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4>Acceso desde cualquier dispositivo</h4>
+                    <p>Usa tu computadora, tablet o smartphone. Nuestro sistema se adapta perfectamente a cualquier tamaño de pantalla.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h4>Gestión completa de citas</h4>
+                    <p>Reserva, modifica o cancela tus citas con un solo clic. Mantén el control total de tu agenda dental.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+        <div class="container">
+            <div class="section-title">
+                <h3>¿Cómo funciona?</h3>
+                <p>Proceso simple y rápido para reservar tu cita</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h4>Crear Cuenta</h4>
+                    <p>Regístrate en nuestro sistema con tu información básica. El proceso toma menos de 2 minutos.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h4>Ver Horarios</h4>
+                    <p>Accede a tu panel personal y visualiza todos los horarios disponibles para atención dental.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h4>Reservar Cita</h4>
+                    <p>Selecciona el horario que mejor te convenga y confirma tu reserva con un solo clic.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h4>Confirmación</h4>
+                    <p>Recibe confirmación inmediata de tu cita. Puedes modificar o cancelar hasta 24h antes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <h3>¿Listo para empezar?</h3>
+            <p>Únete a cientos de pacientes que ya disfrutan de la comodidad de reservar sus citas online</p>
+            <div class="hero-buttons">
+                <a href="{% url 'registro_cliente' %}" class="btn-hero primary">
+                    <i class="fas fa-calendar-plus"></i>
+                    Crear mi cuenta ahora
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Clínica Dental - Sistema de Reservas Online. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+</body>
+</html>

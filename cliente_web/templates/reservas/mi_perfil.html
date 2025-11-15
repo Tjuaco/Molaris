@@ -1,0 +1,442 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Perfil - Clínica Dental</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: #3b82f6;
+            border: 2px solid white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-btn:hover {
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.3);
+        }
+
+        .profile-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .profile-header {
+            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            background: white;
+            color: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 0 auto 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+
+        .profile-header h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .profile-header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .profile-content {
+            padding: 40px;
+        }
+
+        .info-section {
+            margin-bottom: 30px;
+        }
+
+        .info-section h3 {
+            color: #1e293b;
+            font-size: 1.25rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .info-section h3 i {
+            color: #3b82f6;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .info-label {
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-value {
+            color: #1e293b;
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .status-badge.verified {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-badge.not-verified {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #64748b;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .profile-header {
+                padding: 30px 20px;
+            }
+
+            .profile-content {
+                padding: 25px 20px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="{% url 'panel_cliente' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i>
+            Volver al Panel
+        </a>
+
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    {% if perfil and perfil.nombre_completo %}
+                        {{ perfil.nombre_completo|first|upper }}
+                    {% elif user.first_name or user.last_name %}
+                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                    {% elif user.email %}
+                        {{ user.email|first|upper }}
+                    {% else %}
+                        {{ user.username|first|upper }}
+                    {% endif %}
+                </div>
+                <h1>
+                    {% if perfil and perfil.nombre_completo %}
+                        {{ perfil.nombre_completo }}
+                    {% elif user.first_name or user.last_name %}
+                        {{ user.first_name }} {{ user.last_name }}
+                    {% elif user.email %}
+                        {{ user.email }}
+                    {% else %}
+                        {{ user.username }}
+                    {% endif %}
+                </h1>
+                <p>Cliente de Clínica Dental</p>
+            </div>
+
+            <div class="profile-content">
+                <div class="info-section">
+                    <h3>
+                        <i class="fas fa-user-circle"></i>
+                        Información Personal
+                    </h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-signature"></i>
+                                Nombre Completo
+                            </div>
+                            <div class="info-value">
+                                {% if perfil and perfil.nombre_completo %}
+                                    {{ perfil.nombre_completo }}
+                                {% elif user.first_name or user.last_name %}
+                                    {{ user.first_name }} {{ user.last_name }}
+                                {% else %}
+                                    No especificado
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-user"></i>
+                                Nombre de Usuario
+                            </div>
+                            <div class="info-value">{{ user.username }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>
+                        <i class="fas fa-envelope"></i>
+                        Información de Contacto
+                    </h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-at"></i>
+                                Email
+                            </div>
+                            <div class="info-value">
+                                {% if perfil and perfil.email %}
+                                    {{ perfil.email }}
+                                {% elif user.email %}
+                                    {{ user.email }}
+                                {% else %}
+                                    No especificado
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-phone"></i>
+                                Teléfono
+                            </div>
+                            <div class="info-value">
+                                {% if perfil and perfil.telefono %}
+                                    {{ perfil.telefono }}
+                                    {% if perfil.telefono_verificado %}
+                                        <span class="status-badge verified">
+                                            <i class="fas fa-check-circle"></i>
+                                            Verificado
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge not-verified">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            No verificado
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: #94a3b8; font-style: italic;">No especificado</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>
+                        <i class="fas fa-id-card"></i>
+                        Información de Identificación
+                    </h3>
+                    <div class="info-grid">
+                        {% if perfil and perfil.rut %}
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-fingerprint"></i>
+                                RUT
+                            </div>
+                            <div class="info-value">
+                                {{ perfil.rut }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if perfil and perfil.fecha_nacimiento %}
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-birthday-cake"></i>
+                                Fecha de Nacimiento
+                            </div>
+                            <div class="info-value">
+                                {{ perfil.fecha_nacimiento|date:"d/m/Y" }}
+                                {% if perfil.edad %}
+                                    <span style="color: #64748b; font-size: 0.9rem;">({{ perfil.edad }} años)</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if perfil and perfil.alergias %}
+                <div class="info-section">
+                    <h3>
+                        <i class="fas fa-exclamation-triangle" style="color: #dc2626;"></i>
+                        Información Médica Importante
+                    </h3>
+                    <div class="info-grid">
+                        <div class="info-item" style="grid-column: 1 / -1; background: #fef2f2; border-left: 4px solid #dc2626;">
+                            <div class="info-label" style="color: #dc2626;">
+                                <i class="fas fa-allergies"></i>
+                                Alergias Conocidas
+                            </div>
+                            <div class="info-value" style="color: #991b1b; white-space: pre-wrap;">
+                                {{ perfil.alergias }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="info-section">
+                    <h3>
+                        <i class="fas fa-calendar-check"></i>
+                        Estadísticas de Citas
+                    </h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-calendar-alt"></i>
+                                Total de Citas
+                            </div>
+                            <div class="info-value">{{ citas_totales|default:0 }}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-clock"></i>
+                                Citas Activas
+                            </div>
+                            <div class="info-value">{{ citas_reservadas|default:0 }}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">
+                                <i class="fas fa-check-circle"></i>
+                                Citas Completadas
+                            </div>
+                            <div class="info-value">{{ citas_completadas|default:0 }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <a href="{% url 'panel_cliente' %}" class="btn btn-primary">
+                        <i class="fas fa-calendar"></i>
+                        Ver Mis Citas
+                    </a>
+                    <a href="{% url 'historial_citas' %}" class="btn btn-secondary">
+                        <i class="fas fa-history"></i>
+                        Ver Historial
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+

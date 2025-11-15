@@ -1,0 +1,56 @@
+# Generated manually
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('citas', '0016_alter_cita_options_cita_notas_paciente_and_more'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='Mensaje',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('tipo', models.CharField(choices=[('general', 'Mensaje General'), ('odontograma', 'Envío de Odontograma'), ('cita', 'Información de Cita'), ('urgente', 'Urgente')], default='general', max_length=20, verbose_name='Tipo de Mensaje')),
+                ('asunto', models.CharField(max_length=200, verbose_name='Asunto')),
+                ('mensaje', models.TextField(verbose_name='Mensaje')),
+                ('estado', models.CharField(choices=[('no_leido', 'No Leído'), ('leido', 'Leído'), ('archivado', 'Archivado')], default='no_leido', max_length=20, verbose_name='Estado')),
+                ('fecha_envio', models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Envío')),
+                ('fecha_lectura', models.DateTimeField(blank=True, null=True, verbose_name='Fecha de Lectura')),
+                ('cliente', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='mensajes', to='citas.cliente', verbose_name='Cliente Relacionado')),
+                ('destinatario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='mensajes_recibidos', to='citas.perfil', verbose_name='Destinatario')),
+                ('odontograma', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='mensajes', to='citas.odontograma', verbose_name='Odontograma Adjunto')),
+                ('remitente', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='mensajes_enviados', to='citas.perfil', verbose_name='Remitente')),
+            ],
+            options={
+                'verbose_name': 'Mensaje',
+                'verbose_name_plural': 'Mensajes',
+                'ordering': ['-fecha_envio'],
+                'indexes': [
+                    models.Index(fields=['-fecha_envio'], name='citas_mensa_fecha_e_d0e5f5_idx'),
+                    models.Index(fields=['destinatario', 'estado'], name='citas_mensa_destina_a34c9a_idx'),
+                ],
+            },
+        ),
+    ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

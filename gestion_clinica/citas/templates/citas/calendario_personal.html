@@ -1,0 +1,712 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Mi Calendario - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-calendar-alt"></i> Mi Calendario Personal{% endblock %}
+{% block page_subtitle %}Gestiona tu agenda y toma citas disponibles{% endblock %}
+
+{% block content %}
+<!-- Estadísticas Personales -->
+<div class="section">
+    <h2><i class="fas fa-chart-pie"></i> Mis Estadísticas</h2>
+    <div class="stats stats-horizontal">
+        <div class="stat-box">
+            <h3>{{ estadisticas.citas_hoy }}</h3>
+            <p>Citas Hoy</p>
+        </div>
+        <div class="stat-box">
+            <h3>{{ estadisticas.citas_semana }}</h3>
+            <p>Esta Semana</p>
+        </div>
+        <div class="stat-box">
+            <h3>{{ estadisticas.citas_pendientes }}</h3>
+            <p>Pendientes</p>
+        </div>
+        <div class="stat-box">
+            <h3>{{ estadisticas.citas_completadas_mes }}</h3>
+            <p>Completadas (Mes)</p>
+        </div>
+    </div>
+</div>
+
+<!-- Layout Principal Estilo Despegar -->
+<div class="layout-container">
+    <div class="despegar-layout">
+    <!-- Sidebar Izquierdo - Citas Disponibles -->
+    <div class="sidebar-citas">
+        <div class="sidebar-header">
+            <h2><i class="fas fa-calendar-plus"></i> Citas Disponibles</h2>
+        </div>
+        
+        <div class="search-form">
+            <!-- Filtros de búsqueda -->
+            <div class="form-section">
+                <label class="section-label">FILTRAR CITAS</label>
+                <div class="form-info">
+                    <p>Buscar citas disponibles para tomar</p>
+                </div>
+            </div>
+
+            <!-- Fecha -->
+            <div class="form-section">
+                <label class="section-label">FECHA</label>
+                <div class="date-input">
+                    <i class="fas fa-calendar"></i>
+                    <input type="date" id="fecha-filtro" value="{{ fecha_actual|date:'Y-m-d' }}">
+                </div>
+            </div>
+
+            <!-- Hora -->
+            <div class="form-section">
+                <label class="section-label">HORA</label>
+                <div class="select-wrapper">
+                    <select id="hora-filtro" class="custom-select">
+                        <option value="">Todas las horas</option>
+                        <option value="08:00">08:00</option>
+                        <option value="09:00">09:00</option>
+                        <option value="10:00">10:00</option>
+                        <option value="11:00">11:00</option>
+                        <option value="12:00">12:00</option>
+                        <option value="14:00">14:00</option>
+                        <option value="15:00">15:00</option>
+                        <option value="16:00">16:00</option>
+                        <option value="17:00">17:00</option>
+                        <option value="18:00">18:00</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Botón de búsqueda -->
+            <button type="button" class="search-btn" onclick="filtrarCitas()">
+                <i class="fas fa-search"></i>
+                Buscar Citas
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="main-content-area">
+        <!-- Tabs de Resultados -->
+        <div class="results-tabs">
+            <button class="tab-btn active" data-tab="disponibles">Citas Disponibles</button>
+            <button class="tab-btn" data-tab="tomadas">Mis Citas</button>
+            <button class="tab-btn" data-tab="completadas">Completadas</button>
+        </div>
+
+        
+        <!-- Contenido: Citas Disponibles -->
+        <div id="tab-content-disponibles" class="citas-results">
+            {% for cita in citas_disponibles %}
+            <div class="cita-result-card disponible" data-cita-id="{{ cita.id }}">
+                <div class="cita-info">
+                    <div class="cita-fecha-hora">
+                        <div class="cita-fecha">
+                            <i class="fas fa-calendar"></i>
+                            {{ cita.fecha_hora|date:"d/m/Y" }}
+                        </div>
+                        <div class="cita-hora">
+                            <i class="fas fa-clock"></i>
+                            {{ cita.fecha_hora|time:"H:i" }}
+                        </div>
+                    </div>
+                    <div class="cita-tipo">
+                        <i class="fas fa-user"></i>
+                        Cliente: {{ cita.nombre_paciente }}
+                    </div>
+                </div>
+
+                <div class="cita-estado">
+                    <div class="estado-badge disponible">
+                        <i class="fas fa-circle"></i>
+                        Disponible
+                    </div>
+                </div>
+
+                <div class="cita-paciente">
+                    <div class="paciente-info">
+                        <i class="fas fa-phone"></i>
+                        <span>{{ cita.telefono_paciente|default:"Sin teléfono" }}</span>
+                    </div>
+                </div>
+
+                <div class="cita-actions">
+                    <button onclick="tomarCita({{ cita.id }})" class="action-btn success">
+                        <i class="fas fa-hand-paper"></i>
+                        Tomar Cita
+                    </button>
+                    <button onclick="verDetallesCita({{ cita.id }})" class="action-btn info">
+                        <i class="fas fa-eye"></i>
+                        Ver Detalles
+                    </button>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-results">
+                <i class="fas fa-calendar-times"></i>
+                <h3>No hay citas disponibles</h3>
+                <p>No se encontraron citas disponibles para los criterios seleccionados</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Contenido: Mis Citas -->
+        <div id="tab-content-tomadas" class="citas-results" style="display: none;">
+            {% for cita in mis_citas %}
+            <div class="cita-result-card tomada" data-cita-id="{{ cita.id }}">
+                <div class="cita-info">
+                    <div class="cita-fecha-hora">
+                        <div class="cita-fecha">
+                            <i class="fas fa-calendar"></i>
+                            {{ cita.fecha_hora|date:"d/m/Y" }}
+                        </div>
+                        <div class="cita-hora">
+                            <i class="fas fa-clock"></i>
+                            {{ cita.fecha_hora|time:"H:i" }}
+                        </div>
+                    </div>
+                    <div class="cita-tipo">
+                        <i class="fas fa-user"></i>
+                        Cliente: {{ cita.nombre_paciente }}
+                    </div>
+                </div>
+
+                <div class="cita-estado">
+                    <div class="estado-badge tomada">
+                        <i class="fas fa-circle"></i>
+                        {{ cita.get_estado_display }}
+                    </div>
+                </div>
+
+                <div class="cita-paciente">
+                    <div class="paciente-info">
+                        <i class="fas fa-phone"></i>
+                        <span>{{ cita.telefono_paciente|default:"Sin teléfono" }}</span>
+                    </div>
+                </div>
+
+                <div class="cita-actions">
+                    <button onclick="verDetallesCita({{ cita.id }})" class="action-btn info">
+                        <i class="fas fa-eye"></i>
+                        Ver Detalles
+                    </button>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Solo recepción puede completar citas
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-results">
+                <i class="fas fa-calendar-check"></i>
+                <h3>No tienes citas asignadas</h3>
+                <p>No tienes citas tomadas en este momento</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Contenido: Citas Completadas -->
+        <div id="tab-content-completadas" class="citas-results" style="display: none;">
+            {% for cita in citas_completadas %}
+            <div class="cita-result-card completada" data-cita-id="{{ cita.id }}">
+                <div class="cita-info">
+                    <div class="cita-fecha-hora">
+                        <div class="cita-fecha">
+                            <i class="fas fa-calendar"></i>
+                            {{ cita.fecha_hora|date:"d/m/Y" }}
+                        </div>
+                        <div class="cita-hora">
+                            <i class="fas fa-clock"></i>
+                            {{ cita.fecha_hora|time:"H:i" }}
+                        </div>
+                    </div>
+                    <div class="cita-tipo">
+                        <i class="fas fa-user"></i>
+                        Cliente: {{ cita.nombre_paciente }}
+                    </div>
+                </div>
+
+                <div class="cita-estado">
+                    <div class="estado-badge completada">
+                        <i class="fas fa-circle"></i>
+                        Completada
+                    </div>
+                </div>
+
+                <div class="cita-paciente">
+                    <div class="paciente-info">
+                        <i class="fas fa-phone"></i>
+                        <span>{{ cita.telefono_paciente|default:"Sin teléfono" }}</span>
+                    </div>
+                </div>
+
+                <div class="cita-actions">
+                    <button onclick="verDetallesCita({{ cita.id }})" class="action-btn info">
+                        <i class="fas fa-eye"></i>
+                        Ver Detalles
+                    </button>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-results">
+                <i class="fas fa-calendar-check"></i>
+                <h3>No hay citas completadas</h3>
+                <p>No tienes citas completadas aún</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Layout Container */
+.layout-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Layout Estilo Despegar */
+.despegar-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0;
+    min-height: calc(100vh - 140px);
+    background: #f8fafc;
+    width: 100%;
+    align-items: flex-start;
+}
+
+/* Sidebar Izquierdo - Estilo Despegar */
+.sidebar-citas {
+    width: 350px !important;
+    min-width: 350px !important;
+    max-width: 350px !important;
+    background: white;
+    border-right: 1px solid #e2e8f0;
+    padding: 24px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 140px);
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.sidebar-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-header h2 i {
+    color: #3b82f6;
+}
+
+/* Contenido Principal */
+.main-content-area {
+    flex: 1 !important;
+    background: white;
+    padding: 24px;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: calc(100% - 350px);
+    max-width: calc(100% - 350px);
+}
+
+/* Tabs de Resultados */
+.results-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-btn {
+    padding: 12px 24px;
+    border: none;
+    background: none;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: #3b82f6;
+}
+
+.tab-btn.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+/* Resultados de Citas */
+.citas-results {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cita-result-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cita-result-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.cita-result-card.disponible {
+    border-left: 4px solid #10b981;
+}
+
+.cita-result-card.tomada {
+    border-left: 4px solid #f59e0b;
+}
+
+.cita-result-card.completada {
+    border-left: 4px solid #6b7280;
+}
+
+/* Nueva estructura de citas */
+.cita-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cita-fecha-hora {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cita-fecha {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cita-fecha i {
+    color: #6b7280;
+    width: 16px;
+}
+
+.cita-hora {
+    font-size: 0.875rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cita-hora i {
+    color: #9ca3af;
+    width: 16px;
+}
+
+.cita-tipo {
+    font-size: 0.875rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cita-tipo i {
+    color: #9ca3af;
+    width: 16px;
+}
+
+.cita-estado {
+    display: flex;
+    align-items: center;
+}
+
+.estado-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.estado-badge.disponible {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.estado-badge.tomada {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.estado-badge.completada {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.estado-badge i {
+    font-size: 0.5rem;
+}
+
+.cita-paciente {
+    display: flex;
+    align-items: center;
+    min-width: 150px;
+    max-width: 200px;
+    flex-shrink: 1;
+}
+
+.paciente-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.paciente-info i {
+    color: #9ca3af;
+    width: 16px;
+}
+
+.cita-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.action-btn.primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.action-btn.primary:hover {
+    background: #2563eb;
+}
+
+.action-btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn.success:hover {
+    background: #059669;
+}
+
+.action-btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.action-btn.danger:hover {
+    background: #dc2626;
+}
+
+.action-btn.info {
+    background: #06b6d4;
+    color: white;
+}
+
+.action-btn.info:hover {
+    background: #0891b2;
+}
+
+.empty-results {
+    text-align: center;
+    padding: 48px 24px;
+    color: #6b7280;
+}
+
+.empty-results i {
+    font-size: 3rem;
+    color: #d1d5db;
+    margin-bottom: 16px;
+}
+
+.empty-results h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+}
+
+.empty-results p {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .despegar-layout {
+        flex-direction: column;
+    }
+    
+    .sidebar-citas {
+        width: 100% !important;
+        min-width: auto !important;
+        max-width: none !important;
+        position: static;
+        height: auto;
+        max-height: none;
+    }
+    
+    .main-content-area {
+        min-width: auto;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 1024px) {
+    .cita-result-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .cita-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+    
+    .cita-paciente {
+        min-width: auto;
+        max-width: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Funcionalidad de tabs
+document.addEventListener('DOMContentLoaded', function() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('[id^="tab-content-"]');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            
+            // Remover clase active de todos los botones
+            tabBtns.forEach(b => b.classList.remove('active'));
+            // Agregar clase active al botón clickeado
+            this.classList.add('active');
+            
+            // Ocultar todos los contenidos
+            tabContents.forEach(content => {
+                content.style.display = 'none';
+            });
+            
+            // Mostrar el contenido correspondiente
+            const targetContent = document.getElementById(`tab-content-${tabName}`);
+            if (targetContent) {
+                targetContent.style.display = 'block';
+            }
+        });
+    });
+});
+
+// Función para tomar una cita
+function tomarCita(citaId) {
+    if (confirm('¿Estás seguro de que quieres tomar esta cita?')) {
+        // TODO: Implementar toma de cita
+        fetch(`/trabajadores/tomar_cita/${citaId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Cita tomada exitosamente');
+                location.reload();
+            } else {
+                alert('Error al tomar la cita: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al tomar la cita');
+        });
+    }
+}
+
+// FUNCIÓN DESHABILITADA: Los dentistas ya no pueden completar citas
+// Solo el personal administrativo puede marcar citas como completadas
+function completarCita(citaId) {
+    alert('⚠️ Solo el personal de recepción puede marcar citas como completadas.\n\nContacta al administrador si necesitas completar una cita.');
+}
+
+// Función para ver detalles de una cita
+function verDetallesCita(citaId) {
+    // TODO: Implementar modal de detalles
+    alert('Función de ver detalles en desarrollo');
+}
+
+// Función para filtrar citas
+function filtrarCitas() {
+    const fecha = document.getElementById('fecha-filtro').value;
+    const hora = document.getElementById('hora-filtro').value;
+    
+    // TODO: Implementar filtrado
+    alert('Función de filtrado en desarrollo');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,750 @@
+{% extends 'citas/base.html' %}
+{% load static %}
+
+{% block title %}Mis Citas - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Header con Stats a la Derecha -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-calendar-alt"></i> Mis Citas</h1>
+        <p class="page-subtitle">Gestiona todas tus citas asignadas</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon today">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ citas_hoy }}</div>
+                    <div class="stat-label">Citas de Hoy</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon pending">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ citas_reservadas }}</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon completed">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ citas_completadas_count }}</div>
+                    <div class="stat-label">Completadas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+
+    <!-- Filtros -->
+    <div class="filtros-busqueda">
+        <form method="GET" style="display: contents;">
+            <input type="hidden" name="tab" value="{{ tab }}">
+            <div class="filtro-group">
+                <i class="fas fa-calendar-alt"></i>
+                <input type="date" id="fecha_desde" name="fecha_desde" class="filtro-input" value="{{ fecha_desde }}" placeholder="Fecha desde">
+            </div>
+            <div class="filtro-group">
+                <i class="fas fa-calendar-alt"></i>
+                <input type="date" id="fecha_hasta" name="fecha_hasta" class="filtro-input" value="{{ fecha_hasta }}" placeholder="Fecha hasta">
+            </div>
+            <button type="submit" class="btn-limpiar-filtros" style="background: #3b82f6; color: white; border-color: #3b82f6;">
+                <i class="fas fa-search"></i> Filtrar
+            </button>
+            <a href="{% url 'mis_citas_dentista' %}?tab={{ tab }}" class="btn-limpiar-filtros" title="Limpiar filtros">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+        </form>
+    </div>
+
+    <!-- Sistema de Pestañas -->
+    <div class="citas-container">
+                <!-- Pestañas -->
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-button {% if tab == 'activas' %}active{% endif %}" 
+                                onclick="window.location.href='{% url 'mis_citas_dentista' %}?tab=activas{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}'">
+                            <i class="fas fa-calendar-check"></i>
+                            Mis Citas
+                            <span class="tab-badge">{{ citas_reservadas }}</span>
+                        </button>
+                        <button class="tab-button {% if tab == 'completadas' %}active{% endif %}" 
+                                onclick="window.location.href='{% url 'mis_citas_dentista' %}?tab=completadas{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}'">
+                            <i class="fas fa-check-circle"></i>
+                            Mis Citas Completadas
+                            <span class="tab-badge">{{ citas_completadas_count }}</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Contenido: Mis Citas (Activas) -->
+                    <div class="tab-content {% if tab == 'activas' %}active{% endif %}" id="tab-activas">
+                        {% if citas_activas %}
+                            <div class="citas-grid">
+                                {% for cita in citas_activas %}
+                                <div class="cita-card {{ cita.estado }}">
+                                    <div class="cita-header">
+                                        <div class="cita-fecha">
+                                            <div class="fecha-dia">{{ cita.fecha_hora|date:"d" }}</div>
+                                            <div class="fecha-mes">{{ cita.fecha_hora|date:"M" }}</div>
+                                        </div>
+                                        <div class="cita-hora">
+                                            <i class="fas fa-clock"></i>
+                                            {{ cita.fecha_hora|time:"H:i" }}
+                                        </div>
+                                        <div class="cita-estado">
+                                            <span class="estado-badge {{ cita.estado }}">
+                                                <i class="fas fa-calendar-check"></i>
+                                                {{ cita.get_estado_display }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="cita-body">
+                                        <div class="cita-paciente">
+                                            <i class="fas fa-user"></i>
+                                            <span>{{ cita.nombre_paciente }}</span>
+                                        </div>
+                                        
+                                        {% if cita.tipo_servicio %}
+                                        <div class="cita-tipo">
+                                            <i class="fas fa-stethoscope"></i>
+                                            <span>{{ cita.tipo_servicio.nombre }}</span>
+                                        </div>
+                                        {% elif cita.tipo_consulta %}
+                                        <div class="cita-tipo">
+                                            <i class="fas fa-file-medical"></i>
+                                            <span>{{ cita.tipo_consulta }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if cita.notas %}
+                                        <div class="cita-notas">
+                                            <i class="fas fa-sticky-note"></i>
+                                            <span>{{ cita.notas|truncatechars:50 }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="cita-contacto">
+                                            {% if cita.email_paciente %}
+                                                <div class="contact-item">
+                                                    <i class="fas fa-envelope"></i>
+                                                    <span>{{ cita.email_paciente }}</span>
+                                                </div>
+                                            {% endif %}
+                                            {% if cita.telefono_paciente %}
+                                                <div class="contact-item">
+                                                    <i class="fas fa-phone"></i>
+                                                    <span>{{ cita.telefono_paciente }}</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if cita.tiene_ficha %}
+                                        <div class="ficha-indicator" style="margin-top: 12px; padding: 8px 12px; background: #d1fae5; border-left: 3px solid #10b981; border-radius: 4px;">
+                                            <i class="fas fa-check-circle" style="color: #065f46;"></i>
+                                            <span style="color: #065f46; font-size: 0.875rem; font-weight: 600;">Ficha creada</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="cita-actions">
+                                        {% if not cita.tiene_ficha %}
+                                            <a href="{% url 'crear_odontograma' %}?cita_id={{ cita.id }}" class="action-btn create-ficha">
+                                                <i class="fas fa-file-medical"></i>
+                                                Crear Ficha
+                                            </a>
+                                        {% endif %}
+                                        <div class="info-message" style="background: #f3f4f6; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; color: #6b7280; margin-top: 8px;">
+                                            <i class="fas fa-info-circle"></i> Solo recepción puede completar citas
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i class="fas fa-calendar-times"></i>
+                                </div>
+                                <h3>No tienes citas activas</h3>
+                                <p>Las citas reservadas o confirmadas aparecerán aquí</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Contenido: Mis Citas Completadas -->
+                    <div class="tab-content {% if tab == 'completadas' %}active{% endif %}" id="tab-completadas">
+                        {% if citas_completadas %}
+                            <div class="citas-grid">
+                                {% for cita in citas_completadas %}
+                                <div class="cita-card {{ cita.estado }}">
+                                    <div class="cita-header">
+                                        <div class="cita-fecha">
+                                            <div class="fecha-dia">{{ cita.fecha_hora|date:"d" }}</div>
+                                            <div class="fecha-mes">{{ cita.fecha_hora|date:"M" }}</div>
+                                        </div>
+                                        <div class="cita-hora">
+                                            <i class="fas fa-clock"></i>
+                                            {{ cita.fecha_hora|time:"H:i" }}
+                                        </div>
+                                        <div class="cita-estado">
+                                            <span class="estado-badge {{ cita.estado }}">
+                                                <i class="fas fa-check-circle"></i>
+                                                {{ cita.get_estado_display }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="cita-body">
+                                        <div class="cita-paciente">
+                                            <i class="fas fa-user"></i>
+                                            <span>{{ cita.nombre_paciente }}</span>
+                                        </div>
+                                        
+                                        {% if cita.tipo_servicio %}
+                                        <div class="cita-tipo">
+                                            <i class="fas fa-stethoscope"></i>
+                                            <span>{{ cita.tipo_servicio.nombre }}</span>
+                                        </div>
+                                        {% elif cita.tipo_consulta %}
+                                        <div class="cita-tipo">
+                                            <i class="fas fa-file-medical"></i>
+                                            <span>{{ cita.tipo_consulta }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if cita.notas %}
+                                        <div class="cita-notas">
+                                            <i class="fas fa-sticky-note"></i>
+                                            <span>{{ cita.notas|truncatechars:50 }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="cita-contacto">
+                                            {% if cita.email_paciente %}
+                                                <div class="contact-item">
+                                                    <i class="fas fa-envelope"></i>
+                                                    <span>{{ cita.email_paciente }}</span>
+                                                </div>
+                                            {% endif %}
+                                            {% if cita.telefono_paciente %}
+                                                <div class="contact-item">
+                                                    <i class="fas fa-phone"></i>
+                                                    <span>{{ cita.telefono_paciente }}</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if cita.tiene_ficha %}
+                                        <div class="ficha-indicator" style="margin-top: 12px; padding: 8px 12px; background: #d1fae5; border-left: 3px solid #10b981; border-radius: 4px;">
+                                            <i class="fas fa-check-circle" style="color: #065f46;"></i>
+                                            <span style="color: #065f46; font-size: 0.875rem; font-weight: 600;">Ficha creada</span>
+                                        </div>
+                                        {% else %}
+                                        <div class="ficha-indicator" style="margin-top: 12px; padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px;">
+                                            <i class="fas fa-exclamation-triangle" style="color: #92400e;"></i>
+                                            <span style="color: #92400e; font-size: 0.875rem; font-weight: 600;">Sin ficha - Puedes crearla ahora</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="cita-actions">
+                                        {% if not cita.tiene_ficha %}
+                                            <a href="{% url 'crear_odontograma' %}?cita_id={{ cita.id }}" class="action-btn create-ficha">
+                                                <i class="fas fa-file-medical"></i>
+                                                Crear Ficha
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <h3>No tienes citas completadas</h3>
+                                <p>Las citas completadas aparecerán aquí</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+</div>
+
+<style>
+/* Los estilos de estadísticas están ahora en base.html con diseño unificado */
+
+/* Filtros - Estilo minimalista */
+.filtros-busqueda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    align-items: center;
+}
+
+.filtro-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+
+.filtro-group i {
+    color: #64748b;
+    font-size: 0.875rem;
+    position: absolute;
+    left: 12px;
+    z-index: 1;
+}
+
+.filtro-input,
+.filtro-select {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: #f8fafc;
+    color: #1e293b;
+    transition: all 0.2s ease;
+}
+
+.filtro-input:focus,
+.filtro-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-limpiar-filtros {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.btn-limpiar-filtros:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+/* Grid de citas */
+.citas-container {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.citas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 24px;
+}
+
+.cita-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.cita-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.cita-card.reservada {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+}
+
+.cita-card.completada {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
+
+.cita-card.cancelada {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, #fef2f2, #fecaca);
+}
+
+.cita-card.disponible {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+}
+
+.cita-header {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    gap: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cita-fecha {
+    text-align: center;
+    min-width: 60px;
+}
+
+.fecha-dia {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1;
+}
+
+.fecha-mes {
+    font-size: 0.875rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.cita-hora {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #374151;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.cita-hora i {
+    color: var(--primary-color);
+}
+
+.cita-estado {
+    margin-left: auto;
+}
+
+.estado-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.estado-badge.reservada {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.estado-badge.completada {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.estado-badge.cancelada {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+.estado-badge.disponible {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.cita-body {
+    padding: 20px;
+}
+
+.cita-paciente,
+.cita-tipo,
+.cita-notas {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: #374151;
+}
+
+.cita-paciente i,
+.cita-tipo i,
+.cita-notas i {
+    color: var(--primary-color);
+    width: 16px;
+}
+
+.cita-paciente span,
+.cita-tipo span,
+.cita-notas span {
+    font-weight: 500;
+}
+
+.cita-contacto {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.contact-item i {
+    color: #9ca3af;
+    width: 14px;
+}
+
+.cita-actions {
+    padding: 20px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.action-btn.complete {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn.complete:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.action-btn.cancel {
+    background: #ef4444;
+    color: white;
+}
+
+.action-btn.cancel:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+.action-btn.details {
+    background: var(--primary-color);
+    color: white;
+}
+
+.action-btn.details:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.action-btn.create-ficha {
+    background: #8b5cf6;
+    color: white;
+}
+
+.action-btn.create-ficha:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+}
+
+.action-btn.view-ficha {
+    background: #0ea5e9;
+    color: white;
+}
+
+.action-btn.view-ficha:hover {
+    background: #0284c7;
+    transform: translateY(-1px);
+}
+
+/* Sistema de Pestañas */
+.tabs-container {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.tabs-header {
+    display: flex;
+    border-bottom: 2px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 16px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6b7280;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+}
+
+.tab-button:hover {
+    background: #f1f5f9;
+    color: #374151;
+}
+
+.tab-button.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: white;
+}
+
+.tab-button i {
+    font-size: 1.1rem;
+}
+
+.tab-badge {
+    background: #e5e7eb;
+    color: #6b7280;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 4px;
+}
+
+.tab-button.active .tab-badge {
+    background: var(--primary-color);
+    color: white;
+}
+
+.tab-content {
+    display: none;
+    padding: 24px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.status-completed,
+.status-cancelled {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-cancelled {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 80px 20px;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: #d1d5db;
+    margin-bottom: 24px;
+}
+
+.empty-state h3 {
+    color: #374151;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 32px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stats-card {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .filtros-busqueda {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filtro-group {
+        min-width: 100%;
+    }
+    
+    .citas-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+// FUNCIÓN DESHABILITADA: Los dentistas ya no pueden completar citas
+// Solo el personal administrativo puede marcar citas como completadas
+function completarCita(citaId) {
+    alert('⚠️ Solo el personal de recepción puede marcar citas como completadas.\n\nContacta al administrador si necesitas completar una cita.');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,175 @@
+{% extends 'citas/base.html' %}
+{% load static %}
+
+{% block title %}Asignar Dentista{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-user-md"></i> Asignar Dentista a Cita</h2>
+                <a href="{% url 'gestionar_citas' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Información de la Cita</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <strong>Fecha y Hora:</strong><br>
+                                    {{ cita.fecha_hora|date:"d/m/Y H:i" }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Estado:</strong><br>
+                                    <span class="badge 
+                                        {% if cita.estado == 'confirmada' %}bg-success
+                                        {% elif cita.estado == 'reservada' %}bg-warning
+                                        {% elif cita.estado == 'completada' %}bg-info
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ cita.get_estado_display }}
+                                    </span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Dentista Asignado:</strong><br>
+                                    {% if cita.dentista %}
+                                        <span class="text-success">
+                                            <i class="fas fa-user-md"></i> {{ cita.dentista.nombre_completo }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-warning">
+                                            <i class="fas fa-exclamation-triangle"></i> Sin asignar
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if cita.paciente_nombre %}
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Paciente:</strong><br>
+                                        {{ cita.paciente_nombre }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Teléfono:</strong><br>
+                                        {{ cita.paciente_telefono|default:"No especificado" }}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            {% if cita.tipo_consulta %}
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <strong>Tipo de Consulta:</strong><br>
+                                        {{ cita.tipo_consulta }}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            {% if cita.notas %}
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <strong>Notas:</strong><br>
+                                        {{ cita.notas }}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <hr>
+
+                            <form method="POST">
+                                {% csrf_token %}
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label for="dentista" class="form-label">Seleccionar Dentista *</label>
+                                        <select class="form-select" id="dentista" name="dentista" required>
+                                            <option value="">Seleccionar dentista</option>
+                                            {% for dentista in dentistas %}
+                                                <option value="{{ dentista.id }}" 
+                                                        {% if cita.dentista and cita.dentista.id == dentista.id %}selected{% endif %}>
+                                                    {{ dentista.nombre_completo }} 
+                                                    {% if dentista.especialidad %} - {{ dentista.especialidad }}{% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text">Selecciona el dentista que atenderá esta cita</div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end">
+                                    <a href="{% url 'gestionar_citas' %}" class="btn btn-secondary me-2">Cancelar</a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-user-md"></i> 
+                                        {% if cita.dentista %}Cambiar Dentista{% else %}Asignar Dentista{% endif %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dentistas Disponibles</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if dentistas %}
+                                {% for dentista in dentistas %}
+                                    <div class="card mb-2 {% if cita.dentista and cita.dentista.id == dentista.id %}border-success{% endif %}">
+                                        <div class="card-body p-2">
+                                            <h6 class="card-title mb-1">{{ dentista.nombre_completo }}</h6>
+                                            {% if dentista.especialidad %}
+                                                <small class="text-muted">{{ dentista.especialidad }}</small><br>
+                                            {% endif %}
+                                            <small class="text-muted">
+                                                <i class="fas fa-phone"></i> {{ dentista.telefono }}<br>
+                                                <i class="fas fa-envelope"></i> {{ dentista.email }}
+                                            </small>
+                                            {% if cita.dentista and cita.dentista.id == dentista.id %}
+                                                <span class="badge bg-success">Asignado</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-3">
+                                    <i class="fas fa-user-md fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted">No hay dentistas disponibles</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if cita.dentista %}
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Dentista Actual</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ cita.dentista.nombre_completo }}</h6>
+                                        {% if cita.dentista.especialidad %}
+                                            <small class="text-muted">{{ cita.dentista.especialidad }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-success">Asignado</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

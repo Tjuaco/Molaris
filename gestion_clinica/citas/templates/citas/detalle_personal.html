@@ -1,0 +1,527 @@
+{% extends 'citas/base.html' %}
+{% load static %}
+
+{% block title %}Detalle de Personal - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-user"></i> {{personal.nombre_completo}}{% endblock %}
+{% block page_subtitle %}{{ personal.get_rol_display }}{% if personal.especialidad %} - {{ personal.especialidad }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <a href="{% url 'gestor_personal' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Gestor
+            </a>
+        </div>
+    </div>
+
+    <!-- Estado del usuario -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert {% if personal.activo %}alert-success{% else %}alert-danger{% endif %}">
+                <i class="fas fa-{% if personal.activo %}check-circle{% else %}times-circle{% endif %}"></i>
+                <strong>Estado:</strong> {% if personal.activo %}Activo{% else %}Inactivo{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Columna Izquierda - Información Personal -->
+        <div class="col-lg-6">
+            <!-- Información Básica -->
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <h3><i class="fas fa-id-card"></i> Información Personal</h3>
+                </div>
+                <div class="card-body-custom">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label><i class="fas fa-user"></i> Nombre Completo</label>
+                            <div class="info-value">{{ personal.nombre_completo }}</div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <label><i class="fas fa-envelope"></i> Email</label>
+                            <div class="info-value"><a href="mailto:{{ personal.email }}">{{ personal.email }}</a></div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <label><i class="fas fa-phone"></i> Teléfono</label>
+                            <div class="info-value"><a href="tel:{{ personal.telefono }}">{{ personal.telefono }}</a></div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <label><i class="fas fa-user-tag"></i> Nombre de Usuario</label>
+                            <div class="info-value">{{ personal.user.username }}</div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <label><i class="fas fa-briefcase"></i> Rol</label>
+                            <div class="info-value">
+                                <span class="badge-role {% if personal.rol == 'dentista' %}badge-dentista{% else %}badge-admin{% endif %}">
+                                    <i class="fas fa-{% if personal.rol == 'dentista' %}user-md{% else %}user-tie{% endif %}"></i>
+                                    {{ personal.get_rol_display }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <label><i class="fas fa-calendar-plus"></i> Fecha de Registro</label>
+                            <div class="info-value">{{ personal.fecha_registro|date:"d/m/Y H:i" }}</div>
+                        </div>
+                        
+                        {% if personal.rol == 'dentista' %}
+                        <div class="info-item">
+                            <label><i class="fas fa-stethoscope"></i> Especialidad</label>
+                            <div class="info-value">{{ personal.especialidad|default:"No especificada" }}</div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <label><i class="fas fa-id-badge"></i> Número de Colegio</label>
+                            <div class="info-value">{{ personal.numero_colegio|default:"No registrado" }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas -->
+            {% if personal.rol == 'dentista' %}
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <h3><i class="fas fa-chart-bar"></i> Estadísticas</h3>
+                </div>
+                <div class="card-body-custom">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ citas_asignadas }}</div>
+                                <div class="stat-label">Citas Asignadas</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ citas_completadas }}</div>
+                                <div class="stat-label">Citas Completadas</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ pacientes_atendidos }}</div>
+                                <div class="stat-label">Pacientes Asignados</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Columna Derecha - Permisos y Acciones -->
+        <div class="col-lg-6">
+            <!-- Permisos del Usuario -->
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <h3><i class="fas fa-key"></i> Permisos del Sistema</h3>
+                    <a href="{% url 'gestionar_permisos' personal.id %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-edit"></i> Editar Permisos
+                    </a>
+                </div>
+                <div class="card-body-custom">
+                    <div class="permisos-grid">
+                        <div class="permiso-item {% if personal.puede_gestionar_citas %}permiso-activo{% endif %}">
+                            <i class="fas fa-{% if personal.puede_gestionar_citas %}check-circle{% else %}times-circle{% endif %}"></i>
+                            <span>Gestionar Citas</span>
+                        </div>
+                        
+                        <div class="permiso-item {% if personal.puede_gestionar_clientes %}permiso-activo{% endif %}">
+                            <i class="fas fa-{% if personal.puede_gestionar_clientes %}check-circle{% else %}times-circle{% endif %}"></i>
+                            <span>Gestionar Clientes</span>
+                        </div>
+                        
+                        <div class="permiso-item {% if personal.puede_gestionar_insumos %}permiso-activo{% endif %}">
+                            <i class="fas fa-{% if personal.puede_gestionar_insumos %}check-circle{% else %}times-circle{% endif %}"></i>
+                            <span>Gestionar Insumos</span>
+                        </div>
+                        
+                        <div class="permiso-item {% if personal.puede_gestionar_personal %}permiso-activo{% endif %}">
+                            <i class="fas fa-{% if personal.puede_gestionar_personal %}check-circle{% else %}times-circle{% endif %}"></i>
+                            <span>Gestionar Personal</span>
+                        </div>
+                        
+                        <div class="permiso-item {% if personal.puede_ver_reportes %}permiso-activo{% endif %}">
+                            <i class="fas fa-{% if personal.puede_ver_reportes %}check-circle{% else %}times-circle{% endif %}"></i>
+                            <span>Ver Reportes</span>
+                        </div>
+                        
+                        <div class="permiso-item {% if personal.puede_crear_odontogramas %}permiso-activo{% endif %}">
+                            <i class="fas fa-{% if personal.puede_crear_odontogramas %}check-circle{% else %}times-circle{% endif %}"></i>
+                            <span>Crear Odontogramas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Rápidas -->
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <h3><i class="fas fa-cogs"></i> Acciones</h3>
+                </div>
+                <div class="card-body-custom">
+                    <div class="actions-grid">
+                        <a href="{% url 'editar_personal' personal.id %}" class="action-btn-large primary">
+                            <i class="fas fa-edit"></i>
+                            <span>Editar Información</span>
+                        </a>
+                        
+                        <a href="{% url 'gestionar_permisos' personal.id %}" class="action-btn-large info">
+                            <i class="fas fa-key"></i>
+                            <span>Gestionar Permisos</span>
+                        </a>
+                        
+                        <a href="{% url 'cambiar_contrasena_personal' personal.id %}" class="action-btn-large warning">
+                            <i class="fas fa-lock"></i>
+                            <span>Cambiar Contraseña</span>
+                        </a>
+                        
+                        <button onclick="toggleEstado({{ personal.id }})" class="action-btn-large {% if personal.activo %}secondary{% else %}success{% endif %}">
+                            <i class="fas fa-{% if personal.activo %}pause{% else %}play{% endif %}-circle"></i>
+                            <span>{% if personal.activo %}Desactivar{% else %}Activar{% endif %} Usuario</span>
+                        </button>
+                        
+                        {% if personal.rol == 'dentista' %}
+                        <a href="{% url 'calendario_personal' %}?dentista={{ personal.id }}" class="action-btn-large success">
+                            <i class="fas fa-calendar"></i>
+                            <span>Ver Calendario</span>
+                        </a>
+                        {% endif %}
+                        
+                        <button onclick="confirmarEliminar({{ personal.id }}, '{{ personal.nombre_completo }}')" class="action-btn-large danger">
+                            <i class="fas fa-trash"></i>
+                            <span>Eliminar Personal</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.info-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.card-header-custom {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header-custom h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-body-custom {
+    padding: 24px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.info-item label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-item label i {
+    color: #3b82f6;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: #1f2937;
+    font-weight: 500;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border-left: 3px solid #3b82f6;
+}
+
+.info-value a {
+    color: #3b82f6;
+    text-decoration: none;
+}
+
+.info-value a:hover {
+    text-decoration: underline;
+}
+
+.badge-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.badge-dentista {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.badge-admin {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Estadísticas */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    border-radius: 12px;
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Permisos */
+.permisos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.permiso-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border-left: 3px solid #dc2626;
+    color: #6b7280;
+}
+
+.permiso-item.permiso-activo {
+    border-left-color: #10b981;
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.permiso-item i {
+    font-size: 1.2rem;
+}
+
+.permiso-item.permiso-activo i {
+    color: #10b981;
+}
+
+/* Acciones */
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.action-btn-large {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    text-align: center;
+}
+
+.action-btn-large i {
+    font-size: 2rem;
+}
+
+.action-btn-large span {
+    font-size: 0.875rem;
+}
+
+.action-btn-large.primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.action-btn-large.primary:hover {
+    background: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.action-btn-large.info {
+    background: #06b6d4;
+    color: white;
+}
+
+.action-btn-large.info:hover {
+    background: #0891b2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
+.action-btn-large.warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.action-btn-large.warning:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.action-btn-large.success {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn-large.success:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn-large.secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.action-btn-large.secondary:hover {
+    background: #4b5563;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+.action-btn-large.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.action-btn-large.danger:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .info-grid,
+    .stats-grid,
+    .permisos-grid,
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function toggleEstado(personalId) {
+    if (confirm('¿Estás seguro de que quieres cambiar el estado de este usuario?')) {
+        window.location.href = '{% url "toggle_estado_personal" 0 %}'.replace('0', personalId);
+    }
+}
+
+function confirmarEliminar(personalId, nombre) {
+    if (confirm(`¿Estás seguro de que quieres eliminar a ${nombre}? Esta acción no se puede deshacer.`)) {
+        // Crear formulario para enviar POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "eliminar_personal" 0 %}'.replace('0', personalId);
+        
+        const csrfToken = '{{ csrf_token }}';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        
+        form.appendChild(csrfInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}
+

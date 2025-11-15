@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Diagnóstico - Todas las Citas</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .summary { background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        .btn { background: #007bff; color: white; padding: 8px 16px; text-decoration: none; border-radius: 3px; display: inline-block; margin: 5px; }
+        .btn:hover { background: #0056b3; }
+        .status-disponible { color: #28a745; font-weight: bold; }
+        .status-reservada { color: #ffc107; font-weight: bold; }
+        .status-confirmada { color: #007bff; font-weight: bold; }
+        .status-completada { color: #6c757d; font-weight: bold; }
+        .status-cancelada { color: #dc3545; font-weight: bold; }
+        .status-no_show { color: #fd7e14; font-weight: bold; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Diagnóstico - Todas las Citas</h1>
+        <p><strong>Usuario:</strong> {{ perfil.nombre_completo }} ({{ perfil.rol|title }}) | 
+           <a href="{% url 'panel_trabajador' %}" class="btn">← Volver al Panel</a>
+           <a href="{% url 'logout' %}" class="btn">Cerrar sesión</a></p>
+    </div>
+
+    <!-- Resumen general -->
+    <div class="summary">
+        <h2>📊 Resumen General</h2>
+        <p><strong>Total de citas en la base de datos:</strong> {{ total_citas }}</p>
+        <p><strong>Estados encontrados:</strong> {{ citas_por_estado.keys|join:", " }}</p>
+    </div>
+
+    <!-- Lista de todas las citas (paginada) -->
+    <div class="section">
+        <h2>📋 Todas las Citas</h2>
+        <div class="table-container">
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Estado</th>
+                    <th>Paciente</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Tipo Consulta</th>
+                    <th>Dentista</th>
+                    <th>Ficha Vinculada</th>
+                </tr>
+                {% for cita in todas_citas %}
+                <tr>
+                    <td>{{ cita.id }}</td>
+                    <td>{{ cita.fecha_hora|date:"d/m/Y" }}</td>
+                    <td>{{ cita.fecha_hora|time:"H:i" }}</td>
+                    <td><span class="status-{{ cita.estado }}">{{ cita.estado|title }}</span></td>
+                    <td>{{ cita.paciente_nombre|default:"-" }}</td>
+                    <td>{{ cita.paciente_email|default:"-" }}</td>
+                    <td>{{ cita.paciente_telefono|default:"-" }}</td>
+                    <td>{{ cita.tipo_consulta|default:"-" }}</td>
+                    <td>{{ cita.dentista.nombre_completo|default:"-" }}</td>
+                    <td>
+                        {% with odontogramas=cita.odontogramas.all %}
+                            {% if odontogramas %}
+                                {% for odontograma in odontogramas %}
+                                    <a href="{% url 'detalle_odontograma' odontograma.id %}" style="color: #10b981; text-decoration: none; font-weight: 600;">
+                                        <i class="fas fa-file-medical"></i> Ver Ficha
+                                    </a>
+                                    {% if not forloop.last %}<br>{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span style="color: #9ca3af;">-</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        
+        <!-- Paginación -->
+        {% if todas_citas.has_other_pages %}
+        <div style="margin-top: 20px; text-align: center; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+            <div style="margin-bottom: 10px; color: #6c757d;">
+                Mostrando {{ todas_citas.start_index }} - {{ todas_citas.end_index }} de {{ total_citas }} citas
+            </div>
+            <div>
+                {% if todas_citas.has_previous %}
+                    <a href="?page=1" class="btn">« Primera</a>
+                    <a href="?page={{ todas_citas.previous_page_number }}" class="btn">‹ Anterior</a>
+                {% endif %}
+                
+                <span style="margin: 0 10px; font-weight: bold;">
+                    Página {{ todas_citas.number }} de {{ todas_citas.paginator.num_pages }}
+                </span>
+                
+                {% if todas_citas.has_next %}
+                    <a href="?page={{ todas_citas.next_page_number }}" class="btn">Siguiente ›</a>
+                    <a href="?page={{ todas_citas.paginator.num_pages }}" class="btn">Última »</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Citas agrupadas por estado -->
+    {% for estado, citas in citas_por_estado.items %}
+    <div class="section">
+        <h2>📋 Estado: <span class="status-{{ estado }}">{{ estado|title }}</span> ({{ citas|length }} citas)</h2>
+        
+        <div class="table-container">
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Paciente</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Tipo Consulta</th>
+                    <th>Dentista</th>
+                    <th>Creada por</th>
+                    <th>Ficha Vinculada</th>
+                    <th>Notas</th>
+                </tr>
+                {% for cita in citas %}
+                <tr>
+                    <td>{{ cita.id }}</td>
+                    <td>{{ cita.fecha_hora|date:"d/m/Y" }}</td>
+                    <td>{{ cita.fecha_hora|time:"H:i" }}</td>
+                    <td>{{ cita.paciente_nombre|default:"-" }}</td>
+                    <td>{{ cita.paciente_email|default:"-" }}</td>
+                    <td>{{ cita.paciente_telefono|default:"-" }}</td>
+                    <td>{{ cita.tipo_consulta|default:"-" }}</td>
+                    <td>{{ cita.dentista.nombre_completo|default:"-" }}</td>
+                    <td>{{ cita.creada_por.nombre_completo|default:"-" }}</td>
+                    <td>
+                        {% with odontogramas=cita.odontogramas.all %}
+                            {% if odontogramas %}
+                                {% for odontograma in odontogramas %}
+                                    <a href="{% url 'detalle_odontograma' odontograma.id %}" style="color: #10b981; text-decoration: none; font-weight: 600;">
+                                        <i class="fas fa-file-medical"></i> Ver Ficha
+                                    </a>
+                                    {% if not forloop.last %}<br>{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span style="color: #9ca3af;">-</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>{{ cita.notas|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Análisis del problema -->
+    <div class="warning">
+        <h3>⚠️ Análisis del Problema</h3>
+        <p><strong>Posibles causas de citas "perdidas":</strong></p>
+        <ul>
+            <li><strong>Estado incorrecto:</strong> La cita puede tener un estado que no está siendo filtrado</li>
+            <li><strong>Fecha pasada:</strong> Las citas de días anteriores no se muestran en el panel principal</li>
+            <li><strong>Límite de resultados:</strong> Solo se muestran 10 citas por sección en el panel</li>
+            <li><strong>Filtros de rol:</strong> Los dentistas solo ven sus propias citas</li>
+        </ul>
+    </div>
+
+    <!-- Acciones -->
+    <div class="section">
+        <h2>🔧 Acciones</h2>
+        <a href="{% url 'gestionar_citas' %}" class="btn">📋 Gestionar Citas</a>
+        <a href="{% url 'dashboard' %}" class="btn">📊 Ver Dashboard</a>
+    </div>
+</body>
+</html>

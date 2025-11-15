@@ -1,0 +1,329 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Fichas Odontológicas - Clínica Dental</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 24px 32px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h2 {
+            color: #1e293b;
+            font-size: 2rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+        }
+
+        .header h2 i {
+            color: #3b82f6;
+        }
+
+        .back-btn {
+            background: white;
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-btn:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .stats-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 25px;
+        }
+
+        .stats-number {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stats-label {
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .fichas-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .ficha-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .ficha-card:hover {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-color: #cbd5e1;
+        }
+
+        .ficha-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .ficha-info {
+            flex: 1;
+        }
+
+        .ficha-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ficha-title i {
+            color: #3b82f6;
+        }
+
+        .ficha-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .ficha-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ficha-meta i {
+            color: #3b82f6;
+        }
+
+        .ficha-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-ver {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-ver:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-descargar {
+            background: white;
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
+        }
+
+        .btn-descargar:hover {
+            background: #3b82f6;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .no-fichas {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+            background: white;
+            border-radius: 12px;
+            border: 2px dashed #cbd5e1;
+        }
+
+        .no-fichas i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .no-fichas p {
+            margin: 8px 0;
+            font-size: 1rem;
+        }
+
+        .no-fichas p:first-of-type {
+            font-weight: 600;
+            color: #475569;
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0;
+            }
+
+            .header {
+                flex-direction: column;
+                padding: 15px;
+            }
+
+            .header h2 {
+                font-size: 1.5rem;
+            }
+
+            .ficha-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ficha-actions {
+                width: 100%;
+            }
+
+            .btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>
+                <i class="fas fa-file-pdf"></i>
+                Mis Fichas Odontológicas
+            </h2>
+            <a href="{% url 'panel_cliente' %}" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+                Volver al Panel
+            </a>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-number">{{ total }}</div>
+            <div class="stats-label">Fichas Odontológicas Disponibles</div>
+        </div>
+
+        {% if odontogramas %}
+            <div class="fichas-lista">
+                {% for odonto in odontogramas %}
+                    <div class="ficha-card">
+                        <div class="ficha-header">
+                            <div class="ficha-info">
+                                <div class="ficha-title">
+                                    <i class="fas fa-file-medical"></i>
+                                    Ficha Odontológica
+                                </div>
+                                <div class="ficha-meta">
+                                    {% if odonto.fecha_creacion %}
+                                    <span>
+                                        <i class="fas fa-calendar"></i>
+                                        Creada: {{ odonto.fecha_creacion|date:"d/m/Y H:i" }}
+                                    </span>
+                                    {% endif %}
+                                    {% if odonto.paciente_nombre %}
+                                    <span>
+                                        <i class="fas fa-user"></i>
+                                        {{ odonto.paciente_nombre }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="ficha-actions">
+                                <a href="{% url 'ver_odontograma' odonto.id %}" class="btn btn-ver">
+                                    <i class="fas fa-eye"></i>
+                                    Ver
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-fichas">
+                <i class="fas fa-file-pdf"></i>
+                <p>No tienes fichas odontológicas</p>
+                <p>Las fichas aparecerán aquí después de tus consultas</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+

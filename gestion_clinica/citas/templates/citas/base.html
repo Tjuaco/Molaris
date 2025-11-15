@@ -1,0 +1,3435 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Sistema de Gestión - Clínica Dental{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ============================================================================
+           VARIABLES DE TEMA
+           ============================================================================ */
+        :root {
+            --primary-color: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-darker: #1d4ed8;
+            --primary-light: #60a5fa;
+            --primary-lighter: #93c5fd;
+            --primary-bg: #eff6ff;
+            --primary-text: #1e40af;
+        }
+        
+        /* Tema Verde */
+        [data-theme="green"] {
+            --primary-color: #10b981;
+            --primary-dark: #059669;
+            --primary-darker: #047857;
+            --primary-light: #34d399;
+            --primary-lighter: #6ee7b7;
+            --primary-bg: #d1fae5;
+            --primary-text: #065f46;
+        }
+        
+        /* Tema Morado */
+        [data-theme="purple"] {
+            --primary-color: #8b5cf6;
+            --primary-dark: #7c3aed;
+            --primary-darker: #6d28d9;
+            --primary-light: #a78bfa;
+            --primary-lighter: #c4b5fd;
+            --primary-bg: #ede9fe;
+            --primary-text: #5b21b6;
+        }
+        
+        /* Tema Naranja */
+        [data-theme="orange"] {
+            --primary-color: #f59e0b;
+            --primary-dark: #d97706;
+            --primary-darker: #b45309;
+            --primary-light: #fbbf24;
+            --primary-lighter: #fcd34d;
+            --primary-bg: #fef3c7;
+            --primary-text: #92400e;
+        }
+        
+        /* Tema Rojo */
+        [data-theme="red"] {
+            --primary-color: #ef4444;
+            --primary-dark: #dc2626;
+            --primary-darker: #b91c1c;
+            --primary-light: #f87171;
+            --primary-lighter: #fca5a5;
+            --primary-bg: #fee2e2;
+            --primary-text: #991b1b;
+        }
+        
+        /* Tema Turquesa */
+        [data-theme="teal"] {
+            --primary-color: #14b8a6;
+            --primary-dark: #0d9488;
+            --primary-darker: #0f766e;
+            --primary-light: #2dd4bf;
+            --primary-lighter: #5eead4;
+            --primary-bg: #ccfbf1;
+            --primary-text: #115e59;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f8fafc; 
+            overflow-x: hidden;
+            line-height: 1.6;
+            transition: background 0.3s ease;
+        }
+        
+        /* Layout Principal */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Layout para Dentistas con Sidebar */
+        .app-container.dentist-layout {
+            flex-direction: row;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 999;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid #e2e8f0;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            color: white;
+        }
+        
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .sidebar-brand i {
+            font-size: 1.5rem;
+        }
+        
+        .sidebar-brand h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+        }
+        
+        .dentist-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dentist-avatar {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.5rem;
+            margin: 0 auto 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .dentist-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        
+        .dentist-role {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        
+        .dentist-info {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            text-align: center;
+            line-height: 1.4;
+        }
+        
+        .sidebar-nav {
+            padding: 16px 0;
+        }
+        
+        .nav-section {
+            margin-bottom: 24px;
+        }
+        
+        .nav-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0 24px 8px;
+            margin-bottom: 8px;
+        }
+        
+        .nav-item-sidebar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .nav-item-sidebar:hover {
+            background: #f8fafc;
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+        
+        .nav-item-sidebar.active {
+            background: var(--primary-bg);
+            color: var(--primary-darker);
+            border-left-color: var(--primary-color);
+        }
+        
+        .nav-item-sidebar i {
+            font-size: 1rem;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .sidebar-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .main-content-with-sidebar {
+            margin-left: 280px;
+            flex: 1;
+            min-height: 100vh;
+        }
+        
+        .main-content-with-sidebar .main-content {
+            max-width: none;
+            margin: 0;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content-with-sidebar {
+                margin-left: 0;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+        
+        .mobile-menu-btn {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1.125rem;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Ficha del Dentista */
+        .dentist-info-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            color: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .dentist-card-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .dentist-avatar-small {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.5rem;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        .online-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            background: #10b981;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .dentist-status {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        
+        .dentist-info-text {
+            flex: 1;
+        }
+        
+        .dentist-name-small {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .dentist-role-small {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        
+        .dentist-card-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .dentist-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            opacity: 0.95;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .dentist-detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .dentist-detail-item:hover {
+            opacity: 1;
+            transform: translateX(4px);
+        }
+        
+        .dentist-detail-item i {
+            width: 18px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* Layout con ficha del dentista */
+        .main-content.with-dentist-card {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        
+        .main-content.with-dentist-card .page-header {
+            grid-column: 2;
+        }
+        
+        .main-content.with-dentist-card .dentist-info-card {
+            grid-column: 1;
+            grid-row: 1 / -1;
+            position: sticky;
+            top: 100px;
+            height: fit-content;
+        }
+        
+        .main-content.with-dentist-card .content-wrapper {
+            grid-column: 2;
+            min-width: 0; /* Permite que el contenido se ajuste */
+        }
+        
+        /* Mejoras para el contenido principal */
+        .content-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        
+        .content-wrapper .page-header {
+            margin-bottom: 0;
+        }
+        
+        .content-wrapper .section {
+            margin-bottom: 24px;
+        }
+        
+        /* Responsive para ficha del dentista */
+        @media (max-width: 1024px) {
+            .main-content.with-dentist-card {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .main-content.with-dentist-card .dentist-info-card {
+                grid-column: 1;
+                grid-row: 1;
+                position: static;
+                width: 100%;
+            }
+            
+            .main-content.with-dentist-card .page-header {
+                grid-column: 1;
+                grid-row: 2;
+            }
+            
+            .main-content.with-dentist-card .content-wrapper {
+                grid-column: 1;
+                grid-row: 3;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content.with-dentist-card {
+                gap: 12px;
+            }
+            
+            .dentist-info-card {
+                padding: 16px;
+            }
+            
+            .dentist-card-header {
+                gap: 12px;
+            }
+            
+            .dentist-avatar-small {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+            
+            .dentist-name-small {
+                font-size: 1rem;
+            }
+            
+            .dentist-role-small {
+                font-size: 0.8rem;
+            }
+            
+            .dentist-detail-item {
+                font-size: 0.8rem;
+            }
+        }
+        
+        /* Navbar Horizontal */
+        .navbar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            padding: 0 24px;
+        }
+        
+        .navbar-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+            text-decoration: none;
+        }
+        
+        .navbar-brand i {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+        }
+        
+        .navbar-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            color: #64748b;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .nav-item:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        
+        .nav-item.active {
+            background: #eff6ff;
+            color: #3b82f6;
+        }
+        
+        .nav-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 2px;
+            background: #3b82f6;
+            border-radius: 1px;
+        }
+        
+        .nav-item i {
+            font-size: 1rem;
+        }
+        
+        .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .user-menu:hover {
+            background: #f1f5f9;
+        }
+        
+        .dropdown-icon {
+            font-size: 12px;
+            color: #64748b;
+            transition: transform 0.3s ease;
+        }
+        
+        .user-menu.active .dropdown-icon {
+            transform: rotate(180deg);
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.875rem;
+        }
+        
+        .user-role {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #fef2f2;
+            color: #dc2626;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .logout-btn:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        /* ============================================================================
+           MENÚ DESPLEGABLE DE USUARIO
+           ============================================================================ */
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 80px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            min-width: 320px;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .dropdown-header {
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .dropdown-avatar {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            flex-shrink: 0;
+        }
+        
+        .dropdown-user-info {
+            flex: 1;
+        }
+        
+        .dropdown-user-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+        
+        .dropdown-user-email {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 0;
+        }
+        
+        .dropdown-section {
+            padding: 16px;
+        }
+        
+        .dropdown-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .theme-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        
+        .theme-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .theme-option:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+            transform: translateY(-2px);
+        }
+        
+        .theme-option.active {
+            border-color: var(--primary-color);
+            background: var(--primary-bg);
+        }
+        
+        .theme-color {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .theme-option span {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+        }
+        
+        .theme-check {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            font-size: 10px;
+            color: var(--primary-color);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .theme-option.active .theme-check {
+            opacity: 1;
+        }
+        
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #475569;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .dropdown-item:hover {
+            background: #f8fafc;
+            color: var(--primary-color);
+        }
+        
+        .dropdown-item i {
+            width: 20px;
+            text-align: center;
+            color: #64748b;
+        }
+        
+        .dropdown-item:hover i {
+            color: var(--primary-color);
+        }
+        
+        .dropdown-item.logout-item {
+            color: #dc2626;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .dropdown-item.logout-item:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+        
+        .dropdown-item.logout-item i {
+            color: #dc2626;
+        }
+        
+        .dropdown-item.logout-item:hover i {
+            color: #b91c1c;
+        }
+        
+        /* Contenido Principal */
+        .main-content {
+            flex: 1;
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .page-header {
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        
+        .page-subtitle {
+            color: #64748b;
+            font-size: 1rem;
+        }
+        
+        /* ============================================
+           DISEÑO UNIFICADO DE CARTAS/DASHBOARD
+           ============================================ */
+        
+        /* Contenedor principal de estadísticas */
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        
+        /* Tarjeta de estadística unificada */
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #e5e7eb;
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary-color);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border-color: var(--primary-light);
+        }
+        
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+        
+        /* Icono de estadística */
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            flex-shrink: 0;
+            background: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Variantes de colores para iconos */
+        .stat-icon.primary,
+        .stat-icon.total,
+        .stat-icon.today,
+        .stat-icon.available {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .stat-icon.success,
+        .stat-icon.completed,
+        .stat-icon.administrativos {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .stat-icon.warning,
+        .stat-icon.pending,
+        .stat-icon.nuevos {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .stat-icon.danger,
+        .stat-icon.cancelada {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+        
+        .stat-icon.info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .stat-icon.purple {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+        
+        .stat-icon.gray,
+        .stat-icon.grey {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+        }
+        
+        .stat-icon.dentistas {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-darker) 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Contenido de la estadística */
+        .stat-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+        
+        /* Grid de estadísticas */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+        
+        /* Versión compacta para header */
+        .dashboard-compact .stats-grid {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        /* Estilos para stats-header (compatibilidad con mis_citas_dentista) */
+        .stats-header {
+            margin-bottom: 24px;
+        }
+        
+        .stats-header .stats-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            flex-wrap: wrap;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .stats-header .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            min-width: 200px;
+            padding: 12px;
+            border-radius: 12px;
+            transition: background 0.2s ease;
+        }
+        
+        .stats-header .stat-item:hover {
+            background: #f8fafc;
+        }
+        
+        .stats-header .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .stats-header .stat-content h3 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        
+        .stats-header .stat-content p {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+        
+        /* Layout para header con stats a la derecha */
+        .header-with-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .header-with-stats .page-header {
+            margin-bottom: 0;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .header-with-stats .dashboard-compact {
+            flex-shrink: 0;
+        }
+        
+        /* Stats compactas en el header */
+        .header-with-stats .stats-grid {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .header-with-stats .stat-card {
+            min-width: 140px;
+            max-width: 180px;
+            padding: 14px 16px !important;
+        }
+        
+        .header-with-stats .stat-icon {
+            width: 40px !important;
+            height: 40px !important;
+            font-size: 18px !important;
+            border-radius: 10px !important;
+        }
+        
+        .header-with-stats .stat-number {
+            font-size: 1.5rem !important;
+            font-weight: 700 !important;
+        }
+        
+        .header-with-stats .stat-label {
+            font-size: 0.75rem !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Responsive para header con stats */
+        @media (max-width: 1200px) {
+            .header-with-stats {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .header-with-stats .dashboard-compact {
+                width: 100%;
+            }
+            
+            .header-with-stats .stats-grid {
+                justify-content: flex-start;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header-with-stats .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            
+            .header-with-stats .stat-card {
+                min-width: auto;
+                max-width: none;
+                padding: 12px !important;
+            }
+            
+            .page-title {
+                font-size: 1.5rem;
+            }
+            
+            .page-subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card {
+                padding: 16px;
+                gap: 12px;
+            }
+            
+            .stat-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 1.5rem;
+            }
+            
+            .stat-number {
+                font-size: 1.5rem;
+            }
+            
+            .stats-header .stats-card {
+                padding: 16px;
+                gap: 16px;
+            }
+            
+            .stats-header .stat-item {
+                min-width: auto;
+                flex: 1 1 calc(50% - 8px);
+            }
+            
+            .stats-header .stat-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 20px;
+            }
+            
+            .stats-header .stat-content h3 {
+                font-size: 1.5rem;
+            }
+            
+            .stat-label {
+                font-size: 0.75rem;
+            }
+        }
+        
+        .section { 
+            margin: 24px 0; 
+            padding: 24px; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
+            background: white; 
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section h2 {
+            color: #1e293b;
+            margin-bottom: 16px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Botones */
+        .btn { 
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--primary-color); 
+            color: white; 
+            padding: 8px 16px; 
+            text-decoration: none; 
+            border-radius: 6px; 
+            margin: 3px; 
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover { 
+            background: var(--primary-dark); 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-success { 
+            background: var(--primary-color); 
+        }
+        .btn-success:hover { 
+            background: var(--primary-dark); 
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-warning { 
+            background: #f59e0b; 
+        }
+        .btn-warning:hover { 
+            background: #d97706; 
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .btn-danger { 
+            background: #ef4444; 
+        }
+        .btn-danger:hover { 
+            background: #dc2626; 
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn-info { 
+            background: var(--primary-color); 
+        }
+        .btn-info:hover { 
+            background: var(--primary-dark); 
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+        }
+        
+        /* Navbar Secundario */
+        .secondary-navbar {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 20px;
+            position: sticky;
+            top: 64px;
+            z-index: 999;
+        }
+        
+        .secondary-navbar-content {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 10px 0;
+        }
+        
+        .function-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            padding: 2px 0;
+        }
+        
+        .function-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: white;
+            color: #64748b;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            min-width: fit-content;
+        }
+        
+        .function-btn:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .function-btn.active {
+            background: var(--primary-bg);
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(var(--primary-color), 0.2);
+        }
+        
+        .function-btn i {
+            font-size: 0.9rem;
+        }
+        
+        /* Optimización para pantallas grandes */
+        @media (min-width: 1400px) {
+            .secondary-navbar-content {
+                max-width: 1600px;
+            }
+            
+            .function-btn {
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+        }
+        
+        /* Optimización para pantallas medianas */
+        @media (min-width: 1024px) and (max-width: 1399px) {
+            .function-buttons {
+                gap: 5px;
+            }
+            
+            .function-btn {
+                padding: 8px 11px;
+                font-size: 0.78rem;
+                gap: 5px;
+            }
+        }
+        
+        /* Optimización para tablets y pantallas pequeñas */
+        @media (min-width: 601px) and (max-width: 1023px) {
+            .function-buttons {
+                gap: 4px;
+            }
+            
+            .function-btn {
+                padding: 7px 10px;
+                font-size: 0.75rem;
+                gap: 4px;
+            }
+            
+            .function-btn i {
+                font-size: 0.85rem;
+            }
+        }
+        
+        /* Responsive para navbar secundario */
+        @media (max-width: 600px) {
+            .secondary-navbar {
+                padding: 0 12px;
+            }
+            
+            .function-buttons {
+                gap: 4px;
+            }
+            
+            .function-btn {
+                padding: 8px 10px;
+                font-size: 0.75rem;
+            }
+            
+            .function-btn span {
+                display: none;
+            }
+            
+            .function-btn i {
+                font-size: 1rem;
+            }
+        }
+        
+        /* Mobile Menu */
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            color: #64748b;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        
+        .mobile-menu-toggle:hover {
+            background: #f1f5f9;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0 16px;
+            }
+            
+            .navbar-content {
+                height: 56px;
+            }
+            
+            .navbar-nav {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: white;
+                border-top: 1px solid #e2e8f0;
+                flex-direction: column;
+                padding: 16px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            
+            .navbar-nav.open {
+                display: flex;
+            }
+            
+            .nav-item {
+                width: 100%;
+                justify-content: flex-start;
+                padding: 12px 16px;
+            }
+            
+            .mobile-menu-toggle {
+                display: block;
+            }
+            
+            .main-content {
+                padding: 16px;
+            }
+            
+            .user-info {
+                display: none;
+            }
+            
+            .secondary-navbar {
+                padding: 0 16px;
+            }
+            
+            .function-buttons {
+                gap: 6px;
+            }
+            
+            .function-btn {
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+            
+            .function-btn span {
+                display: none;
+            }
+            
+            .function-btn i {
+                font-size: 1.1rem;
+            }
+        }
+        
+        /* ========== SISTEMA DE NOTIFICACIONES ========== */
+        .notification-btn {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .notifications-panel {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 420px;
+            height: 100vh;
+            background: white;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+            z-index: 2000;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .notifications-panel.open {
+            right: 0;
+        }
+
+        .notifications-header {
+            padding: 20px 24px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .notifications-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .close-notifications {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .close-notifications:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .notifications-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background: #f8fafc;
+        }
+
+        .notification-item {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+            border: 2px solid #e2e8f0;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .notification-item:hover {
+            transform: translateX(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .notification-item.unread {
+            border-left: 4px solid #3b82f6;
+            background: #eff6ff;
+        }
+
+        .notification-item.unread.info {
+            border-left-color: #3b82f6;
+        }
+
+        .notification-item.unread.warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .notification-item.unread.success {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .notification-item.read {
+            opacity: 0.7;
+        }
+
+        .notification-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .notification-item.info .notification-icon {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .notification-item.warning .notification-icon {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .notification-item.success .notification-icon {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .notification-item.read .notification-icon {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .notification-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .notification-text {
+            color: #64748b;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+
+        .notification-time {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mark-read-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            transition: all 0.2s ease;
+            opacity: 0;
+        }
+
+        .notification-item.unread:hover .mark-read-btn {
+            opacity: 1;
+        }
+
+        .mark-read-btn:hover {
+            background: #2563eb;
+            transform: scale(1.1);
+        }
+
+        .notifications-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+        }
+
+        .mark-all-read-btn {
+            width: 100%;
+            padding: 12px;
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            color: #64748b;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .mark-all-read-btn:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .notifications-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .notifications-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Responsive para notificaciones */
+        @media (max-width: 768px) {
+            .notifications-panel {
+                width: 100%;
+                right: -100%;
+            }
+
+            .notification-badge {
+                right: 8px;
+                top: 8px;
+            }
+        }
+
+        /* ========== PANEL DE INFORMACIÓN DE LA CLÍNICA ========== */
+        .info-clinica-btn {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 16px 12px;
+            border-radius: 0 12px 12px 0;
+            cursor: pointer;
+            z-index: 1050;
+            box-shadow: 2px 0 12px rgba(59, 130, 246, 0.4);
+            transition: all 0.3s ease;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-weight: 600;
+            font-size: 0.875rem;
+            letter-spacing: 1px;
+        }
+
+        .info-clinica-btn:hover {
+            padding-left: 16px;
+            box-shadow: 4px 0 20px rgba(59, 130, 246, 0.6);
+        }
+
+        .info-clinica-btn i {
+            margin-bottom: 8px;
+            font-size: 1.2rem;
+            display: block;
+            writing-mode: horizontal-tb;
+        }
+
+        .info-clinica-panel {
+            position: fixed;
+            top: 0;
+            left: -450px;
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+            z-index: 2001;
+            transition: left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-clinica-panel.open {
+            left: 0;
+        }
+
+        .info-clinica-header {
+            padding: 20px 24px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .info-clinica-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .close-info-clinica {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .close-info-clinica:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .info-clinica-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            background: #f8fafc;
+        }
+
+        .info-item {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+
+        .info-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .info-item-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-item-content {
+            color: #1e293b;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-left: 24px;
+        }
+
+        .info-item-content a {
+            color: var(--primary-color);
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .info-item-content a:hover {
+            text-decoration: underline;
+        }
+
+        .info-section-header {
+            background: linear-gradient(135deg, var(--primary-bg), #dbeafe);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 20px 0 16px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .info-section-header h4 {
+            margin: 0;
+            color: var(--primary-text);
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-clinica-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+        }
+
+        .btn-editar-info {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-editar-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .info-clinica-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .info-clinica-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Responsive para panel de información */
+        @media (max-width: 768px) {
+            .info-clinica-panel {
+                width: 100%;
+                left: -100%;
+            }
+
+            .info-clinica-btn {
+                font-size: 0.75rem;
+                padding: 12px 10px;
+            }
+        }
+
+        /* ========== SISTEMA DE MENSAJERÍA ========== */
+        /* Botón de mensajes en navbar */
+        .mensajes-btn {
+            position: relative;
+            background: none;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #64748b;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+        }
+
+        .mensajes-btn:hover {
+            background: #f1f5f9;
+            color: #3b82f6;
+        }
+
+        .mensajes-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .mensajes-badge:empty {
+            display: none;
+        }
+
+        /* Panel lateral de mensajes */
+        .mensajes-panel {
+            position: fixed;
+            top: 0;
+            left: -450px;
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+            z-index: 1100;
+            transition: left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mensajes-panel.open {
+            left: 0;
+        }
+
+        .mensajes-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1099;
+            display: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .mensajes-overlay.show {
+            display: block;
+        }
+
+        /* Header del panel */
+        .mensajes-header {
+            padding: 20px 24px;
+            border-bottom: 2px solid #e5e7eb;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .mensajes-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-mensajes {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .close-mensajes:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Tabs */
+        .mensajes-tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            background: #f9fafb;
+            flex-shrink: 0;
+        }
+
+        .msg-tab {
+            flex: 1;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .msg-tab.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+            background: white;
+        }
+
+        .msg-tab:hover:not(.active) {
+            background: #f3f4f6;
+            color: #3b82f6;
+        }
+
+        /* Contenido */
+        .mensajes-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        /* Lista de mensajes */
+        .mensajes-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .mensaje-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mensaje-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .mensaje-item.no-leido {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+
+        .mensaje-item.urgente {
+            border-left: 4px solid #ef4444;
+        }
+
+        .mensaje-header-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .mensaje-remitente {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 0.95rem;
+        }
+
+        .mensaje-fecha {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        .mensaje-asunto {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+
+        .mensaje-preview {
+            color: #6b7280;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            max-height: 40px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mensaje-tipo-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        .mensaje-tipo-badge.general {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+
+        .mensaje-tipo-badge.odontograma {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .mensaje-tipo-badge.cita {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .mensaje-tipo-badge.urgente {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        /* Formulario nuevo mensaje */
+        .form-nuevo-mensaje {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group-msg {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group-msg label {
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .form-control-msg {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .form-control-msg:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        textarea.form-control-msg {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .btn-enviar-mensaje {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-enviar-mensaje:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .loading-mensajes {
+            text-align: center;
+            padding: 40px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-mensajes {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-mensajes i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Responsive mensajes */
+        @media (max-width: 768px) {
+            .mensajes-panel {
+                width: 100%;
+                left: -100%;
+            }
+
+            .msg-tab {
+                font-size: 0.75rem;
+                padding: 10px 8px;
+            }
+
+            .msg-tab span {
+                display: none;
+            }
+        }
+
+        /* Estilos adicionales para contenido específico */
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Navbar Horizontal -->
+        <nav class="navbar">
+            <div class="navbar-content">
+                <a href="{% url 'panel_trabajador' %}" class="navbar-brand">
+                    <i class="fas fa-tooth"></i>
+                    <span>Clínica Dental</span>
+                </a>
+                
+                <div class="navbar-nav" id="navbarNav">
+                    <!-- Navegación principal movida al navbar secundario -->
+                </div>
+                
+                <div class="navbar-actions">
+                    <!-- Botón de Mensajería -->
+                    <button class="mensajes-btn" onclick="toggleMensajesPanel()" title="Mensajes">
+                        <i class="fas fa-envelope"></i>
+                        <span class="mensajes-badge" id="mensajesBadge">0</span>
+                    </button>
+                    
+                    <div class="user-menu" onclick="toggleUserDropdown(event)">
+                        <div class="user-avatar">
+                            {{ perfil.nombre_completo|first|upper }}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">{{ perfil.nombre_completo }}</div>
+                            <div class="user-role">{{ perfil.rol|title }}</div>
+                        </div>
+                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                    </div>
+                    
+                    <!-- Menú Desplegable de Usuario -->
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="dropdown-header">
+                            <div class="dropdown-avatar">
+                                {{ perfil.nombre_completo|first|upper }}
+                            </div>
+                            <div class="dropdown-user-info">
+                                <div class="dropdown-user-name">{{ perfil.nombre_completo }}</div>
+                                <div class="dropdown-user-email">{{ perfil.user.email }}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="dropdown-divider"></div>
+                        
+                        <div class="dropdown-section">
+                            <div class="dropdown-section-title">
+                                <i class="fas fa-palette"></i> Tema del Sistema
+                            </div>
+                            <div class="theme-selector">
+                                <button class="theme-option" onclick="changeTheme('blue')" data-theme="blue" title="Azul (Por defecto)">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                                    <span>Azul</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                                <button class="theme-option" onclick="changeTheme('green')" data-theme="green" title="Verde">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #10b981, #059669);"></div>
+                                    <span>Verde</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                                <button class="theme-option" onclick="changeTheme('purple')" data-theme="purple" title="Morado">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
+                                    <span>Morado</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                                <button class="theme-option" onclick="changeTheme('orange')" data-theme="orange" title="Naranja">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #f59e0b, #d97706);"></div>
+                                    <span>Naranja</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                                <button class="theme-option" onclick="changeTheme('red')" data-theme="red" title="Rojo">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #ef4444, #dc2626);"></div>
+                                    <span>Rojo</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                                <button class="theme-option" onclick="changeTheme('teal')" data-theme="teal" title="Turquesa">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #14b8a6, #0d9488);"></div>
+                                    <span>Turquesa</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="dropdown-divider"></div>
+                        
+                        <a href="{% url 'mi_perfil' %}" class="dropdown-item">
+                            <i class="fas fa-user"></i>
+                            <span>Mi Perfil</span>
+                        </a>
+                        
+                        <a href="{% url 'logout' %}" class="dropdown-item logout-item">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Cerrar Sesión</span>
+                        </a>
+                    </div>
+                    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Panel de Notificaciones -->
+        <div class="notifications-panel" id="notificationsPanel">
+            <div class="notifications-header">
+                <h3><i class="fas fa-bell"></i> Notificaciones</h3>
+                <button class="close-notifications" onclick="closeNotifications()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="notifications-body">
+                <!-- Notificación de Cita Próxima -->
+                <div class="notification-item unread info">
+                    <div class="notification-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">Cita próxima en 1 hora</div>
+                        <div class="notification-text">María González - Limpieza Dental - 15:00</div>
+                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 10 minutos</div>
+                    </div>
+                    <button class="mark-read-btn" onclick="markAsRead(this)">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+
+                <!-- Notificación de Stock Bajo -->
+                <div class="notification-item unread warning">
+                    <div class="notification-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">Stock bajo de insumo</div>
+                        <div class="notification-text">Anestesia local - Solo quedan 3 unidades</div>
+                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 2 horas</div>
+                    </div>
+                    <button class="mark-read-btn" onclick="markAsRead(this)">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+
+                <!-- Notificación de Nueva Cita -->
+                <div class="notification-item unread success">
+                    <div class="notification-icon">
+                        <i class="fas fa-calendar-plus"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">Nueva cita reservada</div>
+                        <div class="notification-text">Juan Pérez ha reservado una cita para el 25/10/2025</div>
+                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 3 horas</div>
+                    </div>
+                    <button class="mark-read-btn" onclick="markAsRead(this)">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+
+                <!-- Notificación Leída -->
+                <div class="notification-item read">
+                    <div class="notification-icon">
+                        <i class="fas fa-user-md"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">Nuevo dentista agregado</div>
+                        <div class="notification-text">Dr. Carlos Ruiz se ha unido al equipo</div>
+                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 1 día</div>
+                    </div>
+                </div>
+
+                <!-- Notificación Leída -->
+                <div class="notification-item read">
+                    <div class="notification-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">Cita completada</div>
+                        <div class="notification-text">Ana Fernández - Endodoncia completada exitosamente</div>
+                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 2 días</div>
+                    </div>
+                </div>
+            </div>
+            <div class="notifications-footer">
+                <button class="mark-all-read-btn" onclick="markAllAsRead()">
+                    <i class="fas fa-check-double"></i> Marcar todas como leídas
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel de Mensajería -->
+        <div class="mensajes-panel" id="mensajesPanel">
+            <div class="mensajes-header">
+                <h3><i class="fas fa-envelope"></i> Mensajes</h3>
+                <button class="close-mensajes" onclick="closeMensajes()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="mensajes-tabs">
+                <button class="msg-tab active" data-tab="recibidos" onclick="cambiarTabMensajes('recibidos')">
+                    <i class="fas fa-inbox"></i> Recibidos
+                </button>
+                <button class="msg-tab" data-tab="enviados" onclick="cambiarTabMensajes('enviados')">
+                    <i class="fas fa-paper-plane"></i> Enviados
+                </button>
+                <button class="msg-tab" data-tab="nuevo" onclick="cambiarTabMensajes('nuevo')">
+                    <i class="fas fa-plus"></i> Nuevo
+                </button>
+            </div>
+            
+            <!-- Contenido: Mensajes Recibidos -->
+            <div class="mensajes-content" id="tab-recibidos">
+                <div id="listaMensajesRecibidos" class="mensajes-lista">
+                    <div class="loading-mensajes">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando mensajes...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contenido: Mensajes Enviados -->
+            <div class="mensajes-content" id="tab-enviados" style="display: none;">
+                <div id="listaMensajesEnviados" class="mensajes-lista">
+                    <div class="loading-mensajes">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando mensajes...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contenido: Nuevo Mensaje -->
+            <div class="mensajes-content" id="tab-nuevo" style="display: none;">
+                <form id="formNuevoMensaje" class="form-nuevo-mensaje">
+                    {% csrf_token %}
+                    <div class="form-group-msg">
+                        <label><i class="fas fa-user"></i> Destinatario</label>
+                        <select id="destinatario" name="destinatario_id" required class="form-control-msg">
+                            <option value="">Seleccione un destinatario</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group-msg">
+                        <label><i class="fas fa-tag"></i> Tipo</label>
+                        <select id="tipo" name="tipo" required class="form-control-msg">
+                            <option value="general">Mensaje General</option>
+                            <option value="odontograma">Envío de Odontograma</option>
+                            <option value="cita">Información de Cita</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group-msg" id="odontogramaGroup" style="display: none;">
+                        <label><i class="fas fa-tooth"></i> Odontograma (Opcional)</label>
+                        <input type="number" id="odontograma_id" name="odontograma_id" class="form-control-msg" placeholder="ID del odontograma">
+                    </div>
+                    
+                    <div class="form-group-msg">
+                        <label><i class="fas fa-heading"></i> Asunto</label>
+                        <input type="text" id="asunto" name="asunto" required class="form-control-msg" placeholder="Asunto del mensaje">
+                    </div>
+                    
+                    <div class="form-group-msg">
+                        <label><i class="fas fa-comment"></i> Mensaje</label>
+                        <textarea id="mensaje" name="mensaje" required class="form-control-msg" rows="6" placeholder="Escriba su mensaje aquí..."></textarea>
+                    </div>
+                    
+                    <div class="form-group-msg">
+                        <label><i class="fas fa-paperclip"></i> Archivo Adjunto (Opcional)</label>
+                        <input type="file" id="archivo_adjunto" name="archivo_adjunto" class="form-control-msg" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
+                        <small style="color: #6b7280; font-size: 0.75rem; margin-top: 4px; display: block;">
+                            Formatos permitidos: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Máx. 10MB)
+                        </small>
+                        <div id="archivo-preview" style="margin-top: 8px;"></div>
+                    </div>
+                    
+                    <button type="submit" class="btn-enviar-mensaje">
+                        <i class="fas fa-paper-plane"></i> Enviar Mensaje
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Overlay para cerrar mensajes -->
+        <div class="mensajes-overlay" id="mensajesOverlay" onclick="closeMensajes()"></div>
+
+        <!-- Botón de Información de la Clínica -->
+        <button class="info-clinica-btn" onclick="toggleInfoClinicaPanel()" title="Información de la Clínica">
+            <i class="fas fa-info-circle"></i>
+            INFO CLÍNICA
+        </button>
+
+        <!-- Panel de Información de la Clínica -->
+        <div class="info-clinica-panel" id="infoClinicaPanel">
+            <div class="info-clinica-header">
+                <h3><i class="fas fa-building"></i> Información de Contacto</h3>
+                <button class="close-info-clinica" onclick="closeInfoClinica()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="info-clinica-body" id="infoClinicaContent">
+                <div style="text-align: center; padding: 40px 20px; color: #9ca3af;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                    <p>Cargando información...</p>
+                </div>
+            </div>
+            
+            {% if perfil.es_administrativo %}
+            <div class="info-clinica-footer">
+                <a href="{% url 'editar_informacion_clinica' %}" class="btn-editar-info">
+                    <i class="fas fa-edit"></i> Editar Información
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Overlay (clic deshabilitado para evitar pérdida de datos) -->
+        <div class="info-clinica-overlay" id="infoClinicaOverlay"></div>
+
+        <!-- Navbar Secundario - Funciones -->
+        <div class="secondary-navbar">
+            <div class="secondary-navbar-content">
+                <div class="function-buttons">
+                    {% if perfil.es_dentista %}
+                    <!-- Navbar para Dentistas -->
+                    <a href="{% url 'mi_perfil' %}" class="function-btn {% if request.resolver_match.url_name == 'mi_perfil' %}active{% endif %}">
+                        <i class="fas fa-user"></i>
+                        <span>Perfil</span>
+                    </a>
+                    <a href="{% url 'gestionar_pacientes' %}" class="function-btn {% if request.resolver_match.url_name == 'gestionar_pacientes' or request.resolver_match.url_name == 'detalle_paciente' or request.resolver_match.url_name == 'agregar_nota_paciente' or request.resolver_match.url_name == 'estadisticas_pacientes' %}active{% endif %}">
+                        <i class="fas fa-user-friends"></i>
+                        <span>Pacientes</span>
+                    </a>
+                    <a href="{% url 'mis_citas_dentista' %}" class="function-btn {% if request.resolver_match.url_name == 'mis_citas_dentista' %}active{% endif %}">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Citas</span>
+                    </a>
+                    <a href="{% url 'ver_mi_horario' %}" class="function-btn {% if request.resolver_match.url_name == 'ver_mi_horario' %}active{% endif %}">
+                        <i class="fas fa-clock"></i>
+                        <span>Mi Horario</span>
+                    </a>
+                    <a href="{% url 'listar_odontogramas' %}" class="function-btn {% if 'odontograma' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-tooth"></i>
+                        <span>Odontograma</span>
+                    </a>
+                    <a href="{% url 'radiografias_listar' %}" class="function-btn {% if 'radiografia' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-x-ray"></i>
+                        <span>Radiografías</span>
+                    </a>
+                    {% else %}
+                    <!-- Navbar para Administrativos -->
+                    <a href="{% url 'panel_trabajador' %}" class="function-btn {% if request.resolver_match.url_name == 'panel_trabajador' %}active{% endif %}">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Citas</span>
+                    </a>
+                    <a href="{% url 'gestor_clientes' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_clientes' %}active{% endif %}">
+                        <i class="fas fa-users"></i>
+                        <span>Clientes</span>
+                    </a>
+                    <a href="{% url 'gestor_insumos' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_insumos' %}active{% endif %}">
+                        <i class="fas fa-boxes"></i>
+                        <span>Insumos</span>
+                    </a>
+                    <a href="{% url 'gestor_proveedores' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_proveedores' %}active{% endif %}">
+                        <i class="fas fa-truck"></i>
+                        <span>Proveedores</span>
+                    </a>
+                    <a href="{% url 'gestor_servicios' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_servicios' or request.resolver_match.url_name == 'crear_servicio' or request.resolver_match.url_name == 'editar_servicio' or request.resolver_match.url_name == 'eliminar_servicio' %}active{% endif %}">
+                        <i class="fas fa-tasks"></i>
+                        <span>Servicios</span>
+                    </a>
+                    <a href="{% url 'gestor_personal' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_personal' %}active{% endif %}">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Personal</span>
+                    </a>
+                    <a href="{% url 'dashboard_reportes' %}" class="function-btn {% if request.resolver_match.url_name == 'dashboard_reportes' %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Reportes</span>
+                    </a>
+                    <a href="{% url 'gestor_finanzas' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_finanzas' %}active{% endif %}">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Finanzas</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contenido Principal -->
+        <div class="main-content {% if perfil.es_dentista and request.resolver_match.url_name == 'mi_perfil' %}with-dentist-card{% endif %}">
+            {% if perfil.es_dentista and request.resolver_match.url_name == 'mi_perfil' %}
+            <!-- Ficha del Dentista (solo para dentistas en la vista de perfil) -->
+            <div class="dentist-info-card">
+                <div class="dentist-card-header">
+                    <div class="dentist-avatar-small">
+                        {{ perfil.nombre_completo|first|upper }}
+                        <div class="online-indicator"></div>
+                    </div>
+                    <div class="dentist-info-text">
+                        <div class="dentist-name-small">{{ perfil.nombre_completo }}</div>
+                        <div class="dentist-role-small">{{ perfil.get_rol_display }}</div>
+                        <div class="dentist-status">🟢 En línea</div>
+                    </div>
+                </div>
+                <div class="dentist-card-details">
+                    <div class="dentist-detail-item">
+                        <i class="fas fa-envelope"></i>
+                        <span>{{ perfil.user.email }}</span>
+                    </div>
+                    {% if perfil.telefono %}
+                    <div class="dentist-detail-item">
+                        <i class="fas fa-phone"></i>
+                        <span>{{ perfil.telefono }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="dentist-detail-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>Miembro desde {{ perfil.user.date_joined|date:"M Y" }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Wrapper del contenido principal -->
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <h1 class="page-title">{% block page_title %}<i class="fas fa-calendar-alt"></i> Gestión de Citas{% endblock %}</h1>
+                    <p class="page-subtitle">{% block page_subtitle %}Administra las citas de la clínica dental{% endblock %}</p>
+                </div>
+            
+            {% if messages %}
+            <div class="section" style="background:#f0fdf4; border-color:#bbf7d0;">
+                {% for message in messages %}
+                    <div style="margin-bottom:6px; color:#166534;">
+                        <i class="fas fa-check-circle"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+                {% block content %}
+                <!-- El contenido específico de cada página va aquí -->
+                {% endblock %}
+            </div> <!-- Cerrar content-wrapper -->
+        </div>
+    </div>
+    
+    <!-- Overlay para notificaciones -->
+    <div class="notifications-overlay" id="notificationsOverlay" onclick="closeNotifications()"></div>
+
+    <script>
+        // ============================================================================
+        // SISTEMA DE TEMAS
+        // ============================================================================
+        
+        // Cargar tema al iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('clinicaTheme') || 'blue';
+            applyTheme(savedTheme);
+            updateThemeButtons(savedTheme);
+        });
+        
+        function changeTheme(themeName) {
+            applyTheme(themeName);
+            updateThemeButtons(themeName);
+            localStorage.setItem('clinicaTheme', themeName);
+            
+            // Cerrar dropdown después de cambiar tema
+            setTimeout(() => {
+                closeUserDropdown();
+            }, 300);
+        }
+        
+        function applyTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+        }
+        
+        function updateThemeButtons(themeName) {
+            const themeOptions = document.querySelectorAll('.theme-option');
+            themeOptions.forEach(option => {
+                if (option.getAttribute('data-theme') === themeName) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            });
+        }
+        
+        // ============================================================================
+        // MENÚ DESPLEGABLE DE USUARIO
+        // ============================================================================
+        
+        function toggleUserDropdown(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('userDropdown');
+            const userMenu = document.querySelector('.user-menu');
+            
+            if (dropdown.classList.contains('show')) {
+                closeUserDropdown();
+            } else {
+                dropdown.classList.add('show');
+                userMenu.classList.add('active');
+            }
+        }
+        
+        function closeUserDropdown() {
+            const dropdown = document.getElementById('userDropdown');
+            const userMenu = document.querySelector('.user-menu');
+            dropdown.classList.remove('show');
+            userMenu.classList.remove('active');
+        }
+        
+        // Cerrar dropdown al hacer clic fuera
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('userDropdown');
+            const userMenu = document.querySelector('.user-menu');
+            
+            if (dropdown && !dropdown.contains(event.target) && !userMenu.contains(event.target)) {
+                closeUserDropdown();
+            }
+        });
+        
+        // Prevenir que los clics dentro del dropdown lo cierren
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropdown = document.getElementById('userDropdown');
+            if (dropdown) {
+                dropdown.addEventListener('click', function(event) {
+                    // Solo prevenir el cierre si NO es un enlace
+                    if (!event.target.closest('.dropdown-item')) {
+                        event.stopPropagation();
+                    }
+                });
+            }
+        });
+        
+        // ============================================================================
+        // FUNCIONES ORIGINALES
+        // ============================================================================
+        
+        function toggleMobileMenu() {
+            const navbarNav = document.getElementById('navbarNav');
+            navbarNav.classList.toggle('open');
+        }
+        
+        // Cerrar menú móvil al hacer clic fuera
+        document.addEventListener('click', function(event) {
+            const navbarNav = document.getElementById('navbarNav');
+            const mobileToggle = document.querySelector('.mobile-menu-toggle');
+            
+            if (!navbarNav.contains(event.target) && !mobileToggle.contains(event.target)) {
+                navbarNav.classList.remove('open');
+            }
+        });
+
+        // ========== FUNCIONES DE NOTIFICACIONES ==========
+        function toggleNotifications(event) {
+            event.stopPropagation();
+            const panel = document.getElementById('notificationsPanel');
+            const overlay = document.getElementById('notificationsOverlay');
+            
+            panel.classList.toggle('open');
+            overlay.classList.toggle('open');
+        }
+
+        function closeNotifications() {
+            const panel = document.getElementById('notificationsPanel');
+            const overlay = document.getElementById('notificationsOverlay');
+            
+            panel.classList.remove('open');
+            overlay.classList.remove('open');
+        }
+
+        function markAsRead(button) {
+            const notificationItem = button.closest('.notification-item');
+            notificationItem.classList.remove('unread');
+            notificationItem.classList.add('read');
+            button.remove();
+            updateNotificationBadge();
+        }
+
+        function markAllAsRead() {
+            const unreadItems = document.querySelectorAll('.notification-item.unread');
+            unreadItems.forEach(item => {
+                item.classList.remove('unread');
+                item.classList.add('read');
+                const button = item.querySelector('.mark-read-btn');
+                if (button) button.remove();
+            });
+            updateNotificationBadge();
+        }
+
+        function updateNotificationBadge() {
+            const unreadCount = document.querySelectorAll('.notification-item.unread').length;
+            const badge = document.getElementById('notificationBadge');
+            
+            // Verificar que el badge existe antes de intentar modificarlo
+            if (!badge) {
+                return;
+            }
+            
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Cerrar notificaciones con tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const panel = document.getElementById('notificationsPanel');
+                if (panel.classList.contains('open')) {
+                    closeNotifications();
+                }
+            }
+        });
+
+        // Inicializar el badge al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            updateNotificationBadge();
+        });
+
+        // ========== SISTEMA DE MENSAJERÍA ==========
+        function toggleMensajesPanel() {
+            const panel = document.getElementById('mensajesPanel');
+            const overlay = document.getElementById('mensajesOverlay');
+            
+            panel.classList.toggle('open');
+            overlay.classList.toggle('show');
+            
+            if (panel.classList.contains('open')) {
+                cargarMensajes();
+                cargarUsuariosDisponibles();
+            }
+        }
+
+        function closeMensajes() {
+            const panel = document.getElementById('mensajesPanel');
+            const overlay = document.getElementById('mensajesOverlay');
+            
+            panel.classList.remove('open');
+            overlay.classList.remove('show');
+        }
+
+        function cambiarTabMensajes(tab) {
+            // Actualizar tabs activos
+            document.querySelectorAll('.msg-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.msg-tab[data-tab="${tab}"]`).classList.add('active');
+            
+            // Mostrar contenido correspondiente
+            document.querySelectorAll('.mensajes-content').forEach(c => c.style.display = 'none');
+            document.getElementById(`tab-${tab}`).style.display = 'block';
+            
+            // Mostrar/ocultar campo de odontograma según tipo
+            if (tab === 'nuevo') {
+                document.getElementById('tipo').addEventListener('change', function() {
+                    const odontogramaGroup = document.getElementById('odontogramaGroup');
+                    if (this.value === 'odontograma') {
+                        odontogramaGroup.style.display = 'block';
+                    } else {
+                        odontogramaGroup.style.display = 'none';
+                    }
+                });
+            }
+        }
+
+        async function cargarMensajes() {
+            try {
+                const response = await fetch('{% url "obtener_mensajes" %}');
+                const data = await response.json();
+                
+                if (data.mensajes) {
+                    mostrarMensajes(data.mensajes);
+                    actualizarBadgeMensajes(data.no_leidos);
+                }
+            } catch (error) {
+                console.error('Error al cargar mensajes:', error);
+            }
+        }
+
+        function mostrarMensajes(mensajes) {
+            const recibidos = mensajes.filter(m => m.es_recibido);
+            const enviados = mensajes.filter(m => !m.es_recibido);
+            
+            mostrarListaMensajes('listaMensajesRecibidos', recibidos, true);
+            mostrarListaMensajes('listaMensajesEnviados', enviados, false);
+        }
+
+        function mostrarListaMensajes(containerId, mensajes, esRecibido) {
+            const container = document.getElementById(containerId);
+            
+            if (mensajes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-mensajes">
+                        <i class="fas fa-inbox"></i>
+                        <p>No hay mensajes</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = mensajes.map(m => `
+                <div class="mensaje-item ${m.estado === 'no_leido' ? 'no-leido' : ''} ${m.tipo === 'urgente' ? 'urgente' : ''}"
+                     onclick="verDetalleMensaje(${m.id}, ${esRecibido})">
+                    <div class="mensaje-header-item">
+                        <span class="mensaje-remitente">
+                            ${esRecibido ? m.remitente : m.destinatario}
+                        </span>
+                        <span class="mensaje-fecha">${m.fecha_envio}</span>
+                    </div>
+                    <div class="mensaje-asunto">${m.asunto}</div>
+                    <div class="mensaje-preview">${m.mensaje}</div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                        <span class="mensaje-tipo-badge ${m.tipo}">${getTipoLabel(m.tipo)}</span>
+                        ${m.odontograma_id ? '<i class="fas fa-tooth" style="color: #3b82f6;"></i>' : ''}
+                        ${m.tiene_archivo ? `
+                            <a href="${m.archivo_url}" target="_blank" onclick="event.stopPropagation();" 
+                               style="display: flex; align-items: center; gap: 4px; color: #3b82f6; text-decoration: none; font-size: 0.85rem;">
+                                <i class="fas fa-paperclip"></i>
+                                <span>${m.archivo_nombre}</span>
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getTipoLabel(tipo) {
+            const labels = {
+                'general': 'General',
+                'odontograma': 'Odontograma',
+                'cita': 'Cita',
+                'urgente': 'Urgente'
+            };
+            return labels[tipo] || tipo;
+        }
+
+        async function cargarUsuariosDisponibles() {
+            try {
+                const response = await fetch('{% url "obtener_usuarios_disponibles" %}');
+                const data = await response.json();
+                
+                if (data.usuarios) {
+                    const select = document.getElementById('destinatario');
+                    select.innerHTML = '<option value="">Seleccione un destinatario</option>' +
+                        data.usuarios.map(u => 
+                            `<option value="${u.id}">${u.nombre} - ${u.rol}</option>`
+                        ).join('');
+                }
+            } catch (error) {
+                console.error('Error al cargar usuarios:', error);
+            }
+        }
+
+        async function verDetalleMensaje(mensajeId, esRecibido) {
+            if (esRecibido) {
+                // Marcar como leído
+                try {
+                    await fetch(`/trabajadores/mensajes/${mensajeId}/marcar-leido/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        }
+                    });
+                    cargarMensajes(); // Recargar para actualizar estado
+                } catch (error) {
+                    console.error('Error al marcar mensaje:', error);
+                }
+            }
+            // Aquí puedes agregar un modal para mostrar el mensaje completo
+        }
+
+        function actualizarBadgeMensajes(count) {
+            const badge = document.getElementById('mensajesBadge');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.textContent = '0';
+                badge.style.display = 'none';
+            }
+        }
+
+        // Preview de archivo adjunto
+        document.addEventListener('DOMContentLoaded', function() {
+            const archivoInput = document.getElementById('archivo_adjunto');
+            if (archivoInput) {
+                archivoInput.addEventListener('change', function() {
+                    const preview = document.getElementById('archivo-preview');
+                    const file = this.files[0];
+                    
+                    if (file) {
+                        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                        const extension = file.name.split('.').pop().toLowerCase();
+                        let icon = 'fa-file';
+                        
+                        if (extension === 'pdf') icon = 'fa-file-pdf';
+                        else if (['jpg', 'jpeg', 'png'].includes(extension)) icon = 'fa-file-image';
+                        else if (['doc', 'docx'].includes(extension)) icon = 'fa-file-word';
+                        else if (['xls', 'xlsx'].includes(extension)) icon = 'fa-file-excel';
+                        
+                        preview.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f3f4f6; border-radius: 6px;">
+                                <i class="fas ${icon}" style="color: #3b82f6; font-size: 1.2rem;"></i>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 0.85rem; color: #1f2937; font-weight: 500;">${file.name}</div>
+                                    <div style="font-size: 0.75rem; color: #6b7280;">${sizeMB} MB</div>
+                                </div>
+                                <button type="button" onclick="document.getElementById('archivo_adjunto').value=''; document.getElementById('archivo-preview').innerHTML='';" 
+                                        style="background: none; border: none; color: #ef4444; cursor: pointer;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        preview.innerHTML = '';
+                    }
+                });
+            }
+        });
+        
+        // Enviar mensaje
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('formNuevoMensaje');
+            if (form) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(form);
+                    const btnEnviar = form.querySelector('.btn-enviar-mensaje');
+                    const btnOriginalText = btnEnviar.innerHTML;
+                    
+                    // Deshabilitar botón y mostrar loading
+                    btnEnviar.disabled = true;
+                    btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+                    
+                    try {
+                        const response = await fetch('{% url "enviar_mensaje" %}', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert('Mensaje enviado correctamente');
+                            form.reset();
+                            document.getElementById('archivo-preview').innerHTML = '';
+                            cambiarTabMensajes('recibidos');
+                            cargarMensajes();
+                        } else {
+                            alert('Error: ' + (data.error || 'No se pudo enviar el mensaje'));
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Error al enviar el mensaje');
+                    } finally {
+                        // Reactivar botón
+                        btnEnviar.disabled = false;
+                        btnEnviar.innerHTML = btnOriginalText;
+                    }
+                });
+            }
+        });
+
+        // Cerrar mensajes con tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const panel = document.getElementById('mensajesPanel');
+                if (panel.classList.contains('open')) {
+                    closeMensajes();
+                }
+            }
+        });
+
+        // Actualizar mensajes cada 30 segundos si el panel está abierto
+        setInterval(() => {
+            const panel = document.getElementById('mensajesPanel');
+            if (panel && panel.classList.contains('open')) {
+                cargarMensajes();
+            }
+        }, 30000);
+
+        // ========== SISTEMA DE INFORMACIÓN DE LA CLÍNICA ==========
+        function toggleInfoClinicaPanel() {
+            const panel = document.getElementById('infoClinicaPanel');
+            const overlay = document.getElementById('infoClinicaOverlay');
+            
+            panel.classList.toggle('open');
+            overlay.classList.toggle('open');
+            
+            if (panel.classList.contains('open')) {
+                cargarInfoClinica();
+            }
+        }
+
+        function closeInfoClinica() {
+            const panel = document.getElementById('infoClinicaPanel');
+            const overlay = document.getElementById('infoClinicaOverlay');
+            
+            panel.classList.remove('open');
+            overlay.classList.remove('open');
+        }
+
+        async function cargarInfoClinica() {
+            try {
+                const response = await fetch('{% url "obtener_informacion_clinica" %}');
+                const result = await response.json();
+                
+                if (result.success) {
+                    mostrarInfoClinica(result.data);
+                }
+            } catch (error) {
+                console.error('Error al cargar información:', error);
+                document.getElementById('infoClinicaContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; color: #ef4444;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                        <p>Error al cargar la información</p>
+                    </div>
+                `;
+            }
+        }
+
+        function mostrarInfoClinica(data) {
+            let html = `
+                <div class="info-section-header">
+                    <h4><i class="fas fa-building"></i> ${data.nombre_clinica}</h4>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-item-title">
+                        <i class="fas fa-map-marker-alt"></i> Dirección
+                    </div>
+                    <div class="info-item-content">${data.direccion}</div>
+                </div>
+
+                <div class="info-section-header">
+                    <h4><i class="fas fa-phone"></i> Contacto</h4>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-item-title">
+                        <i class="fas fa-phone"></i> Teléfono Principal
+                    </div>
+                    <div class="info-item-content">
+                        <a href="tel:${data.telefono}">${data.telefono}</a>
+                    </div>
+                </div>
+            `;
+
+            if (data.telefono_secundario) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-item-title">
+                            <i class="fas fa-phone"></i> Teléfono Secundario
+                        </div>
+                        <div class="info-item-content">
+                            <a href="tel:${data.telefono_secundario}">${data.telefono_secundario}</a>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="info-item">
+                    <div class="info-item-title">
+                        <i class="fas fa-envelope"></i> Email
+                    </div>
+                    <div class="info-item-content">
+                        <a href="mailto:${data.email}">${data.email}</a>
+                    </div>
+                </div>
+            `;
+
+            if (data.email_alternativo) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-item-title">
+                            <i class="fas fa-envelope"></i> Email Alternativo
+                        </div>
+                        <div class="info-item-content">
+                            <a href="mailto:${data.email_alternativo}">${data.email_alternativo}</a>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (data.whatsapp) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-item-title">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        </div>
+                        <div class="info-item-content">
+                            <a href="https://wa.me/${data.whatsapp.replace(/[^0-9]/g, '')}" target="_blank">${data.whatsapp}</a>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="info-section-header">
+                    <h4><i class="fas fa-clock"></i> Horario de Atención</h4>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-item-content" style="margin-left: 0; white-space: pre-line;">${data.horario_atencion}</div>
+                </div>
+            `;
+
+            if (data.sitio_web || data.facebook || data.instagram) {
+                html += `
+                    <div class="info-section-header">
+                        <h4><i class="fas fa-share-alt"></i> Redes Sociales</h4>
+                    </div>
+                `;
+
+                if (data.sitio_web) {
+                    html += `
+                        <div class="info-item">
+                            <div class="info-item-title">
+                                <i class="fas fa-globe"></i> Sitio Web
+                            </div>
+                            <div class="info-item-content">
+                                <a href="${data.sitio_web}" target="_blank">${data.sitio_web}</a>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (data.facebook) {
+                    html += `
+                        <div class="info-item">
+                            <div class="info-item-title">
+                                <i class="fab fa-facebook"></i> Facebook
+                            </div>
+                            <div class="info-item-content">
+                                <a href="${data.facebook}" target="_blank">${data.facebook}</a>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (data.instagram) {
+                    html += `
+                        <div class="info-item">
+                            <div class="info-item-title">
+                                <i class="fab fa-instagram"></i> Instagram
+                            </div>
+                            <div class="info-item-content">
+                                <a href="https://instagram.com/${data.instagram.replace('@', '')}" target="_blank">${data.instagram}</a>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            if (data.notas_adicionales) {
+                html += `
+                    <div class="info-section-header">
+                        <h4><i class="fas fa-sticky-note"></i> Notas Adicionales</h4>
+                    </div>
+
+                    <div class="info-item">
+                        <div class="info-item-content" style="margin-left: 0; white-space: pre-line;">${data.notas_adicionales}</div>
+                    </div>
+                `;
+            }
+
+            if (data.actualizado_el) {
+                html += `
+                    <div style="background: #eff6ff; padding: 12px 16px; border-radius: 8px; border: 1px solid #bfdbfe; margin-top: 20px; font-size: 0.8rem; color: #1e40af;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Última actualización:</strong> ${data.actualizado_el}
+                        ${data.actualizado_por ? 'por ' + data.actualizado_por : ''}
+                    </div>
+                `;
+            }
+
+            document.getElementById('infoClinicaContent').innerHTML = html;
+        }
+
+        // Cerrar panel de información con tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const panel = document.getElementById('infoClinicaPanel');
+                if (panel && panel.classList.contains('open')) {
+                    closeInfoClinica();
+                }
+            }
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

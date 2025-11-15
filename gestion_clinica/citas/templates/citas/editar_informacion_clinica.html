@@ -1,0 +1,176 @@
+{% extends 'citas/base.html' %}
+
+{% block page_title %}
+<i class="fas fa-building"></i> Editar Información de la Clínica
+{% endblock %}
+
+{% block page_subtitle %}
+Actualiza los datos de contacto y horarios de atención
+{% endblock %}
+
+{% block content %}
+<div class="section">
+    <form method="post" id="formInfoClinica">
+        {% csrf_token %}
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <!-- Información Básica -->
+            <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <h3 style="color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Información Básica
+                </h3>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-building"></i> Nombre de la Clínica *
+                    </label>
+                    <input type="text" name="nombre_clinica" value="{{ info.nombre_clinica }}" required
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-map-marker-alt"></i> Dirección *
+                    </label>
+                    <textarea name="direccion" required rows="3"
+                              style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; font-family: inherit;">{{ info.direccion }}</textarea>
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-clock"></i> Horario de Atención *
+                    </label>
+                    <textarea name="horario_atencion" required rows="3"
+                              style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; font-family: inherit;">{{ info.horario_atencion }}</textarea>
+                    <small style="color: #64748b; font-size: 0.75rem;">
+                        Ejemplo: Lunes a Viernes: 9:00 - 18:00
+                    </small>
+                </div>
+            </div>
+            
+            <!-- Contacto -->
+            <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <h3 style="color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-phone" style="color: #10b981;"></i> Información de Contacto
+                </h3>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-phone"></i> Teléfono Principal *
+                    </label>
+                    <input type="tel" name="telefono" value="{{ info.telefono }}" required
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-phone"></i> Teléfono Secundario
+                    </label>
+                    <input type="tel" name="telefono_secundario" value="{{ info.telefono_secundario|default:'' }}"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-envelope"></i> Email Principal *
+                    </label>
+                    <input type="email" name="email" value="{{ info.email }}" required
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-envelope"></i> Email Alternativo
+                    </label>
+                    <input type="email" name="email_alternativo" value="{{ info.email_alternativo|default:'' }}"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div style="margin-bottom: 0;">
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </label>
+                    <input type="tel" name="whatsapp" value="{{ info.whatsapp|default:'' }}"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Redes Sociales y Otros -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+            <h3 style="color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-share-alt" style="color: #8b5cf6;"></i> Redes Sociales y Sitio Web
+            </h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                <div>
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fas fa-globe"></i> Sitio Web
+                    </label>
+                    <input type="url" name="sitio_web" value="{{ info.sitio_web|default:'' }}" placeholder="https://www.ejemplo.com"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fab fa-facebook"></i> Facebook
+                    </label>
+                    <input type="url" name="facebook" value="{{ info.facebook|default:'' }}" placeholder="https://facebook.com/..."
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">
+                        <i class="fab fa-instagram"></i> Instagram
+                    </label>
+                    <input type="text" name="instagram" value="{{ info.instagram|default:'' }}" placeholder="@usuario"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notas Adicionales -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+            <h3 style="color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-sticky-note" style="color: #f59e0b;"></i> Notas Adicionales
+            </h3>
+            
+            <textarea name="notas_adicionales" rows="4" placeholder="Información adicional importante para el personal..."
+                      style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; font-family: inherit;">{{ info.notas_adicionales|default:'' }}</textarea>
+        </div>
+        
+        <!-- Información de Actualización -->
+        {% if info.actualizado_el %}
+        <div style="background: #eff6ff; padding: 12px 16px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 24px; font-size: 0.875rem; color: #1e40af;">
+            <i class="fas fa-info-circle"></i>
+            <strong>Última actualización:</strong> {{ info.actualizado_el|date:"d/m/Y H:i" }}
+            {% if info.actualizado_por %}
+            por {{ info.actualizado_por.nombre_completo }}
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Botones de Acción -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <a href="{% url 'panel_trabajador' %}" class="btn" style="background: #6b7280;">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    input:focus, textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+</style>
+{% endblock %}
+
+
+
+

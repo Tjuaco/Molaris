@@ -1,0 +1,261 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Citas Tomadas - Clínica Dental{% endblock %}
+
+{% block page_title %}📅 Citas Tomadas{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h2>Listado de Citas Tomadas (Reservadas y Confirmadas)</h2>
+    <div class="table-container">
+        <table>
+            <tr>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Paciente</th>
+                <th>Contacto</th>
+                <th>Tipo</th>
+                <th>Dentista</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+            {% for cita in citas %}
+            <tr>
+                <td>{{ cita.fecha_hora|date:"d/m/Y" }}</td>
+                <td>{{ cita.fecha_hora|time:"H:i" }}</td>
+                <td>{{ cita.paciente_nombre }}</td>
+                <td>
+                    <div>{{ cita.paciente_email|default:"-" }}</div>
+                    <div>{{ cita.paciente_telefono|default:"-" }}</div>
+                </td>
+                <td>{{ cita.tipo_consulta|default:"-" }}</td>
+                <td>{{ cita.dentista.nombre_completo|default:"-" }}</td>
+                <td><span class="status-{{ cita.estado }}">{{ cita.get_estado_display }}</span></td>
+                <td class="action-buttons">
+                    {% if cita.estado == 'reservada' %}
+                        <a href="{% url 'confirmar_cita' cita.id %}" class="btn-action btn-confirmar" title="Confirmar cita">
+                            <i class="fas fa-check-circle"></i> Confirmar
+                        </a>
+                    {% endif %}
+                    {% if cita.estado == 'confirmada' or cita.estado == 'reservada' %}
+                        <a href="{% url 'completar_cita' cita.id %}" class="btn-action btn-completar" title="Marcar cita como completada">
+                            <i class="fas fa-check-double"></i> Completar
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'cancelar_cita_admin' cita.id %}" class="btn-action btn-cancelar" title="Cancelar cita" onclick="return confirm('¿Estás seguro de que deseas cancelar esta cita?')">
+                        <i class="fas fa-times-circle"></i> Cancelar
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">No hay citas tomadas.</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    {% if citas.has_other_pages %}
+    <div class="pagination">
+        <div class="pagination-info">
+            Mostrando {{ citas.start_index }} - {{ citas.end_index }} de {{ citas.paginator.count }} citas
+        </div>
+        <div class="pagination-controls">
+            {% if citas.has_previous %}
+                <a href="?page=1" class="page-btn" title="Primera página">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?page={{ citas.previous_page_number }}" class="page-btn" title="Anterior">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fas fa-angle-double-left"></i></span>
+                <span class="page-btn disabled"><i class="fas fa-angle-left"></i></span>
+            {% endif %}
+            
+            <span class="page-current">
+                Página {{ citas.number }} de {{ citas.paginator.num_pages }}
+            </span>
+            
+            {% if citas.has_next %}
+                <a href="?page={{ citas.next_page_number }}" class="page-btn" title="Siguiente">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="?page={{ citas.paginator.num_pages }}" class="page-btn" title="Última página">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fas fa-angle-right"></i></span>
+                <span class="page-btn disabled"><i class="fas fa-angle-double-right"></i></span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-reservada { 
+        color: #f39c12; 
+        font-weight: 600; 
+        background: #fef3c7;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+    }
+    .status-confirmada { 
+        color: #3498db; 
+        font-weight: 600;
+        background: #dbeafe;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+    }
+    .table-container { overflow-x: auto; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 14px; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: middle; }
+    th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; }
+    tr:hover { background: #f8fafc; }
+    
+    /* Ajustar ancho de columnas */
+    th:nth-child(1), td:nth-child(1) { width: 100px; } /* Fecha */
+    th:nth-child(2), td:nth-child(2) { width: 80px; }  /* Hora */
+    th:nth-child(7), td:nth-child(7) { width: 120px; } /* Estado */
+    th:nth-child(8), td:nth-child(8) { width: 180px; padding: 8px; } /* Acciones */
+    
+    /* Botones de Acción Modernos */
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        flex-direction: column;
+        min-width: 150px;
+    }
+    
+    .btn-action {
+        padding: 8px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        text-align: center;
+        width: 100%;
+    }
+    
+    .btn-confirmar {
+        background: #10b981;
+        color: white;
+        border: 1px solid #10b981;
+    }
+    
+    .btn-confirmar:hover {
+        background: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+    }
+    
+    .btn-completar {
+        background: #f59e0b;
+        color: white;
+        border: 1px solid #f59e0b;
+    }
+    
+    .btn-completar:hover {
+        background: #d97706;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+    }
+    
+    .btn-cancelar {
+        background: #ef4444;
+        color: white;
+        border: 1px solid #ef4444;
+    }
+    
+    .btn-cancelar:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+    }
+    
+    /* Estilos de Paginación */
+    .pagination {
+        margin-top: 30px;
+        padding: 20px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .pagination-info {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    .pagination-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    
+    .page-btn {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        background: white;
+        color: #374151;
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        font-size: 0.875rem;
+    }
+    
+    .page-btn:hover:not(.disabled) {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    
+    .page-btn.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        background: #f9fafb;
+    }
+    
+    .page-current {
+        padding: 8px 16px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    @media (max-width: 768px) {
+        .pagination {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .pagination-info {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - Clínica Dental</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            min-height: 100vh;
+            color: #333;
+            position: relative;
+        }
+
+        .back-to-home {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
+            padding: 12px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-btn:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .register-container { 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            margin: 80px auto 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .register-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #2563eb);
+        }
+
+        .register-header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+
+        .register-header h1 { 
+            color: #333; 
+            margin: 0 0 15px 0; 
+            font-size: 2.2rem;
+            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .register-header p { 
+            color: #666; 
+            margin: 0;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .feature-highlight {
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            border: 1px solid #93c5fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .feature-highlight i {
+            color: #3b82f6;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .feature-highlight p {
+            color: #333;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+
+        .form-group label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: #333; 
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea { 
+            width: 100%; 
+            padding: 15px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 10px; 
+            font-size: 16px; 
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            font-family: inherit;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus { 
+            outline: none; 
+            border-color: #3b82f6; 
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .form-group input[type="text"][name="telefono"] {
+            padding-left: 60px;
+        }
+
+
+        .btn-register { 
+            width: 100%; 
+            background: linear-gradient(45deg, #3b82f6, #2563eb); 
+            color: white; 
+            border: none; 
+            padding: 16px; 
+            border-radius: 10px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-register:hover { 
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-register:active {
+            transform: translateY(-1px);
+        }
+
+        .login-link { 
+            text-align: center; 
+            margin-top: 20px; 
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .login-link a { 
+            color: #3b82f6; 
+            text-decoration: none; 
+            font-weight: 600;
+            padding: 10px 20px;
+            border: 2px solid #3b82f6;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .login-link a:hover { 
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .messages { 
+            margin-bottom: 20px; 
+        }
+
+        .message { 
+            padding: 15px; 
+            border-radius: 10px; 
+            margin-bottom: 15px; 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .message.success { 
+            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            color: white;
+            border-left: 4px solid #1e40af;
+        }
+
+        .message.error { 
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+            border-left: 4px solid #c62828;
+        }
+
+        .errorlist { 
+            color: #dc3545; 
+            font-size: 14px; 
+            margin: 5px 0; 
+            list-style: none; 
+            padding: 0; 
+        }
+
+        .help-text { 
+            color: #666; 
+            font-size: 12px; 
+            margin-top: 5px; 
+            font-style: italic;
+        }
+
+        .required { 
+            color: #dc3545; 
+        }
+
+        .optional { 
+            color: #666; 
+            font-size: 12px; 
+        }
+
+        .security-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .security-note i {
+            margin-right: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .register-container {
+                margin: 60px 20px 20px;
+                padding: 30px;
+            }
+
+            .back-to-home {
+                top: 15px;
+                left: 15px;
+            }
+
+            .register-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .form-group input {
+                padding: 12px;
+            }
+
+            .btn-register {
+                padding: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .register-container {
+                margin: 50px 15px 15px;
+                padding: 25px;
+            }
+
+            .register-header h1 {
+                font-size: 1.6rem;
+            }
+
+            .back-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Botón Volver al Inicio -->
+    <div class="back-to-home">
+        <a href="{% url 'inicio' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i>
+            Volver al Inicio
+        </a>
+    </div>
+
+    <div class="register-container">
+        <div class="register-header">
+            <h1><i class="fas fa-tooth"></i> Clínica Dental</h1>
+            <p>Crea tu cuenta para acceder al sistema de reservas</p>
+        </div>
+
+        <!-- Destacado de Funcionalidad -->
+        <div class="feature-highlight">
+            <i class="fas fa-calendar-check"></i>
+            <p><strong>¡Reserva tus citas de manera remota!</strong><br>
+            Regístrate para poder agendar horarios de atención dental desde tu casa</p>
+        </div>
+
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="message {{ message.tags }}">
+                        {% if message.tags == 'success' %}
+                            <i class="fas fa-check-circle"></i>
+                        {% elif message.tags == 'error' %}
+                            <i class="fas fa-exclamation-circle"></i>
+                        {% endif %}
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            
+            {% if form.errors %}
+                <div class="message error">
+                    <p>Por favor corrige los errores:</p>
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">
+                    <i class="fas fa-user"></i> Usuario: <span class="required">*</span>
+                </label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.username.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.email.id_for_label }}">
+                    <i class="fas fa-envelope"></i> Email: <span class="required">*</span>
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.email.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.password1.id_for_label }}">
+                    <i class="fas fa-lock"></i> Contraseña: <span class="required">*</span>
+                </label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.password1.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.password1.help_text %}
+                    <div class="help-text">{{ form.password1.help_text }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.password2.id_for_label }}">
+                    <i class="fas fa-lock"></i> Confirmar Contraseña: <span class="required">*</span>
+                </label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.password2.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.password2.help_text %}
+                    <div class="help-text">{{ form.password2.help_text }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.nombre_completo.id_for_label }}">
+                    <i class="fas fa-user-circle"></i> Nombre Completo: <span class="required">*</span>
+                </label>
+                {{ form.nombre_completo }}
+                {% if form.nombre_completo.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.nombre_completo.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.telefono.id_for_label }}">
+                    <i class="fas fa-phone"></i> Teléfono: <span class="required">*</span>
+                </label>
+                <div style="position: relative;">
+                    <div style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #666; font-weight: 600; pointer-events: none; z-index: 10;">
+                        +56 9
+                    </div>
+                    {{ form.telefono }}
+                </div>
+                {% if form.telefono.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.telefono.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <div class="help-text">
+                    <strong>Formato:</strong> Solo ingresa los 8 dígitos después del 9<br>
+                    <strong>Ejemplo:</strong> Si tu número es +56 9 1234 5678, ingresa solo: <strong>12345678</strong><br>
+                    <span style="color: #3b82f6; font-weight: 600;">✓ El prefijo +56 9 ya está incluido automáticamente</span><br>
+                    <span style="color: #dc3545; font-weight: 600;">⚠️ Se enviará un código de verificación a este número</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.rut.id_for_label }}">
+                    <i class="fas fa-fingerprint"></i> RUT: <span class="required">*</span>
+                </label>
+                {{ form.rut }}
+                {% if form.rut.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.rut.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.rut.help_text %}
+                    <div class="help-text">{{ form.rut.help_text }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.fecha_nacimiento.id_for_label }}">
+                    <i class="fas fa-birthday-cake"></i> Fecha de Nacimiento: <span class="required">*</span>
+                </label>
+                {{ form.fecha_nacimiento }}
+                {% if form.fecha_nacimiento.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.fecha_nacimiento.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.fecha_nacimiento.help_text %}
+                    <div class="help-text">{{ form.fecha_nacimiento.help_text }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.alergias.id_for_label }}">
+                    <i class="fas fa-exclamation-triangle" style="color: #dc2626;"></i> Alergias: <span class="required">*</span>
+                </label>
+                {{ form.alergias }}
+                {% if form.alergias.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.alergias.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.alergias.help_text %}
+                    <div class="help-text" style="color: #dc2626; font-weight: 600;">
+                        <i class="fas fa-info-circle"></i> {{ form.alergias.help_text }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn-register">
+                <i class="fas fa-user-plus"></i>
+                Crear Cuenta
+            </button>
+        </form>
+
+        <div class="login-link">
+            <p>¿Ya tienes cuenta? <a href="{% url 'login_cliente' %}">
+                <i class="fas fa-sign-in-alt"></i> Inicia sesión aquí
+            </a></p>
+        </div>
+
+        <div class="security-note">
+            <i class="fas fa-shield-alt"></i>
+            Tu información está protegida con encriptación SSL
+        </div>
+    </div>
+</body>
+</html>

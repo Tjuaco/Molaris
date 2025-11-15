@@ -1,0 +1,303 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Editar Perfil - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-user-edit"></i> Editar Perfil{% endblock %}
+{% block page_subtitle %}Actualiza tu información personal{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="post" class="profile-form">
+        {% csrf_token %}
+        
+        <div class="form-section">
+            <h3><i class="fas fa-user"></i> Información Personal</h3>
+            
+            <div class="form-group">
+                <label for="{{ form.nombre_completo.id_for_label }}">
+                    <i class="fas fa-user"></i>
+                    Nombre Completo
+                    <span class="required">*</span>
+                </label>
+                {{ form.nombre_completo }}
+                {% if form.nombre_completo.errors %}
+                    <div class="error-message">{{ form.nombre_completo.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.email.id_for_label }}">
+                    <i class="fas fa-envelope"></i>
+                    Email
+                    <span class="required">*</span>
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="error-message">{{ form.email.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.telefono.id_for_label }}">
+                    <i class="fas fa-phone"></i>
+                    Teléfono
+                    <span class="required">*</span>
+                </label>
+                {{ form.telefono }}
+                {% if form.telefono.errors %}
+                    <div class="error-message">{{ form.telefono.errors }}</div>
+                {% endif %}
+                <small class="form-hint">Formato: +56912345678</small>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3><i class="fas fa-briefcase"></i> Información Profesional</h3>
+            
+            <div class="form-group">
+                <label for="{{ form.rol.id_for_label }}">
+                    <i class="fas fa-user-tag"></i>
+                    Rol
+                    <span class="required">*</span>
+                </label>
+                {{ form.rol }}
+                {% if form.rol.errors %}
+                    <div class="error-message">{{ form.rol.errors }}</div>
+                {% endif %}
+            </div>
+
+            {% if perfil.rol == 'dentista' or form.rol.value == 'dentista' %}
+            <div class="form-group">
+                <label for="{{ form.especialidad.id_for_label }}">
+                    <i class="fas fa-stethoscope"></i>
+                    Especialidad
+                </label>
+                {{ form.especialidad }}
+                {% if form.especialidad.errors %}
+                    <div class="error-message">{{ form.especialidad.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.numero_colegio.id_for_label }}">
+                    <i class="fas fa-id-badge"></i>
+                    Número de Colegio
+                </label>
+                {{ form.numero_colegio }}
+                {% if form.numero_colegio.errors %}
+                    <div class="error-message">{{ form.numero_colegio.errors }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="{{ form.activo.id_for_label }}" class="checkbox-label">
+                    {{ form.activo }}
+                    <span>Activo</span>
+                </label>
+                {% if form.activo.errors %}
+                    <div class="error-message">{{ form.activo.errors }}</div>
+                {% endif %}
+                <small class="form-hint">Si está desactivado, no podrás acceder al sistema</small>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'panel_trabajador' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i>
+                Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i>
+                Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+.form-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.profile-form {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-section {
+    margin-bottom: 32px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h3 {
+    margin: 0 0 24px 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-section h3 i {
+    color: #3b82f6;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-group label i {
+    color: #3b82f6;
+}
+
+.form-group label.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.required {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="tel"],
+.form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group input[type="tel"]:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.error-message {
+    margin-top: 6px;
+    color: #ef4444;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .form-container {
+        padding: 16px;
+    }
+    
+    .profile-form {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
