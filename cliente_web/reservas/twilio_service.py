@@ -141,6 +141,12 @@ Equipo {clinic_name}"""
         socket.setdefaulttimeout(10)  # Timeout de 10 segundos
         
         try:
+            # Verificar configuración antes de enviar
+            logger.info(f"Intentando enviar código por email a {email}")
+            logger.info(f"EMAIL_HOST: {email_host}")
+            logger.info(f"EMAIL_HOST_USER: {email_host_user}")
+            logger.info(f"EMAIL_FROM: {email_from}")
+            
             send_mail(
                 asunto,
                 mensaje,
@@ -148,10 +154,10 @@ Equipo {clinic_name}"""
                 [email],
                 fail_silently=False,
             )
-            logger.info(f"Código de verificación enviado por email a {email}")
+            logger.info(f"✓ Código de verificación enviado por email a {email}")
             return True
         except socket.timeout:
-            logger.error(f"Timeout al enviar código por email a {email}")
+            logger.error(f"✗ Timeout al enviar código por email a {email}")
             # En caso de timeout, mostrar código en consola y continuar
             print(f"\n{'='*60}")
             print(f"[TIMEOUT] Código de verificación Email")
@@ -159,17 +165,33 @@ Equipo {clinic_name}"""
             print(f"CÓDIGO: {codigo}")
             print(f"{'='*60}\n")
             return True  # Retornar True para no romper el flujo
+        except Exception as mail_error:
+            logger.error(f"✗ Error al enviar email: {type(mail_error).__name__}: {str(mail_error)}")
+            # Re-lanzar para que se capture en el except general
+            raise
         finally:
             socket.setdefaulttimeout(None)  # Restaurar timeout por defecto
         
     except Exception as e:
-        logger.error(f"Error al enviar código por email: {e}")
+        error_type = type(e).__name__
+        error_msg = str(e)
+        logger.error(f"✗ Error al enviar código por email: {error_type}: {error_msg}")
+        logger.error(f"  Email destino: {email}")
+        logger.error(f"  Email host: {email_host}")
+        logger.error(f"  Email user: {email_host_user}")
+        
         # En desarrollo, mostrar en consola
         print(f"\n{'='*60}")
-        print(f"[MODO DESARROLLO] Código de verificación Email")
+        print(f"[ERROR] Código de verificación Email")
         print(f"Email: {email}")
         print(f"CÓDIGO: {codigo}")
-        print(f"Error: {e}")
+        print(f"Error: {error_type}: {error_msg}")
         print(f"{'='*60}\n")
-        return True  # Retornar True para no romper el flujo en desarrollo
+        
+        # Si es un error de autenticación, retornar False para que se muestre el error
+        if 'authentication' in error_msg.lower() or '535' in error_msg or '534' in error_msg:
+            logger.error("Error de autenticación con Gmail. Verifica EMAIL_HOST_PASSWORD.")
+            return False
+        
+        return True  # Retornar True para otros errores y no romper el flujo
 
