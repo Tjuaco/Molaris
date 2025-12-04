@@ -1,15 +1,18 @@
+[providers]
+python = "3.11"
+
 [phases.setup]
-nixPkgs = ["python311"]
+nixPkgs = ["python311", "pip"]
 
 [phases.install]
 cmds = [
+  "pip install --upgrade pip",
   "pip install -r requirements.txt"
 ]
 
 [phases.build]
 cmds = [
-  "cd gestion_clinica",
-  "python manage.py collectstatic --noinput"
+  "cd gestion_clinica && python manage.py collectstatic --noinput"
 ]
 
 [start]
