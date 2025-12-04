@@ -5,6 +5,10 @@ set -e
 echo "Running migrations..."
 python manage.py migrate --noinput
 
+# Recopilar archivos estáticos
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
 # Iniciar Gunicorn
 echo "Starting Gunicorn..."
 exec gunicorn cliente_web.wsgi:application \

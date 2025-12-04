@@ -21,9 +21,6 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar todo el código del proyecto (Root Directory es cliente_web, así que copiamos todo)
 COPY . .
 
-# Recopilar archivos estáticos (ya estamos en el directorio correcto)
-RUN python manage.py collectstatic --noinput
-
 # Copiar script de inicio
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
