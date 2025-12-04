@@ -10,15 +10,14 @@ nixPkgs = ["python311", "pip", "postgresql"]
 [phases.install]
 cmds = [
   "pip install --upgrade pip setuptools wheel",
-  "pip install -r requirements.txt"
+  "pip install -r ../requirements.txt"
 ]
 
 [phases.build]
 cmds = [
-  "cd gestion_clinica",
   "python manage.py collectstatic --noinput"
 ]
 
 [start]
-cmd = "cd gestion_clinica && python manage.py migrate --noinput && gunicorn gestion_clinica.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+cmd = "python manage.py migrate --noinput && gunicorn gestion_clinica.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
 
