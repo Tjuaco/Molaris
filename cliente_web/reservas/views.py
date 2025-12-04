@@ -264,157 +264,175 @@ def reservar_cita(request, cita_id):
 
 @login_required
 def panel_cliente(request):
-    # Obtener parámetros de filtro
-    tipo_consulta = request.GET.get('tipo_consulta', '')
-    fecha_filtro = request.GET.get('fecha', '')
-    dentista_id = request.GET.get('dentista_id', '')
-    
-    # Obtener citas disponibles con filtros
-    citas_disponibles = Cita.objects.filter(estado='disponible')
-    
-    # Aplicar filtros si existen
-    if tipo_consulta:
-        citas_disponibles = citas_disponibles.filter(tipo_consulta=tipo_consulta)
-    
-    if fecha_filtro:
-        from datetime import datetime
-        try:
-            fecha_obj = datetime.strptime(fecha_filtro, '%Y-%m-%d').date()
-            citas_disponibles = citas_disponibles.filter(fecha_hora__date=fecha_obj)
-        except ValueError:
-            pass  # Si la fecha es inválida, ignorar el filtro
-    
-    citas_disponibles = citas_disponibles.order_by('fecha_hora')
-    
-    # Aplicar filtro de dentista si existe
-    if dentista_id:
-        try:
-            dentista_id_int = int(dentista_id)
-            # Filtrar citas que tienen este dentista asignado
-            citas_disponibles = citas_disponibles.filter(dentista_id=dentista_id_int)
-        except ValueError:
-            pass  # Si el ID es inválido, ignorar el filtro
-    
-    # Agregar información del dentista y tipo de servicio a cada cita disponible
-    citas_con_dentista = []
-    for cita in citas_disponibles:
-        try:
-            dentista_info = obtener_dentista_de_cita(cita.id)
-            servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
-            # Agregar el dentista y servicio como atributo de la cita
-            cita.dentista_info = dentista_info
-            cita.servicio_info = servicio_info
-            citas_con_dentista.append(cita)
-        except Exception as e:
-            logger.warning(f"Error al obtener información de cita {cita.id}: {e}")
-            # Agregar la cita sin información adicional si hay error
-            cita.dentista_info = None
-            cita.servicio_info = None
-            citas_con_dentista.append(cita)
-    
-    # Obtener citas reservadas por el usuario actual
-    # Buscar por múltiples criterios: email del perfil, cliente_id, o username
     try:
-        perfil_usuario_temp = PerfilCliente.objects.get(user=request.user)
-        email_usuario = perfil_usuario_temp.email or request.user.email
-    except PerfilCliente.DoesNotExist:
-        email_usuario = request.user.email
-    
-    # Primero buscar por cliente_id usando SQL directo (más confiable)
-    citas_reservadas_ids = set()
-    try:
-        from django.db import connections
-        with connections['default'].cursor() as cursor:
-            # Obtener cliente_id del usuario
-            cursor.execute("""
-                SELECT id FROM pacientes_cliente
-                WHERE email = %s AND activo = TRUE
-                LIMIT 1
-            """, [email_usuario])
-            cliente_row = cursor.fetchone()
-            if cliente_row:
-                cliente_id = cliente_row[0]
-                # Buscar citas por cliente_id
+        # Obtener parámetros de filtro
+        tipo_consulta = request.GET.get('tipo_consulta', '')
+        fecha_filtro = request.GET.get('fecha', '')
+        dentista_id = request.GET.get('dentista_id', '')
+        
+        # Obtener citas disponibles con filtros
+        citas_disponibles = Cita.objects.filter(estado='disponible')
+        
+        # Aplicar filtros si existen
+        if tipo_consulta:
+            citas_disponibles = citas_disponibles.filter(tipo_consulta=tipo_consulta)
+        
+        if fecha_filtro:
+            from datetime import datetime
+            try:
+                fecha_obj = datetime.strptime(fecha_filtro, '%Y-%m-%d').date()
+                citas_disponibles = citas_disponibles.filter(fecha_hora__date=fecha_obj)
+            except ValueError:
+                pass  # Si la fecha es inválida, ignorar el filtro
+        
+        citas_disponibles = citas_disponibles.order_by('fecha_hora')
+        
+        # Aplicar filtro de dentista si existe
+        if dentista_id:
+            try:
+                dentista_id_int = int(dentista_id)
+                # Filtrar citas que tienen este dentista asignado
+                citas_disponibles = citas_disponibles.filter(dentista_id=dentista_id_int)
+            except ValueError:
+                pass  # Si el ID es inválido, ignorar el filtro
+        
+        # Agregar información del dentista y tipo de servicio a cada cita disponible
+        citas_con_dentista = []
+        for cita in citas_disponibles:
+            try:
+                dentista_info = obtener_dentista_de_cita(cita.id)
+                servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
+                # Agregar el dentista y servicio como atributo de la cita
+                cita.dentista_info = dentista_info
+                cita.servicio_info = servicio_info
+                citas_con_dentista.append(cita)
+            except Exception as e:
+                logger.warning(f"Error al obtener información de cita {cita.id}: {e}")
+                # Agregar la cita sin información adicional si hay error
+                cita.dentista_info = None
+                cita.servicio_info = None
+                citas_con_dentista.append(cita)
+        
+        # Obtener citas reservadas por el usuario actual
+        # Buscar por múltiples criterios: email del perfil, cliente_id, o username
+        try:
+            perfil_usuario_temp = PerfilCliente.objects.get(user=request.user)
+            email_usuario = perfil_usuario_temp.email or request.user.email
+        except PerfilCliente.DoesNotExist:
+            email_usuario = request.user.email
+        
+        # Primero buscar por cliente_id usando SQL directo (más confiable)
+        citas_reservadas_ids = set()
+        try:
+            from django.db import connections
+            with connections['default'].cursor() as cursor:
+                # Obtener cliente_id del usuario
                 cursor.execute("""
-                    SELECT id FROM citas_cita
-                    WHERE cliente_id = %s 
-                    AND estado IN ('reservada', 'confirmada')
-                """, [cliente_id])
-                for row in cursor.fetchall():
-                    citas_reservadas_ids.add(row[0])
-    except Exception as e:
-        logger.warning(f"Error al buscar citas por cliente_id: {e}")
-    
-    # También buscar por email (por si no hay cliente_id o como respaldo)
-    citas_por_email = Cita.objects.filter(
-        estado__in=['reservada', 'confirmada']
-    ).filter(
-        Q(paciente_email=email_usuario) |
-        Q(paciente_email=request.user.email)
-    )
-    
-    for cita in citas_por_email:
-        citas_reservadas_ids.add(cita.id)
-    
-    # También buscar por username (por compatibilidad con citas antiguas)
-    citas_por_username = Cita.objects.filter(
-        estado__in=['reservada', 'confirmada'],
-        paciente_nombre=request.user.username
-    )
-    
-    for cita in citas_por_username:
-        citas_reservadas_ids.add(cita.id)
-    
-    # Obtener todas las citas únicas
-    if citas_reservadas_ids:
-        citas_reservadas = Cita.objects.filter(id__in=list(citas_reservadas_ids)).order_by('fecha_hora')
-    else:
-        citas_reservadas = Cita.objects.none()
-    
-    # Agregar información del dentista y tipo de servicio a cada cita reservada
-    for cita in citas_reservadas:
-        try:
-            dentista_info = obtener_dentista_de_cita(cita.id)
-            servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
-            cita.dentista_info = dentista_info
-            cita.servicio_info = servicio_info
+                    SELECT id FROM pacientes_cliente
+                    WHERE email = %s AND activo = TRUE
+                    LIMIT 1
+                """, [email_usuario])
+                cliente_row = cursor.fetchone()
+                if cliente_row:
+                    cliente_id = cliente_row[0]
+                    # Buscar citas por cliente_id
+                    cursor.execute("""
+                        SELECT id FROM citas_cita
+                        WHERE cliente_id = %s 
+                        AND estado IN ('reservada', 'confirmada')
+                    """, [cliente_id])
+                    for row in cursor.fetchall():
+                        citas_reservadas_ids.add(row[0])
         except Exception as e:
-            logger.warning(f"Error al obtener información de cita reservada {cita.id}: {e}")
-            cita.dentista_info = None
-            cita.servicio_info = None
-    
-    # Obtener perfil del usuario
-    try:
-        perfil_usuario = PerfilCliente.objects.get(user=request.user)
-    except PerfilCliente.DoesNotExist:
-        perfil_usuario = None
-    
-
-    # Obtener lista de dentistas disponibles para el filtro
-    try:
-        dentistas_disponibles = obtener_todos_dentistas_activos()
+            logger.warning(f"Error al buscar citas por cliente_id: {e}")
+        
+        # También buscar por email (por si no hay cliente_id o como respaldo)
+        citas_por_email = Cita.objects.filter(
+            estado__in=['reservada', 'confirmada']
+        ).filter(
+            Q(paciente_email=email_usuario) |
+            Q(paciente_email=request.user.email)
+        )
+        
+        for cita in citas_por_email:
+            citas_reservadas_ids.add(cita.id)
+        
+        # También buscar por username (por compatibilidad con citas antiguas)
+        citas_por_username = Cita.objects.filter(
+            estado__in=['reservada', 'confirmada'],
+            paciente_nombre=request.user.username
+        )
+        
+        for cita in citas_por_username:
+            citas_reservadas_ids.add(cita.id)
+        
+        # Obtener todas las citas únicas
+        if citas_reservadas_ids:
+            citas_reservadas = Cita.objects.filter(id__in=list(citas_reservadas_ids)).order_by('fecha_hora')
+        else:
+            citas_reservadas = Cita.objects.none()
+        
+        # Agregar información del dentista y tipo de servicio a cada cita reservada
+        for cita in citas_reservadas:
+            try:
+                dentista_info = obtener_dentista_de_cita(cita.id)
+                servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
+                cita.dentista_info = dentista_info
+                cita.servicio_info = servicio_info
+            except Exception as e:
+                logger.warning(f"Error al obtener información de cita reservada {cita.id}: {e}")
+                cita.dentista_info = None
+                cita.servicio_info = None
+        
+        # Obtener perfil del usuario
+        try:
+            perfil_usuario = PerfilCliente.objects.get(user=request.user)
+        except PerfilCliente.DoesNotExist:
+            perfil_usuario = None
+        
+        # Obtener lista de dentistas disponibles para el filtro
+        try:
+            dentistas_disponibles = obtener_todos_dentistas_activos()
+        except Exception as e:
+            logger.warning(f"Error al obtener lista de dentistas: {e}")
+            dentistas_disponibles = []
+        
+        # Obtener teléfono de la clínica desde settings
+        from django.conf import settings
+        telefono_clinica = getattr(settings, 'CLINIC_PHONE', '+56 9 1234 5678')
+        
+        # Obtener información de la clínica para el mapa
+        from django.conf import settings
+        clinic_map_url = getattr(settings, 'CLINIC_MAP_URL', '')
+        clinic_address = getattr(settings, 'CLINIC_ADDRESS', 'Victoria, Región de la Araucanía')
+        
+        return render(request, "reservas/panel.html", {
+            "citas": citas_con_dentista,
+            "citas_reservadas": citas_reservadas,
+            "perfil_usuario": perfil_usuario,
+            "dentistas_disponibles": dentistas_disponibles,
+            "telefono_clinica": telefono_clinica,
+            "CLINIC_MAP_URL": clinic_map_url,
+            "CLINIC_ADDRESS": clinic_address,
+        })
     except Exception as e:
-        logger.warning(f"Error al obtener lista de dentistas: {e}")
-        dentistas_disponibles = []
-    
-    # Obtener teléfono de la clínica desde settings
-    from django.conf import settings
-    telefono_clinica = getattr(settings, 'CLINIC_PHONE', '+56 9 1234 5678')
-    
-    # Obtener información de la clínica para el mapa
-    from django.conf import settings
-    clinic_map_url = getattr(settings, 'CLINIC_MAP_URL', '')
-    clinic_address = getattr(settings, 'CLINIC_ADDRESS', 'Victoria, Región de la Araucanía')
-    
-    return render(request, "reservas/panel.html", {
-        "citas": citas_con_dentista,
-        "citas_reservadas": citas_reservadas,
-        "perfil_usuario": perfil_usuario,
-        "dentistas_disponibles": dentistas_disponibles,
-        "telefono_clinica": telefono_clinica,
-        "CLINIC_MAP_URL": clinic_map_url,
-        "CLINIC_ADDRESS": clinic_address,
-    })
+        logger.error(f"Error en panel_cliente: {e}", exc_info=True)
+        messages.error(request, 'Ocurrió un error al cargar el panel. Por favor, intenta nuevamente.')
+        # Intentar renderizar con valores por defecto
+        try:
+            perfil_usuario = PerfilCliente.objects.get(user=request.user)
+        except PerfilCliente.DoesNotExist:
+            perfil_usuario = None
+        
+        return render(request, "reservas/panel.html", {
+            "citas": [],
+            "citas_reservadas": [],
+            "perfil_usuario": perfil_usuario,
+            "dentistas_disponibles": [],
+            "telefono_clinica": '+56 9 1234 5678',
+            "CLINIC_MAP_URL": '',
+            "CLINIC_ADDRESS": 'Victoria, Región de la Araucanía',
+        })
 
 
 def _cambiar_estado_cita(cita: Cita, nuevo_estado: str):
