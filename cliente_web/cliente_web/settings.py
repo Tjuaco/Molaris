@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-28vh&5z1ku08x3e@gwocph(vtcc=k3shq(!6=4@-v1iuw+c)5t'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-28vh&5z1ku08x3e@gwocph(vtcc=k3shq(!6=4@-v1iuw+c)5t')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default='False', cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 
 # Application definition
@@ -43,6 +45,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -75,17 +78,27 @@ WSGI_APPLICATION = 'cliente_web.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# Railway proporciona DATABASE_URL automáticamente, pero también podemos usar variables individuales
+import dj_database_url
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'clinica_db',       # Nombre de tu base de datos
-        'USER': 'postgres',       # Usuario de PostgreSQL
-        'PASSWORD': 'postgres',# Contraseña del usuario
-        'HOST': 'localhost',        # O dirección de tu servidor DB
-        'PORT': '5432',
+# Intentar usar DATABASE_URL de Railway primero
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
     }
-}
+else:
+    # Fallback a variables individuales
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='clinica_db'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default='postgres'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 
 # Password validation
@@ -134,8 +147,11 @@ except:
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# WhiteNoise configuration for serving static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -174,20 +190,20 @@ TWILIO_WHATSAPP_BUSINESS_NUMBER = os.getenv('TWILIO_WHATSAPP_BUSINESS_NUMBER', T
 TWILIO_STATUS_CALLBACK = os.getenv('TWILIO_STATUS_CALLBACK', None)
 
 # URL base del sitio para construir enlaces en mensajes
-SITE_URL = "http://localhost:8000"
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
 # Información de la clínica para personalizar mensajes (opcional, se obtiene del modelo si no se define)
-CLINIC_NAME = os.getenv('CLINIC_NAME', 'Clínica Dental San Felipe')
-CLINIC_ADDRESS = os.getenv('CLINIC_ADDRESS', '')
-CLINIC_PHONE = os.getenv('CLINIC_PHONE', '')
-CLINIC_EMAIL = os.getenv('CLINIC_EMAIL', '')
-CLINIC_WEBSITE = os.getenv('CLINIC_WEBSITE', '')
-CLINIC_MAP_URL = os.getenv('CLINIC_MAP_URL', 'https://www.google.com/maps/place/Clinica+San+Felipe/@-38.2356192,-72.3361399,17z/data=!3m1!4b1!4m6!3m5!1s0x966b155a8306e093:0x46de06dfbc92e29d!8m2!3d-38.2356192!4d-72.333565!16s%2Fg%2F11sswz76yt?hl=es&entry=ttu')
+CLINIC_NAME = config('CLINIC_NAME', default='Clínica Dental San Felipe')
+CLINIC_ADDRESS = config('CLINIC_ADDRESS', default='')
+CLINIC_PHONE = config('CLINIC_PHONE', default='')
+CLINIC_EMAIL = config('CLINIC_EMAIL', default='')
+CLINIC_WEBSITE = config('CLINIC_WEBSITE', default='')
+CLINIC_MAP_URL = config('CLINIC_MAP_URL', default='https://www.google.com/maps/place/Clinica+San+Felipe/@-38.2356192,-72.3361399,17z/data=!3m1!4b1!4m6!3m5!1s0x966b155a8306e093:0x46de06dfbc92e29d!8m2!3d-38.2356192!4d-72.333565!16s%2Fg%2F11sswz76yt?hl=es&entry=ttu')
 
 # Configuración para conectar con el sistema de gestión
-GESTION_API_URL = "http://localhost:8001/api"  # URL del sistema de gestión
-GESTION_BASE_URL = "http://localhost:8001"  # URL base del sistema de gestión (para media files)
-GESTION_API_TOKEN = ""  # Token de autenticación para la API
+GESTION_API_URL = config('GESTION_API_URL', default='http://localhost:8001/api')  # URL del sistema de gestión
+GESTION_BASE_URL = config('GESTION_BASE_URL', default='http://localhost:8001')  # URL base del sistema de gestión (para media files)
+GESTION_API_TOKEN = config('GESTION_API_TOKEN', default='')  # Token de autenticación para la API
 
 # Configuración de Email
 # Email de la clínica para enviar correos
