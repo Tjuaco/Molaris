@@ -145,6 +145,19 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Configuración de seguridad para producción (Railway)
+# Detectar si estamos en producción
+if not DEBUG:
+    # Configuración para Railway (detrás de proxy HTTPS)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = False  # Railway maneja SSL, no necesitamos redirección
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+    if not CSRF_TRUSTED_ORIGINS:
+        # Si no está configurado, usar ALLOWED_HOSTS para generar CSRF_TRUSTED_ORIGINS
+        CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in ALLOWED_HOSTS if host]
+
 # Login URLs
 LOGIN_URL = '/trabajadores/login/'
 LOGIN_REDIRECT_URL = '/trabajadores/dashboard/'
