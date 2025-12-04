@@ -25,9 +25,9 @@ COPY . .
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
-# Exponer el puerto (Railway usa variable PORT dinámicamente)
-EXPOSE 8080
+# Exponer el puerto
+EXPOSE $PORT
 
-# Comando de inicio (usar bash explícitamente)
-CMD ["/bin/bash", "/app/start.sh"]
+# Comando de inicio
+CMD ["/app/start.sh"]
 
