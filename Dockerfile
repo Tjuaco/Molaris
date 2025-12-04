@@ -1,9 +1,6 @@
 # Usar imagen base de Python
 FROM python:3.11.9-slim
 
-# Establecer directorio de trabajo
-WORKDIR /app
-
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
     postgresql-client \
@@ -11,11 +8,14 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements.txt
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Copiar requirements.txt primero (para cachear la instalación)
 COPY requirements.txt .
 
 # Instalar dependencias de Python
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copiar todo el código

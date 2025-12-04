@@ -52,7 +52,10 @@ Esta guía te ayudará a desplegar ambos proyectos Django (`gestion_clinica` y `
 1. Click en el servicio recién creado
 2. Ve a la pestaña **"Settings"**
 3. En **"Root Directory"**, escribe: `gestion_clinica`
-4. En **"Start Command"**, deja vacío (Railway usará el `Procfile`)
+4. En **"Start Command"**, escribe:
+   ```
+   python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn gestion_clinica.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+   ```
 5. En **"Build Command"**, deja vacío
 
 ### 3.3. Conectar la base de datos
@@ -122,7 +125,10 @@ SITE_URL=https://gestion-clinica-tu-proyecto.railway.app
 1. Click en el servicio recién creado
 2. Ve a la pestaña **"Settings"**
 3. En **"Root Directory"**, escribe: `cliente_web`
-4. En **"Start Command"**, deja vacío
+4. En **"Start Command"**, escribe:
+   ```
+   python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn cliente_web.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+   ```
 5. En **"Build Command"**, deja vacío
 
 ### 4.3. Conectar la misma base de datos
