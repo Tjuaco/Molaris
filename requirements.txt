@@ -5,7 +5,6 @@ django-cors-headers==4.3.1
 
 # Base de datos
 psycopg2-binary==2.9.11
-mysqlclient==2.2.7
 dj-database-url==2.1.0
 
 # Utilidades
