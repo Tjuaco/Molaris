@@ -58,6 +58,7 @@ class Cita(models.Model):
 
     class Meta:
         db_table = "citas_cita"
+        managed = False  # La tabla es gestionada por gestion_clinica
 
 
 class Evaluacion(models.Model):

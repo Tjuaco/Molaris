@@ -10,14 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql="""
-                ALTER TABLE citas_cita 
-                ADD COLUMN IF NOT EXISTS whatsapp_message_sid VARCHAR(100) NULL;
-            """,
-            reverse_sql="""
-                ALTER TABLE citas_cita 
-                DROP COLUMN IF EXISTS whatsapp_message_sid;
-            """
-        ),
+        # El modelo Cita está marcado como managed = False
+        # Las modificaciones a la tabla citas_cita deben hacerse en gestion_clinica
     ]

@@ -10,24 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='cita',
-            name='whatsapp_message_sid',
-            field=models.CharField(blank=True, max_length=100, null=True),
-        ),
-        migrations.AlterField(
-            model_name='cita',
-            name='actualizada_el',
-            field=models.DateTimeField(auto_now=True),
-        ),
-        migrations.AlterField(
-            model_name='cita',
-            name='creada_el',
-            field=models.DateTimeField(auto_now_add=True),
-        ),
-        migrations.AlterField(
-            model_name='cita',
-            name='paciente_email',
-            field=models.EmailField(blank=True, max_length=254, null=True),
-        ),
+        # El modelo Cita está marcado como managed = False
+        # Las modificaciones a la tabla citas_cita deben hacerse en gestion_clinica
     ]
