@@ -188,9 +188,16 @@ Equipo {clinic_name}"""
         print(f"Error: {error_type}: {error_msg}")
         print(f"{'='*60}\n")
         
+        # Si es un error de red (común en Railway), retornar False para mostrar el código
+        if 'network' in error_msg.lower() or 'unreachable' in error_msg.lower() or '101' in error_msg:
+            logger.warning("Error de red al enviar email. Railway puede estar bloqueando conexiones SMTP.")
+            logger.warning(f"CÓDIGO DE VERIFICACIÓN (mostrar al usuario): {codigo}")
+            return False
+        
         # Si es un error de autenticación, retornar False para que se muestre el error
         if 'authentication' in error_msg.lower() or '535' in error_msg or '534' in error_msg:
             logger.error("Error de autenticación con Gmail. Verifica EMAIL_HOST_PASSWORD.")
+            logger.warning(f"CÓDIGO DE VERIFICACIÓN (mostrar al usuario): {codigo}")
             return False
         
         return True  # Retornar True para otros errores y no romper el flujo

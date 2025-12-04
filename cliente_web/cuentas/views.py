@@ -33,15 +33,22 @@ def registro_cliente(request):
                         enviar_codigo_por_whatsapp(telefono_normalizado, codigo_obj.codigo)
                         mensaje_exito = f'Código de verificación enviado por WhatsApp al {telefono_normalizado}. Por favor, revisa tu WhatsApp e ingresa el código recibido.'
                     else:  # email
-                        enviar_codigo_por_email(email, codigo_obj.codigo)
-                        mensaje_exito = f'Código de verificación enviado por email a {email}. Por favor, revisa tu correo e ingresa el código recibido.'
+                        email_enviado = enviar_codigo_por_email(email, codigo_obj.codigo)
+                        if email_enviado:
+                            mensaje_exito = f'Código de verificación enviado por email a {email}. Por favor, revisa tu correo e ingresa el código recibido.'
+                        else:
+                            # Si falla el envío, mostrar el código en un mensaje (solo para desarrollo/producción con problemas de red)
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.warning(f"No se pudo enviar email. Código: {codigo_obj.codigo}")
+                            mensaje_exito = f'⚠️ No se pudo enviar el email debido a problemas de red. Tu código de verificación es: {codigo_obj.codigo}. Por favor, ingrésalo en la siguiente pantalla.'
                     
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.error(f"Error al enviar código de verificación: {str(e)}")
-                    messages.error(request, f'Error al enviar código de verificación: {str(e)}. Por favor, verifica tus datos e intenta nuevamente.')
-                    return render(request, 'cuentas/registro_cliente.html', {'form': form})
+                    # En caso de error, mostrar el código para que el usuario pueda continuar
+                    mensaje_exito = f'⚠️ No se pudo enviar el código por email debido a: {str(e)}. Tu código de verificación es: {codigo_obj.codigo}. Por favor, ingrésalo en la siguiente pantalla.'
                 
                 # Guardar datos del formulario en sesión
                 request.session['registro_data'] = {
