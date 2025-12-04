@@ -48,28 +48,49 @@ def registro_cliente(request):
                     alergias=form.cleaned_data.get('alergias')
                 )
                 
-                # Intentar crear Cliente en el sistema de gestión (opcional)
+                # Intentar crear Cliente en el sistema de gestión usando SQL directo
+                # (ya que ambos proyectos comparten la misma base de datos)
                 try:
-                    from pacientes.models import Cliente
-                    if not Cliente.objects.filter(email=perfil_cliente.email).exists():
-                        Cliente.objects.create(
-                            nombre_completo=perfil_cliente.nombre_completo,
-                            email=perfil_cliente.email,
-                            telefono=perfil_cliente.telefono,
-                            rut=perfil_cliente.rut,
-                            fecha_nacimiento=perfil_cliente.fecha_nacimiento,
-                            alergias=perfil_cliente.alergias,
-                            activo=True,
-                            notas=f'Cliente registrado desde la página web. Usuario: {user.username}'
-                        )
-                except ImportError:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"No se pudo crear Cliente automáticamente para {perfil_cliente.email}")
+                    from django.db import connections
+                    from django.utils import timezone
+                    
+                    with connections['default'].cursor() as cursor:
+                        # Verificar si ya existe un cliente con este email
+                        cursor.execute("""
+                            SELECT id FROM pacientes_cliente 
+                            WHERE email = %s
+                        """, [perfil_cliente.email])
+                        
+                        if not cursor.fetchone():
+                            # Insertar nuevo cliente en la tabla pacientes_cliente
+                            cursor.execute("""
+                                INSERT INTO pacientes_cliente 
+                                (nombre_completo, email, telefono, rut, fecha_nacimiento, 
+                                 alergias, fecha_registro, activo, notas, user_id)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, [
+                                perfil_cliente.nombre_completo,
+                                perfil_cliente.email,
+                                perfil_cliente.telefono,
+                                perfil_cliente.rut,
+                                perfil_cliente.fecha_nacimiento,
+                                perfil_cliente.alergias,
+                                timezone.now(),
+                                True,  # activo
+                                f'Cliente registrado desde la página web. Usuario: {user.username}',
+                                user.id  # user_id
+                            ])
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.info(f"Cliente creado exitosamente en pacientes_cliente para {perfil_cliente.email}")
+                        else:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.info(f"Cliente ya existe en pacientes_cliente para {perfil_cliente.email}")
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.error(f"Error al crear Cliente automáticamente: {str(e)}")
+                    logger.error(f"Error al crear Cliente automáticamente: {str(e)}", exc_info=True)
                 
                 # Iniciar sesión automáticamente
                 login(request, user, backend='django.contrib.auth.backends.ModelBackend')
@@ -155,30 +176,49 @@ def verificar_telefono(request):
                     alergias=registro_data.get('alergias')
                 )
                 
-                # IMPORTANTE: Crear automáticamente el Cliente en el sistema de gestión
+                # IMPORTANTE: Crear automáticamente el Cliente en el sistema de gestión usando SQL directo
+                # (ya que ambos proyectos comparten la misma base de datos)
                 try:
-                    from pacientes.models import Cliente
+                    from django.db import connections
+                    from django.utils import timezone
                     
-                    # Verificar si ya existe un Cliente con este email
-                    if not Cliente.objects.filter(email=perfil_cliente.email).exists():
-                        Cliente.objects.create(
-                            nombre_completo=perfil_cliente.nombre_completo,
-                            email=perfil_cliente.email,
-                            telefono=perfil_cliente.telefono,
-                            rut=perfil_cliente.rut,
-                            fecha_nacimiento=perfil_cliente.fecha_nacimiento,
-                            alergias=perfil_cliente.alergias,
-                            activo=True,
-                            notas=f'Cliente registrado desde la página web. Usuario: {user.username}'
-                        )
-                except ImportError:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"No se pudo crear Cliente automáticamente para {perfil_cliente.email}")
+                    with connections['default'].cursor() as cursor:
+                        # Verificar si ya existe un cliente con este email
+                        cursor.execute("""
+                            SELECT id FROM pacientes_cliente 
+                            WHERE email = %s
+                        """, [perfil_cliente.email])
+                        
+                        if not cursor.fetchone():
+                            # Insertar nuevo cliente en la tabla pacientes_cliente
+                            cursor.execute("""
+                                INSERT INTO pacientes_cliente 
+                                (nombre_completo, email, telefono, rut, fecha_nacimiento, 
+                                 alergias, fecha_registro, activo, notas, user_id)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, [
+                                perfil_cliente.nombre_completo,
+                                perfil_cliente.email,
+                                perfil_cliente.telefono,
+                                perfil_cliente.rut,
+                                perfil_cliente.fecha_nacimiento,
+                                perfil_cliente.alergias,
+                                timezone.now(),
+                                True,  # activo
+                                f'Cliente registrado desde la página web. Usuario: {user.username}',
+                                user.id  # user_id
+                            ])
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.info(f"Cliente creado exitosamente en pacientes_cliente para {perfil_cliente.email}")
+                        else:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.info(f"Cliente ya existe en pacientes_cliente para {perfil_cliente.email}")
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.error(f"Error al crear Cliente automáticamente: {str(e)}")
+                    logger.error(f"Error al crear Cliente automáticamente: {str(e)}", exc_info=True)
                 
                 # Limpiar sesión
                 del request.session['registro_data']
