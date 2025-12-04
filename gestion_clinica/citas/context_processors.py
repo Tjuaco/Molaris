@@ -31,6 +31,29 @@ def perfil_context(request):
     }
 
 
+def info_clinica(request):
+    """Context processor para incluir información de la clínica en todos los templates"""
+    try:
+        from configuracion.models import InformacionClinica
+        info = InformacionClinica.obtener()
+        return {
+            'info_clinica': info,
+            'nombre_clinica': info.nombre_clinica or 'Clínica Dental San Felipe',
+            'direccion_clinica': info.direccion or '',
+            'telefono_clinica': info.telefono or '',
+            'email_clinica': info.email or '',
+        }
+    except Exception:
+        # Si hay algún error, retornar valores por defecto
+        return {
+            'info_clinica': None,
+            'nombre_clinica': 'Clínica Dental San Felipe',
+            'direccion_clinica': '',
+            'telefono_clinica': '',
+            'email_clinica': '',
+        }
+
+
 
 
 

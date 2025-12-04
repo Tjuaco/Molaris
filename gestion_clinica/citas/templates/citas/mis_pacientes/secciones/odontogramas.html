@@ -1,0 +1,462 @@
+<div class="odontogramas-seccion">
+    <div class="seccion-header">
+        <h2>
+            <i class="fas fa-tooth"></i>
+            Odontogramas de {{ paciente_seleccionado.nombre_completo }}
+        </h2>
+        <a href="{% url 'crear_odontograma' %}?paciente_id={{ paciente_seleccionado.id }}" class="btn-agregar">
+            <i class="fas fa-plus"></i>
+            Crear Odontograma
+        </a>
+    </div>
+    
+    {% if odontogramas %}
+    <div class="odontogramas-list">
+        {% for odontograma in odontogramas %}
+        <div class="odontograma-card">
+            <div class="odontograma-header">
+                <div class="odontograma-info">
+                    <h4>
+                        <i class="fas fa-tooth"></i>
+                        Odontograma #{{ odontograma.id }}
+                    </h4>
+                    <p class="odontograma-fecha">
+                        <i class="fas fa-calendar"></i>
+                        Creado: {{ odontograma.fecha_creacion|date:"d/m/Y H:i" }}
+                    </p>
+                    {% if odontograma.motivo_consulta %}
+                    <p class="odontograma-motivo">
+                        <i class="fas fa-comment"></i>
+                        {{ odontograma.motivo_consulta|truncatewords:20 }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="odontograma-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">{{ odontograma.dientes.count }}</span>
+                        <span class="stat-label">Dientes</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vista Previa del Odontograma -->
+            {% if odontograma.dientes.exists %}
+            <div class="odontograma-preview">
+                <div class="preview-header">
+                    <h5>
+                        <i class="fas fa-eye"></i>
+                        Vista Previa - Dientes Marcados
+                    </h5>
+                </div>
+                <div class="preview-content">
+                    <div class="odontograma-grid">
+                        {% for diente in odontograma.dientes.all %}
+                        <div class="diente-preview estado-{{ diente.estado }}" title="Diente {{ diente.numero_diente }}: {{ diente.get_estado_display }}">
+                            <span class="diente-numero">{{ diente.numero_diente }}</span>
+                            <span class="diente-estado">{{ diente.get_estado_display|truncatewords:1 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="odontograma-preview empty">
+                <p><i class="fas fa-info-circle"></i> No hay dientes marcados en este odontograma</p>
+            </div>
+            {% endif %}
+            
+            <div class="odontograma-actions">
+                <a href="{% url 'exportar_odontograma_pdf' odontograma.id %}" class="btn-action btn-pdf" target="_blank">
+                    <i class="fas fa-file-pdf"></i>
+                    Descargar PDF
+                </a>
+                <a href="{% url 'editar_odontograma' odontograma.id %}" class="btn-action">
+                    <i class="fas fa-edit"></i>
+                    Editar
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-tooth"></i>
+        <h3>No hay odontogramas registrados</h3>
+        <p>Este paciente aún no tiene odontogramas. Puedes crear uno nuevo.</p>
+        <a href="{% url 'crear_odontograma' %}?paciente_id={{ paciente_seleccionado.id }}" class="btn-primary">
+            <i class="fas fa-plus"></i>
+            Crear Primer Odontograma
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .odontogramas-seccion {
+        padding: 0;
+        width: 100%;
+        margin: 0;
+        background: #f8fafc;
+    }
+    
+    .seccion-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        margin-top: 0;
+        flex-wrap: wrap;
+        gap: 15px;
+        padding: 12px 24px 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .seccion-header h2 {
+        font-size: 1.5rem;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+    }
+    
+    .seccion-header h2 i {
+        color: #14b8a6;
+    }
+    
+    .btn-agregar {
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-agregar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+    
+    .odontogramas-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 24px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .odontograma-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+    }
+    
+    .odontograma-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .odontograma-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        gap: 15px;
+    }
+    
+    .odontograma-info {
+        flex: 1;
+    }
+    
+    .odontograma-info h4 {
+        margin: 0 0 6px 0;
+        font-size: 1rem;
+        color: #1e293b;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .odontograma-info h4 i {
+        color: #14b8a6;
+    }
+    
+    .odontograma-fecha {
+        margin: 0 0 6px 0;
+        font-size: 0.8rem;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .odontograma-motivo {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #94a3b8;
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    
+    .odontograma-stats {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+    }
+    
+    .stat-value {
+        display: block;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #14b8a6;
+    }
+    
+    .stat-label {
+        display: block;
+        font-size: 0.7rem;
+        color: #64748b;
+        margin-top: 2px;
+    }
+    
+    /* Vista Previa del Odontograma - Más pequeña y sutil */
+    .odontograma-preview {
+        margin: 12px 0;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .odontograma-preview.empty {
+        text-align: center;
+        padding: 16px;
+    }
+    
+    .odontograma-preview.empty p {
+        margin: 0;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 0.85rem;
+    }
+    
+    .preview-header {
+        margin-bottom: 8px;
+    }
+    
+    .preview-header h5 {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #64748b;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .preview-header h5 i {
+        color: #14b8a6;
+        font-size: 0.75rem;
+    }
+    
+    .odontograma-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+        gap: 6px;
+        max-height: 120px;
+        overflow-y: auto;
+        padding: 4px;
+    }
+    
+    .diente-preview {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .diente-preview:hover {
+        transform: scale(1.08);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    
+    .diente-numero {
+        font-weight: 700;
+        font-size: 0.75rem;
+        color: #1e293b;
+    }
+    
+    .diente-estado {
+        font-size: 0.6rem;
+        color: #64748b;
+        text-align: center;
+        line-height: 1.1;
+    }
+    
+    /* Colores según estado del diente */
+    .diente-preview.estado-sano {
+        border-color: #10b981;
+        background: #d1fae5;
+    }
+    
+    .diente-preview.estado-cariado {
+        border-color: #ef4444;
+        background: #fee2e2;
+    }
+    
+    .diente-preview.estado-obturado {
+        border-color: #3b82f6;
+        background: #dbeafe;
+    }
+    
+    .diente-preview.estado-perdido {
+        border-color: #6b7280;
+        background: #f3f4f6;
+    }
+    
+    .diente-preview.estado-endodoncia {
+        border-color: #8b5cf6;
+        background: #ede9fe;
+    }
+    
+    .diente-preview.estado-corona {
+        border-color: #f59e0b;
+        background: #fef3c7;
+    }
+    
+    .diente-preview.estado-implante {
+        border-color: #14b8a6;
+        background: #ccfbf1;
+    }
+    
+    .diente-preview.estado-protesis {
+        border-color: #ec4899;
+        background: #fce7f3;
+    }
+    
+    .diente-preview.estado-extraccion {
+        border-color: #dc2626;
+        background: #fee2e2;
+    }
+    
+    .odontograma-actions {
+        display: flex;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 12px;
+    }
+    
+    .btn-action {
+        flex: 1;
+        padding: 8px 12px;
+        background: #f8fafc;
+        color: #64748b;
+        border-radius: 6px;
+        text-decoration: none;
+        text-align: center;
+        font-weight: 500;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    
+    .btn-action:hover {
+        background: #14b8a6;
+        color: white;
+    }
+    
+    .btn-action.btn-pdf {
+        background: #dc2626;
+        color: white;
+    }
+    
+    .btn-action.btn-pdf:hover {
+        background: #b91c1c;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #94a3b8;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        color: #cbd5e1;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.5rem;
+        color: #64748b;
+        margin-bottom: 10px;
+    }
+    
+    .empty-state p {
+        margin-bottom: 30px;
+    }
+    
+    .btn-primary {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+    
+    @media (max-width: 768px) {
+        .odontograma-grid {
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+        }
+        
+        .odontograma-actions {
+            flex-direction: column;
+        }
+        
+        .odontogramas-list {
+            padding: 16px;
+        }
+    }
+</style>

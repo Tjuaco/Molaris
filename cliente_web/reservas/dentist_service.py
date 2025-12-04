@@ -13,7 +13,7 @@ def obtener_info_dentista() -> Dict:
     Obtiene la información del dentista desde la base de datos del sistema de gestión.
     """
     try:
-        logger.info("🔍 Iniciando búsqueda de dentista en citas_perfil")
+        logger.info("🔍 Iniciando búsqueda de dentista en personal_perfil")
         
         # Conectar a la base de datos del sistema de gestión
         # Asumiendo que usas la misma base de datos pero con tablas diferentes
@@ -22,7 +22,7 @@ def obtener_info_dentista() -> Dict:
             logger.info("📊 Ejecutando consulta SQL para buscar dentistas")
             cursor.execute("""
                 SELECT nombre_completo, especialidad, telefono, email, numero_colegio, activo
-                FROM citas_perfil 
+                FROM personal_perfil 
                 WHERE rol = 'dentista' AND activo = true
                 ORDER BY nombre_completo
                 LIMIT 1
@@ -82,7 +82,7 @@ def obtener_dentista_por_cliente(cliente_email: str) -> Optional[Dict]:
                        p.numero_colegio, p.activo, p.fecha_registro
                 FROM cuentas_perfilcliente pc
                 LEFT JOIN reservas_cita rc ON pc.id = rc.cliente_id
-                LEFT JOIN citas_perfil p ON rc.dentista_id = p.id
+                LEFT JOIN personal_perfil p ON rc.dentista_id = p.id
                 WHERE pc.email = %s
                 ORDER BY rc.fecha_hora DESC
                 LIMIT 1
@@ -153,14 +153,14 @@ def diagnosticar_base_datos() -> Dict:
                 columnas = cursor.fetchall()
                 estructuras[tabla] = [col[0] for col in columnas]
             
-            # Verificar si hay dentistas en citas_perfil
+            # Verificar si hay dentistas en personal_perfil
             dentistas_count = 0
             dentistas_data = []
             try:
-                cursor.execute("SELECT COUNT(*) FROM citas_perfil WHERE rol = 'dentista' AND activo = true")
+                cursor.execute("SELECT COUNT(*) FROM personal_perfil WHERE rol = 'dentista' AND activo = true")
                 dentistas_count = cursor.fetchone()[0]
                 
-                cursor.execute("SELECT nombre_completo, especialidad, email FROM citas_perfil WHERE rol = 'dentista' AND activo = true LIMIT 3")
+                cursor.execute("SELECT nombre_completo, especialidad, email FROM personal_perfil WHERE rol = 'dentista' AND activo = true LIMIT 3")
                 dentistas_data = cursor.fetchall()
             except Exception as e:
                 logger.error(f"Error al verificar dentistas: {e}")
@@ -212,7 +212,7 @@ def obtener_estadisticas_dentista() -> Dict:
                     COUNT(CASE WHEN rc.tomada = true THEN 1 END) as citas_completadas,
                     COUNT(CASE WHEN rc.tomada = false AND rc.cliente_id IS NOT NULL THEN 1 END) as citas_pendientes,
                     COUNT(CASE WHEN DATE(rc.fecha_hora) = CURRENT_DATE THEN 1 END) as citas_hoy
-                FROM citas_perfil p
+                FROM personal_perfil p
                 LEFT JOIN reservas_cita rc ON rc.dentista_id = p.id
                 WHERE p.rol = 'dentista' AND p.activo = true
             """)
@@ -257,7 +257,7 @@ def obtener_todos_dentistas_activos() -> list:
             cursor.execute("""
                 SELECT id, nombre_completo, especialidad, telefono, email, 
                        numero_colegio, activo, fecha_registro, rol
-                FROM citas_perfil
+                FROM personal_perfil
                 WHERE rol = 'dentista' AND activo = true
                 ORDER BY nombre_completo
             """)
@@ -273,7 +273,7 @@ def obtener_todos_dentistas_activos() -> list:
                 try:
                     cursor.execute("""
                         SELECT foto 
-                        FROM citas_perfil 
+                        FROM personal_perfil 
                         WHERE id = %s
                     """, [perfil_id])
                     resultado_foto = cursor.fetchone()
@@ -328,11 +328,11 @@ def obtener_dentista_de_cita(cita_id: int) -> Optional[Dict]:
             if not dentista_id:
                 return None
             
-            # Buscar el dentista en citas_perfil
+            # Buscar el dentista en personal_perfil
             cursor.execute("""
                 SELECT id, nombre_completo, especialidad, telefono, email, 
                        numero_colegio, activo, fecha_registro, rol
-                FROM citas_perfil
+                FROM personal_perfil
                 WHERE id = %s
             """, [dentista_id])
             
@@ -346,7 +346,7 @@ def obtener_dentista_de_cita(cita_id: int) -> Optional[Dict]:
                 try:
                     cursor.execute("""
                         SELECT foto 
-                        FROM citas_perfil 
+                        FROM personal_perfil 
                         WHERE id = %s
                     """, [perfil_id])
                     resultado_foto = cursor.fetchone()
@@ -386,7 +386,7 @@ def obtener_dentista_de_cita(cita_id: int) -> Optional[Dict]:
                     'foto': foto
                 }
             else:
-                logger.warning(f"No se encontro dentista con ID {dentista_id} en citas_perfil")
+                logger.warning(f"No se encontro dentista con ID {dentista_id} en personal_perfil")
                 return None
                 
     except Exception as e:

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Perfil - Clínica Dental</title>
+    <title>Mi Perfil - Clínica San Felipe</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -15,9 +15,9 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
         }
 
         .container {
@@ -27,7 +27,7 @@
 
         .back-btn {
             background: rgba(255, 255, 255, 0.9);
-            color: #3b82f6;
+            color: #14b8a6;
             border: 2px solid white;
             padding: 12px 24px;
             border-radius: 25px;
@@ -44,7 +44,7 @@
         .back-btn:hover {
             background: white;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.3);
+            box-shadow: 0 5px 15px rgba(20, 184, 166, 0.3);
         }
 
         .profile-card {
@@ -55,7 +55,7 @@
         }
 
         .profile-header {
-            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             padding: 40px;
             text-align: center;
@@ -66,7 +66,7 @@
             width: 120px;
             height: 120px;
             background: white;
-            color: #3b82f6;
+            color: #14b8a6;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -107,7 +107,7 @@
         }
 
         .info-section h3 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .info-grid {
@@ -174,13 +174,13 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         .btn-secondary {
@@ -202,8 +202,26 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
             .profile-header {
                 padding: 30px 20px;
+            }
+
+            .profile-avatar {
+                width: 100px;
+                height: 100px;
+                font-size: 2.5rem;
+            }
+
+            .profile-header h1 {
+                font-size: 1.5rem;
             }
 
             .profile-content {
@@ -221,6 +239,35 @@
             .btn {
                 width: 100%;
                 justify-content: center;
+            }
+
+            .back-btn {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .profile-header {
+                padding: 20px 15px;
+            }
+
+            .profile-avatar {
+                width: 80px;
+                height: 80px;
+                font-size: 2rem;
+            }
+
+            .profile-header h1 {
+                font-size: 1.25rem;
+            }
+
+            .profile-content {
+                padding: 20px 15px;
+            }
+
+            .info-section h3 {
+                font-size: 1.1rem;
             }
         }
     </style>
@@ -256,7 +303,7 @@
                         {{ user.username }}
                     {% endif %}
                 </h1>
-                <p>Cliente de Clínica Dental</p>
+                <p>Cliente de Clínica San Felipe</p>
             </div>
 
             <div class="profile-content">
@@ -395,30 +442,33 @@
 
                 <div class="info-section">
                     <h3>
-                        <i class="fas fa-calendar-check"></i>
-                        Estadísticas de Citas
+                        <i class="fas fa-info-circle"></i>
+                        Información Importante
                     </h3>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <div class="info-label">
-                                <i class="fas fa-calendar-alt"></i>
-                                Total de Citas
+                    <div class="info-item" style="grid-column: 1 / -1; background: linear-gradient(135deg, #f0fdfa, #e0f2f1); border-left: 4px solid #14b8a6; padding: 24px;">
+                        <div style="display: flex; align-items: start; gap: 15px;">
+                            <div style="color: #14b8a6; font-size: 1.5rem;">
+                                <i class="fas fa-bell"></i>
                             </div>
-                            <div class="info-value">{{ citas_totales|default:0 }}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">
-                                <i class="fas fa-clock"></i>
-                                Citas Activas
+                            <div style="flex: 1;">
+                                <div class="info-label" style="color: #0f766e; font-size: 1rem; font-weight: 600; margin-bottom: 12px;">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    Recuerda mantener tu información actualizada
+                                </div>
+                                <div class="info-value" style="color: #475569; font-size: 0.9375rem; font-weight: 400; line-height: 1.6;">
+                                    Es importante que tus datos personales, contacto e información médica estén siempre actualizados para brindarte el mejor servicio. Si necesitas actualizar algún dato de tu perfil, por favor comunícate con nuestra clínica.
+                                </div>
+                                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #ccfbf1;">
+                                    <div style="display: flex; align-items: center; gap: 10px; color: #0f766e; font-size: 0.875rem; font-weight: 500;">
+                                        <i class="fas fa-phone-alt"></i>
+                                        <span>+56 9 2678 6544</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px; color: #0f766e; font-size: 0.875rem; font-weight: 500; margin-top: 8px;">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>miclinicacontacto@gmail.com</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="info-value">{{ citas_reservadas|default:0 }}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">
-                                <i class="fas fa-check-circle"></i>
-                                Citas Completadas
-                            </div>
-                            <div class="info-value">{{ citas_completadas|default:0 }}</div>
                         </div>
                     </div>
                 </div>

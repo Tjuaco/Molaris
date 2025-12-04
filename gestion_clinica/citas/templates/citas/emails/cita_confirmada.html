@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación de Cita - {{ nombre_clinica }}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+        <!-- Header con fondo turquesa -->
+        <div style="background: linear-gradient(135deg, #14b8a6, #0d9488); padding: 30px 20px; text-align: center;">
+            <div style="display: inline-block; background: rgba(255, 255, 255, 0.2); border-radius: 50%; width: 60px; height: 60px; line-height: 60px; margin-bottom: 15px;">
+                <span style="font-size: 30px; color: white;">🦷</span>
+            </div>
+            <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">{{ nombre_clinica }}</h1>
+        </div>
+
+        <!-- Contenido principal -->
+        <div style="padding: 40px 30px; background: white;">
+            <h2 style="color: #1e293b; margin-top: 0; font-size: 20px; font-weight: 600;">Confirmación de Cita</h2>
+            
+            <p style="color: #64748b; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                Hola <strong>{{ cliente_nombre }}</strong>!
+            </p>
+            
+            <p style="color: #64748b; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                Gracias por reservar tu cita con nosotros. Tu cita ha sido agendada exitosamente.
+            </p>
+
+            <!-- Información de la cita -->
+            <div style="background: #f0fdfa; border-left: 4px solid #14b8a6; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                <h3 style="color: #14b8a6; margin-top: 0; font-size: 18px; font-weight: 600; margin-bottom: 15px;">
+                    Información de tu Cita
+                </h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px; width: 120px;"><strong>Fecha:</strong></td>
+                        <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">{{ fecha_cita }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;"><strong>Hora:</strong></td>
+                        <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">{{ hora_cita }}</td>
+                    </tr>
+                    {% if dentista_nombre %}
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;"><strong>Dentista:</strong></td>
+                        <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">{{ dentista_nombre }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if servicio_nombre %}
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;"><strong>Servicio:</strong></td>
+                        <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">{{ servicio_nombre }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if precio_texto %}
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;"><strong>Precio:</strong></td>
+                        <td style="padding: 8px 0; color: #1e293b; font-size: 14px; font-weight: 600;">{{ precio_texto }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+
+            <!-- Recomendación -->
+            <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 8px; margin: 25px 0;">
+                <p style="color: #1e40af; font-size: 14px; margin: 0; line-height: 1.6;">
+                    <strong>💡 Recomendación:</strong> Llega 10 minutos antes para facilitar la atención.
+                </p>
+            </div>
+
+            <!-- Información de contacto y ubicación -->
+            {% if direccion_clinica or telefono_clinica or email_clinica or map_url %}
+            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                <h3 style="color: #1e293b; margin-top: 0; font-size: 16px; font-weight: 600; margin-bottom: 15px;">
+                    Información de Contacto
+                </h3>
+                {% if direccion_clinica %}
+                <p style="color: #64748b; font-size: 14px; margin: 8px 0;">
+                    <strong>Dirección:</strong> {{ direccion_clinica }}
+                </p>
+                {% endif %}
+                {% if map_url %}
+                <p style="color: #64748b; font-size: 14px; margin: 8px 0;">
+                    <strong>Cómo llegar:</strong> <a href="{{ map_url }}" style="color: #14b8a6; text-decoration: none;">Ver en Google Maps</a>
+                </p>
+                {% endif %}
+                {% if telefono_clinica %}
+                <p style="color: #64748b; font-size: 14px; margin: 8px 0;">
+                    <strong>Teléfono:</strong> {{ telefono_clinica }}
+                </p>
+                {% endif %}
+                {% if email_clinica %}
+                <p style="color: #64748b; font-size: 14px; margin: 8px 0;">
+                    <strong>Email:</strong> <a href="mailto:{{ email_clinica }}" style="color: #14b8a6; text-decoration: none;">{{ email_clinica }}</a>
+                </p>
+                {% endif %}
+                {% if horario_clinica %}
+                <p style="color: #64748b; font-size: 14px; margin: 8px 0;">
+                    <strong>Horario de Atención:</strong><br>
+                    <span style="white-space: pre-line;">{{ horario_clinica }}</span>
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Recordatorios importantes -->
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 25px 0;">
+                <p style="color: #92400e; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">
+                    📌 Recuerda:
+                </p>
+                <ul style="color: #78350f; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                    <li>Si deseas cambiar o cancelar tu cita, contáctanos con anticipación.</li>
+                    <li>Mantén tu teléfono disponible para recordatorios.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="color: #94a3b8; font-size: 12px; margin: 0; line-height: 1.6;">
+                Este es un correo automático, por favor no respondas a este mensaje.<br>
+                Si tienes alguna consulta, contáctanos directamente.
+            </p>
+            <p style="color: #64748b; font-size: 14px; margin: 15px 0 0 0;">
+                <strong>{{ nombre_clinica }}</strong>
+            </p>
+            <p style="color: #14b8a6; font-size: 16px; margin: 10px 0 0 0; font-weight: 600;">
+                ¡Esperamos verte y cuidar tu sonrisa!
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

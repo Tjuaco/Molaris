@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ClienteActivoMiddleware:
     """
-    Middleware que verifica que los clientes autenticados existan y estén activos en citas_cliente.
+    Middleware que verifica que los clientes autenticados existan y estén activos en pacientes_cliente.
     """
     
     def __init__(self, get_response):
@@ -36,7 +36,7 @@ class ClienteActivoMiddleware:
                 from .models import PerfilCliente
                 perfil = PerfilCliente.objects.get(user=request.user)
                 
-                # Verificar el estado del cliente en citas_cliente del sistema de gestión
+                # Verificar el estado del cliente en pacientes_cliente del sistema de gestión
                 # IMPORTANTE: Solo bloquear si el cliente existe pero está INACTIVO (fue borrado)
                 # Si no existe, permitir continuar (puede ser un registro nuevo)
                 try:
@@ -50,7 +50,7 @@ class ClienteActivoMiddleware:
                         # Cliente existe en el sistema de gestión
                         if not cliente_doc.activo:
                             # Cliente fue borrado/desactivado en el sistema de gestión, cerrar sesión
-                            logger.warning(f"Cliente {request.user.username} está INACTIVO en citas_cliente, cerrando sesión")
+                            logger.warning(f"Cliente {request.user.username} está INACTIVO en pacientes_cliente, cerrando sesión")
                             logout(request)
                             messages.error(request, 'Tu cuenta ha sido desactivada en el sistema de gestión. Por favor, contacta a la clínica.')
                             return redirect('login_cliente')

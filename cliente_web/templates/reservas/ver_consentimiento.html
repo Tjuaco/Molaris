@@ -1,0 +1,779 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ consentimiento.titulo }} - Clínica Dental</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 24px 32px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h2 {
+            color: #1e293b;
+            font-size: 2rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+        }
+
+        .header h2 i {
+            color: #14b8a6;
+        }
+
+        .badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .badge-pendiente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-firmado {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .back-btn {
+            background: white;
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-btn:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .consentimiento-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+
+        .consentimiento-header {
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .consentimiento-title {
+            color: #1e293b;
+            font-size: 1.75rem;
+            margin-bottom: 15px;
+        }
+
+        .consentimiento-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .consentimiento-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .consentimiento-meta i {
+            color: #14b8a6;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h3 {
+            color: #1e293b;
+            font-size: 1.25rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .section h3 i {
+            color: #14b8a6;
+        }
+
+        .section-content {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 20px;
+            color: #475569;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .form-section {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .required {
+            color: #ef4444;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #14b8a6;
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+        }
+
+        .signature-pad {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 16px;
+            background: #f9fafb;
+            margin-bottom: 12px;
+        }
+
+        canvas {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: white;
+            cursor: crosshair;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .signature-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #0d9488, #0f766e);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #6b7280;
+            border: 2px solid #6b7280;
+        }
+
+        .btn-secondary:hover {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-clear {
+            background: #ef4444;
+            color: white;
+            padding: 8px 16px;
+        }
+
+        .btn-clear:hover {
+            background: #dc2626;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: start;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-top: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            flex: 1;
+            cursor: pointer;
+            color: #374151;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 32px;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+
+        /* Notificaciones personalizadas */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            min-width: 300px;
+            max-width: 400px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
+            border-left: 4px solid #0f766e;
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            border-left: 4px solid #c62828;
+        }
+
+        .notification i {
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .notification {
+                right: 10px;
+                left: 10px;
+                min-width: auto;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2><i class="fas fa-file-signature"></i> Consentimiento Informado</h2>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <span class="badge badge-{{ consentimiento.estado }}">
+                    {{ consentimiento.estado_display }}
+                </span>
+                <a href="{% url 'ver_consentimientos' %}" class="back-btn">
+                    <i class="fas fa-arrow-left"></i> Volver
+                </a>
+            </div>
+        </div>
+
+        <div class="consentimiento-card">
+            <div class="consentimiento-header">
+                <h1 class="consentimiento-title">{{ consentimiento.titulo }}</h1>
+                <div class="consentimiento-meta">
+                    <span><i class="fas fa-tooth"></i> <strong>Tipo:</strong> {{ consentimiento.tipo_display }}</span>
+                    <span><i class="fas fa-calendar"></i> <strong>Creado:</strong> {{ consentimiento.fecha_creacion|date:"d/m/Y" }}</span>
+                    {% if consentimiento.fecha_firma %}
+                    <span><i class="fas fa-check"></i> <strong>Firmado:</strong> {{ consentimiento.fecha_firma|date:"d/m/Y" }}</span>
+                    {% endif %}
+                    {% if consentimiento.fecha_vencimiento %}
+                    <span><i class="fas fa-clock"></i> <strong>Válido hasta:</strong> {{ consentimiento.fecha_vencimiento|date:"d/m/Y" }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if consentimiento.diagnostico %}
+            <div class="section">
+                <h3><i class="fas fa-stethoscope"></i> Diagnóstico y Justificación</h3>
+                <div class="section-content">{{ consentimiento.diagnostico }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.naturaleza_procedimiento %}
+            <div class="section">
+                <h3><i class="fas fa-info-circle"></i> Naturaleza del Procedimiento</h3>
+                <div class="section-content">{{ consentimiento.naturaleza_procedimiento }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.objetivos_tratamiento %}
+            <div class="section">
+                <h3><i class="fas fa-bullseye"></i> Objetivos del Tratamiento</h3>
+                <div class="section-content">{{ consentimiento.objetivos_tratamiento }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.contenido %}
+            <div class="section">
+                <h3><i class="fas fa-file-alt"></i> Información General del Procedimiento</h3>
+                <div class="section-content">{{ consentimiento.contenido }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.riesgos %}
+            <div class="section">
+                <h3><i class="fas fa-exclamation-triangle"></i> Riesgos y Complicaciones</h3>
+                <div class="section-content">{{ consentimiento.riesgos }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.beneficios %}
+            <div class="section">
+                <h3><i class="fas fa-check-circle"></i> Beneficios Esperados</h3>
+                <div class="section-content">{{ consentimiento.beneficios }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.alternativas %}
+            <div class="section">
+                <h3><i class="fas fa-exchange-alt"></i> Alternativas de Tratamiento</h3>
+                <div class="section-content">{{ consentimiento.alternativas }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.pronostico %}
+            <div class="section">
+                <h3><i class="fas fa-chart-line"></i> Pronóstico</h3>
+                <div class="section-content">{{ consentimiento.pronostico }}</div>
+            </div>
+            {% endif %}
+
+            {% if consentimiento.cuidados_postoperatorios %}
+            <div class="section">
+                <h3><i class="fas fa-heart"></i> Cuidados Postoperatorios</h3>
+                <div class="section-content">{{ consentimiento.cuidados_postoperatorios }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if puede_firmar %}
+        <div class="form-section">
+            <h2 style="color: #1e293b; margin-bottom: 24px; font-size: 1.5rem;">
+                <i class="fas fa-signature"></i> Firmar Consentimiento
+            </h2>
+
+            <form method="post" id="formFirmar" action="{% url 'firmar_consentimiento_cliente' consentimiento.id %}">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        Nombre Completo del Firmante <span class="required">*</span>
+                    </label>
+                    <input type="text" name="nombre_firmante" class="form-control" 
+                           value="{{ perfil.nombre_completo }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        RUT del Firmante <span class="required">*</span>
+                    </label>
+                    <input type="text" name="rut_firmante" class="form-control" 
+                           value="{{ perfil.rut|default:'' }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        Firma Digital <span class="required">*</span>
+                    </label>
+                    <div class="signature-pad">
+                        <canvas id="signatureCanvas" width="600" height="200"></canvas>
+                        <div class="signature-controls">
+                            <button type="button" class="btn btn-clear" onclick="clearSignature()">
+                                <i class="fas fa-eraser"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="firma_paciente" id="firmaPaciente" required>
+                    <small style="color: #64748b; font-size: 0.75rem;">
+                        Por favor, firme en el área de arriba usando el mouse o el dedo (en dispositivos táctiles).
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        Nombre del Testigo (Opcional)
+                    </label>
+                    <input type="text" name="nombre_testigo" class="form-control" placeholder="Nombre completo del testigo">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        RUT del Testigo (Opcional)
+                    </label>
+                    <input type="text" name="rut_testigo" class="form-control" placeholder="12.345.678-9">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        Firma del Testigo (Opcional)
+                    </label>
+                    <div class="signature-pad">
+                        <canvas id="signatureCanvasTestigo" width="600" height="200"></canvas>
+                        <div class="signature-controls">
+                            <button type="button" class="btn btn-clear" onclick="clearSignatureTestigo()">
+                                <i class="fas fa-eraser"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="firma_testigo" id="firmaTestigo">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="declaracion_comprension" id="declaracionComprension" required>
+                    <label for="declaracionComprension">
+                        <strong>DECLARACIÓN DE COMPRENSIÓN:</strong> Yo, el paciente o su representante legal, declaro que he sido informado de forma clara, comprensible y oportuna sobre mi diagnóstico, los riesgos, beneficios y alternativas del procedimiento propuesto, de acuerdo con lo establecido en la Ley N° 20.584 sobre Derechos y Deberes de las Personas en relación con las Acciones vinculadas a su Atención en Salud.
+                    </label>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="derecho_revocacion" id="derechoRevocacion" required>
+                    <label for="derechoRevocacion">
+                        <strong>DERECHO DE REVOCACIÓN:</strong> Conozco que tengo el derecho a revocar libremente este consentimiento en cualquier momento previo al inicio del tratamiento.
+                    </label>
+                </div>
+                
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Firmar Consentimiento
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% elif consentimiento.estado == 'firmado' %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> Este consentimiento ya ha sido firmado el {{ consentimiento.fecha_firma|date:"d/m/Y" }}.
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Canvas para firma del paciente
+        const canvas = document.getElementById('signatureCanvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            let isDrawing = false;
+            
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = 200;
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', handleTouch);
+            canvas.addEventListener('touchmove', handleTouch);
+            canvas.addEventListener('touchend', stopDrawing);
+            
+            function startDrawing(e) {
+                isDrawing = true;
+                const rect = canvas.getBoundingClientRect();
+                ctx.beginPath();
+                ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
+                const rect = canvas.getBoundingClientRect();
+                ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                ctx.stroke();
+            }
+            
+            function stopDrawing() {
+                if (isDrawing) {
+                    isDrawing = false;
+                    updateSignature();
+                }
+            }
+            
+            function handleTouch(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                                 e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvas.dispatchEvent(mouseEvent);
+            }
+            
+            function clearSignature() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                document.getElementById('firmaPaciente').value = '';
+            }
+            
+            function updateSignature() {
+                document.getElementById('firmaPaciente').value = canvas.toDataURL();
+            }
+        }
+        
+        // Canvas para firma del testigo
+        const canvasTestigo = document.getElementById('signatureCanvasTestigo');
+        if (canvasTestigo) {
+            const ctxTestigo = canvasTestigo.getContext('2d');
+            let isDrawingTestigo = false;
+            
+            function resizeCanvasTestigo() {
+                const rect = canvasTestigo.getBoundingClientRect();
+                canvasTestigo.width = rect.width;
+                canvasTestigo.height = 200;
+                ctxTestigo.strokeStyle = '#1e293b';
+                ctxTestigo.lineWidth = 2;
+                ctxTestigo.lineCap = 'round';
+                ctxTestigo.lineJoin = 'round';
+            }
+            resizeCanvasTestigo();
+            window.addEventListener('resize', resizeCanvasTestigo);
+            
+            canvasTestigo.addEventListener('mousedown', startDrawingTestigo);
+            canvasTestigo.addEventListener('mousemove', drawTestigo);
+            canvasTestigo.addEventListener('mouseup', stopDrawingTestigo);
+            canvasTestigo.addEventListener('mouseout', stopDrawingTestigo);
+            canvasTestigo.addEventListener('touchstart', handleTouchTestigo);
+            canvasTestigo.addEventListener('touchmove', handleTouchTestigo);
+            canvasTestigo.addEventListener('touchend', stopDrawingTestigo);
+            
+            function startDrawingTestigo(e) {
+                isDrawingTestigo = true;
+                const rect = canvasTestigo.getBoundingClientRect();
+                ctxTestigo.beginPath();
+                ctxTestigo.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+            }
+            
+            function drawTestigo(e) {
+                if (!isDrawingTestigo) return;
+                const rect = canvasTestigo.getBoundingClientRect();
+                ctxTestigo.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                ctxTestigo.stroke();
+            }
+            
+            function stopDrawingTestigo() {
+                if (isDrawingTestigo) {
+                    isDrawingTestigo = false;
+                    updateSignatureTestigo();
+                }
+            }
+            
+            function handleTouchTestigo(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                                 e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvasTestigo.dispatchEvent(mouseEvent);
+            }
+            
+            function clearSignatureTestigo() {
+                ctxTestigo.clearRect(0, 0, canvasTestigo.width, canvasTestigo.height);
+                document.getElementById('firmaTestigo').value = '';
+            }
+            
+            function updateSignatureTestigo() {
+                document.getElementById('firmaTestigo').value = canvasTestigo.toDataURL();
+            }
+        }
+        
+        // Función para mostrar notificaciones estilizadas
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+            notification.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remover después de 4 segundos
+            setTimeout(() => {
+                notification.style.animation = 'slideInRight 0.3s ease reverse';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 4000);
+        }
+
+        // Validar formulario antes de enviar
+        const formFirmar = document.getElementById('formFirmar');
+        if (formFirmar) {
+            formFirmar.addEventListener('submit', function(e) {
+                const firmaPaciente = document.getElementById('firmaPaciente');
+                if (!firmaPaciente || !firmaPaciente.value) {
+                    e.preventDefault();
+                    showNotification('Por favor, firme el consentimiento antes de enviar.', 'error');
+                    return false;
+                }
+                
+                // Mostrar loading
+                const submitBtn = formFirmar.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Firmando...';
+                
+                // Enviar por AJAX
+                e.preventDefault();
+                const formData = new FormData(formFirmar);
+                
+                fetch(formFirmar.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showNotification('Error: ' + (data.error || 'No se pudo firmar el consentimiento'), 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('Error al firmar el consentimiento.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+            });
+        }
+    </script>
+</body>
+</html>
+

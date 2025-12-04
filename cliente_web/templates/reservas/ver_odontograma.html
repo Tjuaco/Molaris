@@ -15,153 +15,162 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f8fafc;
+            background: #f0fdfa;
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 0 auto;
         }
 
         .header {
             background: white;
-            padding: 24px 32px;
-            border-radius: 16px;
-            margin-bottom: 25px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(20, 184, 166, 0.1);
+            border: 1px solid #ccfbf1;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: 12px;
         }
 
         .header h2 {
-            color: #1e293b;
-            font-size: 2rem;
+            color: #0f766e;
+            font-size: 1.5rem;
             margin: 0;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             font-weight: 700;
         }
 
         .header h2 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .back-btn {
             background: white;
-            color: #3b82f6;
-            border: 2px solid #3b82f6;
-            padding: 10px 20px;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
+            padding: 8px 16px;
             border-radius: 8px;
             text-decoration: none;
             font-weight: 600;
             transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            font-size: 0.875rem;
         }
 
         .back-btn:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         .ficha-card {
             background: white;
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            padding: 30px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            border: 1px solid #ccfbf1;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(20, 184, 166, 0.1);
         }
 
         .ficha-header {
-            border-bottom: 2px solid #f1f5f9;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            border-bottom: 2px solid #e0f2f1;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
         }
 
         .ficha-title {
-            color: #1e293b;
-            font-size: 1.75rem;
-            margin-bottom: 10px;
+            color: #0f766e;
+            font-size: 1.25rem;
+            margin-bottom: 8px;
+            font-weight: 700;
         }
 
         .ficha-meta {
             display: flex;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 16px;
             color: #64748b;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
         }
 
         .ficha-meta span {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
 
         .ficha-meta i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .ficha-section {
-            margin-bottom: 30px;
+            margin-bottom: 16px;
         }
 
         .ficha-section h3 {
-            color: #1e293b;
-            font-size: 1.25rem;
-            margin-bottom: 15px;
+            color: #0f766e;
+            font-size: 1rem;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #f1f5f9;
+            gap: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e0f2f1;
+            font-weight: 600;
         }
 
         .ficha-section h3 i {
-            color: #3b82f6;
+            color: #14b8a6;
+            font-size: 0.875rem;
         }
 
         .ficha-content {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 20px;
+            background: #f0fdfa;
+            border-radius: 6px;
+            padding: 10px 12px;
             color: #475569;
-            line-height: 1.6;
+            line-height: 1.5;
+            font-size: 0.875rem;
+            border-left: 3px solid #14b8a6;
         }
 
         .ficha-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
         }
 
         .info-item {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 15px;
+            background: #f0fdfa;
+            border-radius: 6px;
+            padding: 10px 12px;
+            border-left: 3px solid #14b8a6;
         }
 
         .info-label {
             color: #64748b;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .info-value {
-            color: #1e293b;
-            font-size: 1rem;
+            color: #0f766e;
+            font-size: 0.875rem;
             font-weight: 600;
         }
 
@@ -171,34 +180,122 @@
             font-weight: 400;
         }
 
-        .ficha-content {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
         .ficha-content.empty-content {
             color: #94a3b8;
             font-style: italic;
         }
 
+        .compact-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .compact-section {
+            background: #f0fdfa;
+            border-radius: 6px;
+            padding: 10px 12px;
+            border-left: 3px solid #14b8a6;
+        }
+
+        .compact-section-label {
+            color: #64748b;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .compact-section-value {
+            color: #0f766e;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        .pdf-info-box {
+            background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 16px;
+            border: 2px solid #14b8a6;
+        }
+
+        .pdf-info-content {
+            text-align: center;
+            color: #0f766e;
+        }
+
+        .pdf-info-icon {
+            font-size: 2rem;
+            color: #14b8a6;
+            margin-bottom: 10px;
+        }
+
+        .pdf-info-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #0f766e;
+        }
+
+        .pdf-info-text {
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            color: #475569;
+        }
+
+        .pdf-contact-box {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            border-left: 4px solid #14b8a6;
+        }
+
+        .pdf-contact-title {
+            font-weight: 600;
+            color: #0f766e;
+            margin-bottom: 6px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pdf-contact-text {
+            color: #475569;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
             .container {
                 padding: 0;
             }
 
             .header {
-                padding: 15px;
+                padding: 12px 16px;
             }
 
             .header h2 {
-                font-size: 1.5rem;
+                font-size: 1.25rem;
             }
 
             .ficha-card {
-                padding: 20px;
+                padding: 16px;
             }
 
             .ficha-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .compact-row {
                 grid-template-columns: 1fr;
             }
         }
@@ -277,47 +374,33 @@
                 </div>
             </div>
 
-            <div class="ficha-section">
-                <h3>
-                    <i class="fas fa-notes-medical"></i>
-                    Antecedentes Médicos
-                </h3>
-                <div class="ficha-content {% if not odontograma.antecedentes_medicos %}empty-content{% endif %}">
-                    {{ odontograma.antecedentes_medicos|default:"No especificado" }}
-                </div>
-            </div>
-
-            <div class="ficha-section">
-                <h3>
-                    <i class="fas fa-exclamation-triangle"></i>
-                    Alergias
-                </h3>
-                <div class="ficha-content {% if not odontograma.alergias %}empty-content{% endif %}">
-                    {{ odontograma.alergias|default:"No especificado" }}
-                </div>
-            </div>
-
-            <div class="ficha-section">
-                <h3>
-                    <i class="fas fa-pills"></i>
-                    Medicamentos Actuales
-                </h3>
-                <div class="ficha-content {% if not odontograma.medicamentos_actuales %}empty-content{% endif %}">
-                    {{ odontograma.medicamentos_actuales|default:"No especificado" }}
-                </div>
-            </div>
-
-            <div class="ficha-grid">
-                <div class="info-item">
-                    <div class="info-label">Higiene Oral</div>
-                    <div class="info-value {% if not odontograma.higiene_oral %}empty{% endif %}">
-                        {{ odontograma.higiene_oral|default:"No especificado" }}
+            <div class="compact-row">
+                <div class="compact-section">
+                    <div class="compact-section-label"><i class="fas fa-notes-medical"></i> Antecedentes Médicos</div>
+                    <div class="compact-section-value {% if not odontograma.antecedentes_medicos %}empty-content{% endif %}">
+                        {{ odontograma.antecedentes_medicos|default:"No especificado" }}
                     </div>
                 </div>
-                <div class="info-item">
-                    <div class="info-label">Estado General</div>
-                    <div class="info-value {% if not odontograma.estado_general %}empty{% endif %}">
-                        {{ odontograma.estado_general|default:"No especificado" }}
+                <div class="compact-section">
+                    <div class="compact-section-label"><i class="fas fa-exclamation-triangle"></i> Alergias</div>
+                    <div class="compact-section-value {% if not odontograma.alergias %}empty-content{% endif %}">
+                        {{ odontograma.alergias|default:"No especificado" }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="compact-row">
+                <div class="compact-section">
+                    <div class="compact-section-label"><i class="fas fa-pills"></i> Medicamentos Actuales</div>
+                    <div class="compact-section-value {% if not odontograma.medicamentos_actuales %}empty-content{% endif %}">
+                        {{ odontograma.medicamentos_actuales|default:"No especificado" }}
+                    </div>
+                </div>
+                <div class="compact-section">
+                    <div class="compact-section-label"><i class="fas fa-tooth"></i> Higiene Oral / Estado General</div>
+                    <div class="compact-section-value">
+                        <strong>Higiene:</strong> {{ odontograma.higiene_oral|default:"No especificado" }}<br>
+                        <strong>Estado:</strong> {{ odontograma.estado_general|default:"No especificado" }}
                     </div>
                 </div>
             </div>
@@ -342,52 +425,29 @@
                 </div>
             </div>
 
-            {% if odontograma.proxima_cita %}
-            <div class="ficha-section">
-                <h3>
-                    <i class="fas fa-calendar-check"></i>
-                    Próxima Cita
-                </h3>
-                <div class="ficha-content">
-                    {{ odontograma.proxima_cita|date:"l, j \d\e F \d\e Y - H:i"|capfirst }} hrs
-                </div>
-            </div>
-            {% else %}
-            <div class="ficha-section">
-                <h3>
-                    <i class="fas fa-calendar-check"></i>
-                    Próxima Cita
-                </h3>
-                <div class="ficha-content">
-                    No programada
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Sección del Odontograma PDF -->
-            <div class="ficha-section" style="margin-top: 40px;">
+            <!-- Sección de Información sobre el PDF -->
+            <div class="ficha-section" style="margin-top: 16px;">
                 <h3>
                     <i class="fas fa-file-pdf"></i>
-                    Odontograma
+                    Documento PDF
                 </h3>
-                <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                    <div id="pdf-container" style="width: 100%; min-height: 600px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; position: relative;">
-                        <iframe 
-                            id="pdf-viewer" 
-                            src="{% url 'ver_pdf_odontograma' odontograma.id %}" 
-                            style="width: 100%; height: 800px; border: none; border-radius: 8px;"
-                            onerror="this.style.display='none'; document.getElementById('pdf-error').style.display='block';"
-                            onload="document.getElementById('pdf-loading').style.display='none';">
-                        </iframe>
-                        <div id="pdf-loading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #64748b;">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                            <p>Cargando odontograma...</p>
+                <div class="pdf-info-box">
+                    <div class="pdf-info-content">
+                        <i class="fas fa-info-circle pdf-info-icon"></i>
+                        <div class="pdf-info-title">Documento PDF Disponible</div>
+                        <div class="pdf-info-text">
+                            Aquí puedes ver un resumen de tu ficha odontológica. Si necesitas el documento PDF oficial 
+                            para presentarlo en otras instituciones o para tus registros personales, por favor 
+                            contacta con nuestra clínica.
                         </div>
-                        <div id="pdf-error" style="display: none; padding: 40px; text-align: center; color: #64748b;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #f59e0b; margin-bottom: 15px;"></i>
-                            <p style="font-weight: 600; margin-bottom: 10px;">PDF no disponible</p>
-                            <p style="font-size: 0.875rem;">El odontograma PDF no está disponible en este momento.</p>
-                            <p style="font-size: 0.875rem; margin-top: 5px;">Verifica que el sistema de gestión esté corriendo.</p>
+                        <div class="pdf-contact-box">
+                            <div class="pdf-contact-title">
+                                <i class="fas fa-phone-alt"></i> Contáctanos:
+                            </div>
+                            <div class="pdf-contact-text">
+                                Puedes comunicarte con nosotros por teléfono, email o acercándote a nuestras instalaciones 
+                                para solicitar una copia oficial del documento PDF de tu ficha odontológica.
+                            </div>
                         </div>
                     </div>
                 </div>

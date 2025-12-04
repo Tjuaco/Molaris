@@ -1,0 +1,648 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Mis Pacientes - Clínica Dental{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --turquesa-primary: #14b8a6;
+        --turquesa-dark: #0d9488;
+        --turquesa-light: #5eead4;
+        --turquesa-bg: #f0fdfa;
+    }
+    
+    /* Override del contenedor principal para ocupar todo el espacio */
+    .main-content {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* Override específico para eliminar cualquier padding del wrapper */
+    body .main-content-wrapper,
+    body .content-wrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        gap: 0 !important;
+    }
+    
+    /* Eliminar margen superior del page-header si existe */
+    .page-header {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Eliminar gap de cualquier contenedor flex dentro del contenido */
+    .mis-pacientes-content .content-wrapper,
+    .mis-pacientes-content [class*="wrapper"],
+    .mis-pacientes-content [class*="container"],
+    .mis-pacientes-content > div {
+        gap: 0 !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Eliminar espacio superior de las secciones incluidas */
+    .mis-pacientes-content > div[class*="seccion"],
+    .mis-pacientes-content > div[class*="section"],
+    .mis-pacientes-content .resumen-paciente-section,
+    .mis-pacientes-content .radiografias-seccion,
+    .mis-pacientes-content .odontogramas-seccion {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    .mis-pacientes-container {
+        display: flex;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        align-items: flex-start;
+        width: 100%;
+        position: relative;
+        min-height: calc(100vh - 110px);
+    }
+    
+    /* Primer Navbar Lateral - Lista de Pacientes */
+    .pacientes-sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 0;
+        margin: 0;
+        min-height: calc(100vh - 110px);
+        position: fixed;
+        top: 110px;
+        left: 0;
+        border-right: 2px solid #e5e7eb;
+        z-index: 200;
+        overflow-y: auto;
+        max-height: calc(100vh - 110px);
+    }
+    
+    .pacientes-sidebar-header {
+        padding: 20px 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 0;
+        padding-top: 20px;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
+    }
+    
+    .pacientes-search {
+        padding: 20px 20px 15px;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 0;
+        position: sticky;
+        top: 72px;
+        background: white;
+        z-index: 9;
+    }
+    
+    .pacientes-list {
+        padding: 12px 12px 20px;
+    }
+    
+    
+    .pacientes-sidebar-header h2 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .pacientes-sidebar-header h2 i {
+        color: var(--turquesa-primary);
+        font-size: 1.3rem;
+    }
+    
+    
+    .pacientes-search input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+    
+    .pacientes-search input:focus {
+        outline: none;
+        border-color: var(--turquesa-primary);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+    
+    
+    .paciente-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #64748b;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+    
+    .paciente-item:hover {
+        background: #f8fafc;
+        color: var(--turquesa-primary);
+        border-color: #e5e7eb;
+    }
+    
+    .paciente-item.active {
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        color: white;
+        border-color: var(--turquesa-dark);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+    
+    .paciente-item.active .paciente-info h4,
+    .paciente-item.active .paciente-info span {
+        color: white;
+    }
+    
+    .paciente-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+    
+    .paciente-item.active .paciente-avatar {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .paciente-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .paciente-info h4 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .paciente-info span {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .paciente-badges {
+        display: flex;
+        gap: 4px;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    
+    .paciente-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #e5e7eb;
+        color: #64748b;
+        font-weight: 600;
+    }
+    
+    .paciente-item.active .paciente-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+    
+    /* Menú Horizontal de Opciones del Paciente */
+    .paciente-menu-horizontal {
+        background: white;
+        border-bottom: 2px solid #e5e7eb;
+        padding: 0;
+        margin: 0;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        width: 100%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        position: sticky;
+        top: 0px;
+        z-index: 100;
+    }
+    
+    /* Calcular altura del navbar secundario dinámicamente */
+    @media (min-width: 769px) {
+        .paciente-menu-horizontal {
+            /* navbar principal (64px) + navbar secundario (padding 3px + altura labels ~10px + altura botones ~30px + padding 3px) */
+            top: 0px; /* Total: 0px - Posición perfecta */
+        }
+    }
+    
+    /* Asegurar que el contenido principal tenga margen superior para el menú sticky */
+    .mis-pacientes-content {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* El primer elemento dentro del contenido debe estar justo después del navbar */
+    .mis-pacientes-content > .paciente-menu-horizontal:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Asegurar que el contenido debajo del menú no se sobreponga */
+    .mis-pacientes-content > *:not(.paciente-menu-horizontal) {
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Asegurar que las secciones incluidas tengan espacio superior */
+    .mis-pacientes-content > div:not(.paciente-menu-horizontal) {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Contenido que viene después del menú horizontal */
+    .mis-pacientes-content .resumen-paciente-section,
+    .mis-pacientes-content .radiografias-seccion,
+    .mis-pacientes-content .odontogramas-seccion,
+    .mis-pacientes-content > div[class*="seccion"],
+    .mis-pacientes-content > div[class*="section"] {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Asegurar que el header de las secciones no se sobreponga */
+    .radiografias-header-modern,
+    .resumen-paciente-section > *:first-child,
+    .odontogramas-seccion > *:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    .paciente-info-header {
+        padding: 0 24px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #f8fafc;
+        margin: 0;
+        min-height: auto;
+    }
+    
+    .paciente-info-header h4 {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+        padding: 4px 0 2px 0;
+    }
+    
+    .paciente-info-header p {
+        margin: 0;
+        font-size: 0.7rem;
+        color: #64748b;
+        line-height: 1;
+        padding: 0 0 4px 0;
+    }
+    
+    .opciones-menu-horizontal {
+        display: flex;
+        gap: 0;
+        padding: 0;
+        background: white;
+    }
+    
+    .opcion-item-horizontal {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 24px;
+        text-decoration: none;
+        color: #64748b;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        position: relative;
+    }
+    
+    .opcion-item-horizontal:hover {
+        background: #f8fafc;
+        color: var(--turquesa-primary);
+    }
+    
+    .opcion-item-horizontal.active {
+        color: var(--turquesa-primary);
+        border-bottom-color: var(--turquesa-primary);
+        background: #f0fdfa;
+    }
+    
+    .opcion-item-horizontal i {
+        font-size: 1rem;
+    }
+    
+    .opcion-badge-horizontal {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: #e5e7eb;
+        color: #64748b;
+        font-weight: 600;
+        margin-left: 4px;
+    }
+    
+    .opcion-item-horizontal.active .opcion-badge-horizontal {
+        background: var(--turquesa-primary);
+        color: white;
+    }
+    
+    /* Contenido Principal */
+    .mis-pacientes-content {
+        flex: 1;
+        min-width: 0;
+        margin: 0 0 0 280px;
+        margin-top: 0 !important;
+        padding: 0;
+        padding-top: 0 !important;
+        box-sizing: border-box;
+        transition: margin-left 0.3s ease;
+        background: #f8fafc;
+        width: calc(100% - 280px);
+        max-width: none;
+        overflow-x: hidden;
+    }
+    
+    /* Override de max-width del base.html si existe */
+    .mis-pacientes-content .main-content {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Asegurar que no haya espacios superiores */
+    .mis-pacientes-content > *:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Eliminar cualquier espacio superior del menú horizontal */
+    .paciente-menu-horizontal {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    .paciente-menu-horizontal .paciente-info-header {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    
+    .paciente-info-header h4,
+    .paciente-info-header p {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    
+    .paciente-info-header h4 {
+        margin-bottom: 0 !important;
+        padding-top: 4px !important;
+        padding-bottom: 2px !important;
+    }
+    
+    .paciente-info-header p {
+        padding-top: 0 !important;
+        padding-bottom: 4px !important;
+    }
+    
+    /* Forzar que el primer elemento no tenga espacio */
+    #main-content > .paciente-menu-horizontal:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Reducir aún más el espacio superior del contenido */
+    .mis-pacientes-content {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    .content-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        color: #94a3b8;
+        text-align: center;
+        padding: 40px;
+    }
+    
+    .content-placeholder i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        color: #cbd5e1;
+    }
+    
+    .content-placeholder h3 {
+        font-size: 1.5rem;
+        color: #64748b;
+        margin-bottom: 10px;
+    }
+    
+    .content-placeholder p {
+        font-size: 1rem;
+        color: #94a3b8;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .pacientes-sidebar {
+            width: 100%;
+            position: relative;
+            top: 0;
+        }
+        
+        .mis-pacientes-content {
+            margin-left: 0;
+            width: 100%;
+        }
+        
+        .opciones-menu-horizontal {
+            flex-wrap: wrap;
+        }
+        
+        .opcion-item-horizontal {
+            flex: 1;
+            min-width: 120px;
+            justify-content: center;
+        }
+        
+        .paciente-menu-horizontal {
+            position: relative;
+            top: 0;
+        }
+    }
+</style>
+
+<div class="mis-pacientes-container">
+    <!-- Primer Navbar: Lista de Pacientes -->
+    <div class="pacientes-sidebar">
+        <div class="pacientes-sidebar-header">
+            <h2>
+                <i class="fas fa-users"></i>
+                Mis Pacientes
+            </h2>
+        </div>
+        
+        <div class="pacientes-search">
+            <form method="get" id="search-form">
+                <input 
+                    type="text" 
+                    name="search" 
+                    value="{{ search }}" 
+                    placeholder="Buscar paciente..."
+                    autocomplete="off"
+                    id="search-input"
+                >
+            </form>
+        </div>
+        
+        <div class="pacientes-list">
+            {% for paciente in pacientes %}
+            <a 
+                href="{% url 'mis_pacientes_paciente' paciente.id %}" 
+                class="paciente-item {% if paciente_seleccionado and paciente_seleccionado.id == paciente.id %}active{% endif %}"
+            >
+                <div class="paciente-avatar">
+                    {{ paciente.nombre_completo|first|upper }}
+                </div>
+                <div class="paciente-info">
+                    <h4>{{ paciente.nombre_completo }}</h4>
+                    <span>
+                        <i class="fas fa-envelope"></i>
+                        {{ paciente.email|truncatechars:20 }}
+                    </span>
+                </div>
+                <div class="paciente-badges">
+                    {% if paciente.total_radiografias > 0 %}
+                    <span class="paciente-badge">{{ paciente.total_radiografias }} 📷</span>
+                    {% endif %}
+                    {% if paciente.total_odontogramas > 0 %}
+                    <span class="paciente-badge">{{ paciente.total_odontogramas }} 🦷</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% empty %}
+            <div class="content-placeholder" style="min-height: 200px;">
+                <i class="fas fa-user-slash"></i>
+                <p>No hay pacientes vinculados</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Contenido Principal -->
+    <div class="mis-pacientes-content" id="main-content">
+        <!-- Menú Horizontal de Opciones del Paciente -->
+        {% if paciente_seleccionado %}
+        <div class="paciente-menu-horizontal">
+            <div class="paciente-info-header">
+                <h4>{{ paciente_seleccionado.nombre_completo }}</h4>
+                <p>{{ paciente_seleccionado.email }}</p>
+            </div>
+            <div class="opciones-menu-horizontal">
+                <a 
+                    href="{% url 'mis_pacientes_seccion' paciente_seleccionado.id 'resumen' %}" 
+                    class="opcion-item-horizontal {% if seccion_actual == 'resumen' %}active{% endif %}"
+                >
+                    <i class="fas fa-chart-line"></i>
+                    <span>Resumen</span>
+                </a>
+                
+                <a 
+                    href="{% url 'mis_pacientes_seccion' paciente_seleccionado.id 'radiografias' %}" 
+                    class="opcion-item-horizontal {% if seccion_actual == 'radiografias' %}active{% endif %}"
+                >
+                    <i class="fas fa-x-ray"></i>
+                    <span>Radiografías</span>
+                    {% if paciente_seleccionado.total_radiografias > 0 %}
+                    <span class="opcion-badge-horizontal">{{ paciente_seleccionado.total_radiografias }}</span>
+                    {% endif %}
+                </a>
+                
+                <a 
+                    href="{% url 'mis_pacientes_seccion' paciente_seleccionado.id 'odontogramas' %}" 
+                    class="opcion-item-horizontal {% if seccion_actual == 'odontogramas' %}active{% endif %}"
+                >
+                    <i class="fas fa-tooth"></i>
+                    <span>Odontogramas</span>
+                    {% if paciente_seleccionado.total_odontogramas > 0 %}
+                    <span class="opcion-badge-horizontal">{{ paciente_seleccionado.total_odontogramas }}</span>
+                    {% endif %}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        {% if paciente_seleccionado %}
+            {% if seccion_actual == 'resumen' %}
+                {% include 'citas/mis_pacientes/secciones/resumen.html' %}
+            {% elif seccion_actual == 'radiografias' %}
+                {% include 'citas/mis_pacientes/secciones/radiografias.html' %}
+            {% elif seccion_actual == 'odontogramas' %}
+                {% include 'citas/mis_pacientes/secciones/odontogramas.html' %}
+            {% endif %}
+        {% else %}
+            <div class="content-placeholder">
+                <i class="fas fa-user-md"></i>
+                <h3>Selecciona un paciente</h3>
+                <p>Elige un paciente de la lista para ver sus documentos y opciones</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Búsqueda en tiempo real
+    document.getElementById('search-input')?.addEventListener('input', function(e) {
+        const form = document.getElementById('search-form');
+        if (e.target.value.length === 0 || e.target.value.length >= 2) {
+            form.submit();
+        }
+    });
+    
+</script>
+{% endblock %}
+

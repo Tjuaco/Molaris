@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema de gestión clínica dental Molaris - Clínica San Felipe">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Iniciar Sesión - Molaris | Clínica San Felipe</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <style>
+        :root {
+            --primary-color: #14b8a6;
+            --primary-dark: #0d9488;
+            --primary-darker: #0f766e;
+            --primary-light: #2dd4bf;
+            --primary-lighter: #5eead4;
+            --primary-bg: #f0fdfa;
+            --primary-text: #134e4a;
+            --error-color: #ef4444;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            background: #0f766e;
+        }
+        
+        /* Imagen de fondo de clínica dental */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* 
+            INSTRUCCIONES PARA CAMBIAR LA IMAGEN:
+            1. Coloca tu imagen de clínica dental en: gestion_clinica/media/login_bg.jpg
+            2. O cambia 'login_bg.jpg' por el nombre de tu archivo
+            3. Si prefieres usar una URL externa, reemplaza toda la línea background-image con:
+               background-image: url('https://tu-url.com/imagen.jpg');
+            */
+            background-image: 
+                url('/media/fondo.jpg'),
+                linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: blur(4px);
+            -webkit-filter: blur(4px);
+            z-index: 0;
+        }
+        
+        /* Overlay turquesa con baja opacidad */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(20, 184, 166, 0.35); /* Overlay turquesa con 35% de opacidad - ajusta el valor (0.35) para más/menos opacidad */
+            z-index: 0;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            animation: fadeIn 0.6s ease;
+            display: flex;
+            flex-direction: column;
+            min-height: 600px;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        /* Header del modal */
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 32px;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-color);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 22px;
+        }
+        
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-color);
+            letter-spacing: -0.5px;
+        }
+        
+        .clinic-name {
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        /* Contenido principal - dos columnas */
+        .modal-content {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        
+        /* Sección izquierda - Login */
+        .login-section {
+            flex: 1;
+            padding: 48px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .login-section h2 {
+            color: var(--primary-color);
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 32px;
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #334155;
+            font-size: 14px;
+        }
+        
+        .input-wrapper {
+            position: relative;
+        }
+        
+        .input-icon {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 18px;
+            pointer-events: none;
+        }
+        
+        input {
+            width: 100%;
+            padding: 14px 48px 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+            font-family: inherit;
+        }
+        
+        input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.1);
+        }
+        
+        input::placeholder {
+            color: #cbd5e1;
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+            font-family: inherit;
+        }
+        
+        .btn-login:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+        }
+        
+        .btn-login:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        
+        .btn-login:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        /* Sección derecha - Registro */
+        .register-section {
+            flex: 1;
+            padding: 48px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #f8fafc;
+            border-left: 1px solid #e5e7eb;
+            text-align: center;
+        }
+        
+        .register-section h3 {
+            color: var(--primary-color);
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+        
+        .register-btn {
+            display: inline-block;
+            padding: 14px 32px;
+            background: white;
+            color: var(--primary-color);
+            text-decoration: none;
+            border: 2px solid var(--primary-color);
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            margin-top: 16px;
+        }
+        
+        .register-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        }
+        
+        .register-text {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 16px;
+        }
+        
+        .alert {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid var(--error-color);
+            text-align: left;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .alert.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left-color: var(--warning-color);
+        }
+        
+        .alert.success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left-color: var(--success-color);
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .alert i {
+            margin-right: 8px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .modal-content {
+                flex-direction: column;
+            }
+            
+            .register-section {
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+            }
+            
+            .login-section,
+            .register-section {
+                padding: 32px 24px;
+            }
+            
+            .modal-header {
+                padding: 20px 24px;
+            }
+            
+            .logo-text {
+                font-size: 24px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .login-section h2,
+            .register-section h3 {
+                font-size: 24px;
+            }
+            
+            .logo-text {
+                font-size: 20px;
+            }
+            
+            .clinic-name {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <!-- Header con logo y nombre de clínica -->
+        <div class="modal-header">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-tooth"></i>
+                </div>
+                <div>
+                    <div class="logo-text">Molaris</div>
+                </div>
+            </div>
+            <div class="clinic-name">Clínica San Felipe</div>
+        </div>
+        
+        <!-- Contenido principal - dos secciones -->
+        <div class="modal-content">
+            <!-- Sección izquierda - Iniciar Sesión -->
+            <div class="login-section">
+                <h2>Iniciar Sesión</h2>
+                
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert {% if 'warning' in message.tags or '⚠️' in message|stringformat:'s' %}warning{% elif 'success' in message.tags %}success{% endif %}">
+                            <i class="fas {% if 'warning' in message.tags or '⚠️' in message|stringformat:'s' %}fa-exclamation-triangle{% elif 'success' in message.tags %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+                            {{ message|safe }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="post" id="login-form" autocomplete="on">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="id_username">Usuario</label>
+                        <div class="input-wrapper">
+                            <input type="text" name="username" id="id_username" placeholder="Ingresa tu usuario" required autocomplete="username" maxlength="150" pattern="[a-zA-Z0-9@.+\-_]+" title="Solo letras, números y caracteres: @ . + - _">
+                            <i class="fas fa-user input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_password">Contraseña</label>
+                        <div class="input-wrapper">
+                            <input type="password" name="password" id="id_password" placeholder="Ingresa tu contraseña" required autocomplete="current-password" minlength="8">
+                            <i class="fas fa-lock input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-login" id="login-submit" disabled>
+                        Entrar
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Sección derecha - ¿Nuevo aquí? -->
+            <div class="register-section">
+                <h3>¿Nuevo aquí?</h3>
+                <a href="{% url 'registro_trabajador' %}" class="register-btn">
+                    Crear Cuenta
+                </a>
+                <p class="register-text">¡Únete a Molaris hoy!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Validación del formulario
+        const form = document.getElementById('login-form');
+        const submit = document.getElementById('login-submit');
+        const inputs = form.querySelectorAll('input[required]');
+
+        function validate() {
+            let valid = true;
+            inputs.forEach(input => {
+                if (!input.value.trim()) {
+                    valid = false;
+                }
+            });
+            submit.disabled = !valid;
+        }
+
+        inputs.forEach(input => {
+            input.addEventListener('input', validate);
+            input.addEventListener('blur', validate);
+        });
+
+        validate();
+        
+        // Prevenir envío múltiple
+        let isSubmitting = false;
+        form.addEventListener('submit', function(e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            isSubmitting = true;
+            submit.disabled = true;
+            submit.innerHTML = 'Iniciando sesión...';
+        });
+    </script>
+</body>
+</html>

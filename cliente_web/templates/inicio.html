@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clínica Dental - Sistema de Reservas Online</title>
+    <title>Clínica San Felipe - Sistema de Reservas Online</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -14,7 +14,7 @@
 
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
             min-height: 100vh;
             color: #333;
             line-height: 1.6;
@@ -55,7 +55,7 @@
         .logo-icon {
             width: 50px;
             height: 50px;
-            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -83,7 +83,7 @@
         }
 
         .btn-primary {
-            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             color: white;
             padding: 12px 24px;
             border-radius: 25px;
@@ -97,13 +97,13 @@
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 25px rgba(20, 184, 166, 0.3);
         }
 
         .btn-secondary {
             background: transparent;
-            color: #3b82f6;
-            border: 2px solid #667eea;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
             padding: 10px 22px;
             border-radius: 25px;
             text-decoration: none;
@@ -115,7 +115,7 @@
         }
 
         .btn-secondary:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             transform: translateY(-2px);
         }
@@ -125,6 +125,74 @@
             padding: 80px 0;
             text-align: center;
             color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Contenedor de imágenes de fondo */
+        .hero-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        
+        .hero-background-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0;
+            transition: opacity 2s ease-in-out;
+        }
+        
+        .hero-background-image.active {
+            opacity: 1;
+        }
+        
+        /* Fondo turquesa sólido que alterna con la imagen */
+        .hero-background-color {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            opacity: 0;
+            transition: opacity 2s ease-in-out;
+        }
+        
+        .hero-background-color.active {
+            opacity: 1;
+        }
+        
+        /* Overlay turquesa con baja opacidad (solo cuando muestra la imagen) */
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(20, 184, 166, 0.4); /* Overlay turquesa con 40% de opacidad */
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 2s ease-in-out;
+        }
+        
+        .hero-overlay.show {
+            opacity: 1;
+        }
+        
+        /* Contenido del hero sobre las imágenes */
+        .hero .container {
+            position: relative;
+            z-index: 2;
         }
 
         .hero h2 {
@@ -163,7 +231,7 @@
 
         .btn-hero.primary {
             background: white;
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .btn-hero.primary:hover {
@@ -232,7 +300,7 @@
         .feature-icon {
             width: 80px;
             height: 80px;
-            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -275,7 +343,7 @@
         .step-number {
             width: 60px;
             height: 60px;
-            background: linear-gradient(45deg, #28a745, #20c997);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -300,7 +368,7 @@
         /* CTA Section */
         .cta {
             padding: 80px 0;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
             text-align: center;
             color: white;
         }
@@ -439,6 +507,35 @@
             animation-delay: 0.6s;
         }
     </style>
+    <script>
+        // Alternancia entre imagen y color turquesa en el hero section
+        document.addEventListener('DOMContentLoaded', function() {
+            const heroImage = document.getElementById('hero-image');
+            const heroColor = document.getElementById('hero-color');
+            const heroOverlay = document.getElementById('hero-overlay');
+            
+            let showingImage = true; // Comienza mostrando la imagen
+            
+            function toggleBackground() {
+                if (showingImage) {
+                    // Cambiar a color turquesa sólido
+                    heroImage.classList.remove('active');
+                    heroColor.classList.add('active');
+                    heroOverlay.classList.remove('show'); // Ocultar overlay cuando muestra color sólido
+                    showingImage = false;
+                } else {
+                    // Cambiar a imagen
+                    heroColor.classList.remove('active');
+                    heroImage.classList.add('active');
+                    heroOverlay.classList.add('show'); // Mostrar overlay cuando muestra imagen
+                    showingImage = true;
+                }
+            }
+            
+            // Alternar cada 4 segundos
+            setInterval(toggleBackground, 4000);
+        });
+    </script>
 </head>
 <body>
     <!-- Header -->
@@ -450,8 +547,8 @@
                         <i class="fas fa-tooth"></i>
                     </div>
                     <div class="logo-text">
-                        <h1>Clínica Dental</h1>
-                        <p>Sistema de Reservas Online</p>
+                        <h1>Clínica San Felipe</h1>
+                        <p>Victoria, Región de la Araucanía - Sistema de Reservas Online</p>
                     </div>
                 </a>
                 <div class="nav-buttons">
@@ -470,9 +567,25 @@
 
     <!-- Hero Section -->
     <section class="hero">
+        <!-- Carrusel de imagen y color turquesa -->
+        <div class="hero-background">
+            <!-- Imagen de la clínica -->
+            <div class="hero-background-image active" id="hero-image" style="background-image: url('/media/hero/clinica_interior.png');"></div>
+            <!-- Fondo turquesa sólido -->
+            <div class="hero-background-color" id="hero-color"></div>
+        </div>
+        <!-- Overlay turquesa (solo cuando muestra la imagen) -->
+        <div class="hero-overlay show" id="hero-overlay"></div>
+        <!-- Contenido -->
         <div class="container">
-            <h2>Reserva tu cita dental de manera remota</h2>
-            <p>Accede a nuestro sistema online para ver horarios disponibles y agendar tu atención dental desde la comodidad de tu casa. Sin llamadas, sin esperas, todo en tiempo real.</p>
+            <h2>Reserva tu cita dental en Clínica San Felipe</h2>
+            <p style="margin-bottom: 20px;">Ubicada en Victoria, Región de la Araucanía, Chile. Accede a nuestro sistema online para ver horarios disponibles y agendar tu atención dental desde la comodidad de tu casa. Sin llamadas, sin esperas, todo en tiempo real.</p>
+            <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                <p style="font-size: 1.1rem; margin: 0; line-height: 1.6;">
+                    <i class="fas fa-handshake" style="margin-right: 8px;"></i>
+                    <strong>Sistema desarrollado en colaboración con Molaris</strong> - Plataforma de gestión dental profesional que potencia la experiencia de nuestros pacientes.
+                </p>
+            </div>
             <div class="hero-buttons">
                 <a href="{% url 'registro_cliente' %}" class="btn-hero primary">
                     <i class="fas fa-calendar-plus"></i>
@@ -482,6 +595,21 @@
                     <i class="fas fa-sign-in-alt"></i>
                     Ya tengo cuenta
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="features" style="background: linear-gradient(135deg, #f0fdfa 0%, #e0f2f1 100%);">
+        <div class="container">
+            <div class="section-title">
+                <h3 style="color: #0f766e;">Sobre Nosotros</h3>
+                <p style="color: #475569; max-width: 800px; margin: 0 auto 40px;">
+                    <strong>Clínica San Felipe</strong> de Victoria, Región de la Araucanía, se enorgullece de presentar su sistema de reservas online desarrollado en colaboración con <strong>Molaris</strong>, una plataforma de gestión dental de última generación.
+                </p>
+                <p style="color: #64748b; max-width: 800px; margin: 0 auto;">
+                    Esta innovadora solución tecnológica nos permite ofrecer a nuestros pacientes una experiencia moderna y eficiente para gestionar sus citas dentales. Molaris nos proporciona las herramientas necesarias para mantener un servicio de excelencia, mientras que nuestros pacientes disfrutan de la comodidad de reservar sus citas desde cualquier lugar y en cualquier momento.
+                </p>
             </div>
         </div>
     </section>
@@ -568,7 +696,13 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Clínica Dental - Sistema de Reservas Online. Todos los derechos reservados.</p>
+            <p style="margin-bottom: 15px;">&copy; 2024 Clínica San Felipe - Victoria, Región de la Araucanía, Chile. Sistema de Reservas Online.</p>
+            <p style="font-size: 0.9rem; opacity: 0.7; margin: 0;">
+                Desarrollado en colaboración con <strong>Molaris</strong> - Plataforma de Gestión Dental Profesional
+            </p>
+            <p style="font-size: 0.85rem; opacity: 0.6; margin-top: 10px;">
+                Todos los derechos reservados.
+            </p>
         </div>
     </footer>
 </body>

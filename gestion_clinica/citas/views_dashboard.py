@@ -171,7 +171,7 @@ def dashboard_reportes(request):
         'ultimas_evaluaciones': ultimas_evaluaciones,
     }
     
-    return render(request, 'citas/dashboard_reportes.html', context)
+    return render(request, 'citas/dashboard/dashboard_reportes.html', context)
 
 
 # ========== EXPORTACIÓN A EXCEL - CITAS ==========
@@ -608,7 +608,7 @@ def dashboard_reportes(request):
         'ultimas_evaluaciones': ultimas_evaluaciones,
     }
     
-    return render(request, 'citas/dashboard_reportes.html', context)
+    return render(request, 'citas/dashboard/dashboard_reportes.html', context)
 
 
 # ========== EXPORTACIÓN A EXCEL - CITAS ==========
@@ -1045,7 +1045,7 @@ def dashboard_reportes(request):
         'ultimas_evaluaciones': ultimas_evaluaciones,
     }
     
-    return render(request, 'citas/dashboard_reportes.html', context)
+    return render(request, 'citas/dashboard/dashboard_reportes.html', context)
 
 
 # ========== EXPORTACIÓN A EXCEL - CITAS ==========
@@ -1482,7 +1482,7 @@ def dashboard_reportes(request):
         'ultimas_evaluaciones': ultimas_evaluaciones,
     }
     
-    return render(request, 'citas/dashboard_reportes.html', context)
+    return render(request, 'citas/dashboard/dashboard_reportes.html', context)
 
 
 # ========== EXPORTACIÓN A EXCEL - CITAS ==========

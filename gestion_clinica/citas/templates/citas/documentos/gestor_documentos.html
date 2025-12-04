@@ -1,0 +1,885 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Gestión de Documentos - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    .main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Layout con Sidebar */
+    .gestor-layout-container {
+        display: flex;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        align-items: flex-start;
+        width: 100%;
+        position: relative;
+        min-height: calc(100vh - 80px);
+        overflow-x: hidden;
+    }
+
+    /* Sidebar Izquierdo */
+    .gestor-sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 20px 0;
+        min-height: calc(100vh - 99px);
+        position: fixed;
+        top: 99px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 100;
+        overflow-y: auto;
+        max-height: calc(100vh - 99px);
+    }
+
+    .sidebar-header {
+        padding: 0 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding-top: 12px;
+        background: #f0fdfa;
+        border-radius: 0;
+    }
+
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-header h3 i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 0 12px;
+        margin-top: 8px;
+    }
+
+    .sidebar-section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 20px 8px;
+        margin-top: 12px;
+        margin-bottom: 4px;
+    }
+
+    .sidebar-divider {
+        height: 1px;
+        background: #e5e7eb;
+        margin: 12px 20px;
+    }
+
+    .sidebar-select, .sidebar-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #1e293b;
+        background: white;
+        transition: all 0.2s;
+    }
+
+    .sidebar-select:focus, .sidebar-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .gestor-content {
+        margin-left: 260px;
+        margin-right: 0;
+        margin-top: 0;
+        width: calc(100% - 260px);
+        padding: 12px 24px;
+        padding-top: 12px;
+        min-height: calc(100vh - 99px);
+    }
+
+    .header-with-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 24px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .page-header {
+        flex: 1;
+        min-width: 300px;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-title i {
+        color: var(--primary-color);
+    }
+
+    .page-subtitle {
+        font-size: 0.875rem;
+        color: #64748b;
+        margin: 0;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+        min-width: 300px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: white;
+        background: var(--primary-color);
+        flex-shrink: 0;
+    }
+
+    .stat-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+        margin-top: 4px;
+    }
+
+    .section {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        width: 100%;
+        border: 1px solid #e2e8f0;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .data-table thead {
+        background: #f8fafc;
+    }
+
+    .data-table th {
+        padding: 14px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+    }
+
+    .data-table th i {
+        margin-right: 6px;
+        color: var(--primary-color);
+    }
+
+    .data-table tbody tr {
+        border-bottom: 1px solid #e2e8f0;
+        transition: background 0.2s;
+    }
+
+    .data-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .data-table td {
+        padding: 16px;
+        color: #374151;
+        vertical-align: middle;
+    }
+
+    .badge-tipo {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .badge-presupuesto {
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+
+    .badge-odontograma {
+        background: #f0fdf4;
+        color: #10b981;
+    }
+
+    .badge-radiografia {
+        background: #fef3c7;
+        color: #f59e0b;
+    }
+
+    .badge-consentimiento {
+        background: #f3e8ff;
+        color: #8b5cf6;
+    }
+
+    .badge-receta {
+        background: #fce7f3;
+        color: #ec4899;
+    }
+
+    .badge-factura {
+        background: #fff1f2;
+        color: #ef4444;
+    }
+
+    .badge-nota-medica {
+        background: #ecfdf5;
+        color: #059669;
+    }
+
+    .badge-otro {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .cliente-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .cliente-nombre {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.875rem;
+    }
+
+    .cliente-email {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .btn-action {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        color: white;
+    }
+
+    .btn-download {
+        background: #3b82f6;
+    }
+
+    .btn-download:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-email {
+        background: #10b981;
+    }
+
+    .btn-email:hover {
+        background: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 24px;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+    }
+
+    .empty-state-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #64748b;
+        margin: 0 0 8px 0;
+    }
+
+    .empty-state-text {
+        font-size: 0.875rem;
+        color: #94a3b8;
+        margin: 0;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        padding: 20px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .pagination a, .pagination span {
+        padding: 8px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .pagination a {
+        background: #3b82f6;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .pagination a:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+    }
+
+    .pagination span {
+        color: #64748b;
+        background: #f8fafc;
+    }
+
+    /* Modal */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #64748b;
+        cursor: pointer;
+        padding: 4px;
+        line-height: 1;
+        transition: color 0.2s;
+    }
+
+    .modal-close:hover {
+        color: #1e293b;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        color: #374151;
+        font-weight: 500;
+        font-size: 0.875rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-secondary {
+        background: #6b7280;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #4b5563;
+    }
+
+    .btn-primary {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #059669;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .gestor-sidebar {
+            display: none;
+        }
+        .gestor-content {
+            margin-left: 0;
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="gestor-layout-container">
+    <!-- Sidebar Izquierdo -->
+    <nav class="gestor-sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-file-pdf"></i> Documentos</h3>
+        </div>
+        <div class="sidebar-nav">
+            <form method="get" action="{% url 'gestor_documentos' %}" id="filtrosForm">
+                <div class="sidebar-section-title">Tipo de Documento</div>
+                <div style="padding: 0 20px 16px;">
+                    <select name="tipo" class="sidebar-select" onchange="document.getElementById('filtrosForm').submit();">
+                        <option value="">Todos los tipos</option>
+                        {% for tipo_val, tipo_nombre in tipos_documento %}
+                        <option value="{{ tipo_val }}" {% if tipo_filtro == tipo_val %}selected{% endif %}>
+                            {{ tipo_nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div class="sidebar-section-title">Buscar Cliente</div>
+                <div style="padding: 0 20px 16px;">
+                    <input type="text" name="cliente" value="{{ cliente_busqueda }}" 
+                           placeholder="Nombre, email o RUT" 
+                           class="sidebar-input">
+                </div>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div style="padding: 0 20px;">
+                    <button type="submit" class="btn" style="width: 100%; background: var(--primary-color); color: white; margin-bottom: 8px;">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                    <a href="{% url 'gestor_documentos' %}" class="btn" style="width: 100%; background: #6b7280; color: white; display: block; text-align: center; text-decoration: none;">
+                        <i class="fas fa-redo"></i> Limpiar
+                    </a>
+                </div>
+            </form>
+            
+            <div class="sidebar-divider"></div>
+            
+            <div class="sidebar-section-title">Estadísticas</div>
+            <div style="padding: 0 20px 16px;">
+                <div style="font-size: 0.875rem; color: #1e293b; margin-bottom: 12px; font-weight: 600;">
+                    Total: <span style="color: var(--primary-color);">{{ total_documentos }}</span>
+                </div>
+                {% for tipo_val, tipo_nombre in tipos_documento %}
+                {% with count=documentos_por_tipo|get_item:tipo_val %}
+                {% if count %}
+                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px; padding-left: 8px;">
+                    <i class="fas fa-circle" style="font-size: 0.5rem; margin-right: 6px;"></i>
+                    {{ tipo_nombre }}: <strong>{{ count }}</strong>
+                </div>
+                {% endif %}
+                {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <div class="gestor-content">
+        <!-- Header con Estadísticas -->
+        <div class="header-with-stats">
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="fas fa-file-pdf"></i> Gestión de Documentos
+                </h1>
+                <p class="page-subtitle">Busca, descarga y envía documentos de clientes de forma rápida y eficiente</p>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--primary-color);">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ total_documentos }}</div>
+                        <div class="stat-label">Total Documentos</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #10b981;">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ documentos|length }}</div>
+                        <div class="stat-label">En esta página</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lista de Documentos -->
+        <div class="section">
+            {% if documentos %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-tag"></i> Tipo</th>
+                            <th><i class="fas fa-file-alt"></i> Título</th>
+                            <th><i class="fas fa-user"></i> Cliente</th>
+                            <th><i class="fas fa-calendar"></i> Fecha</th>
+                            <th><i class="fas fa-user-tie"></i> Generado por</th>
+                            <th style="text-align: center;"><i class="fas fa-cog"></i> Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for documento in documentos %}
+                        <tr>
+                            <td>
+                                <span class="badge-tipo badge-{{ documento.tipo }}">
+                                    <i class="fas fa-{% if documento.tipo == 'presupuesto' %}dollar-sign{% elif documento.tipo == 'odontograma' %}tooth{% elif documento.tipo == 'radiografia' %}x-ray{% elif documento.tipo == 'consentimiento' %}file-signature{% elif documento.tipo == 'receta' %}prescription{% elif documento.tipo == 'factura' %}receipt{% else %}file{% endif %}"></i>
+                                    {{ documento.get_tipo_display }}
+                                </span>
+                            </td>
+                            <td style="font-weight: 500; color: #1e293b;">
+                                {{ documento.titulo }}
+                            </td>
+                            <td>
+                                <div class="cliente-info">
+                                    {% if documento.cliente %}
+                                    <div class="cliente-nombre">{{ documento.cliente.nombre_completo }}</div>
+                                    <div class="cliente-email">{{ documento.cliente.email }}</div>
+                                    {% elif documento.odontograma %}
+                                    <div class="cliente-nombre">{{ documento.odontograma.paciente_nombre }}</div>
+                                    <div class="cliente-email">{{ documento.odontograma.paciente_email }}</div>
+                                    {% elif documento.plan_tratamiento %}
+                                    <div class="cliente-nombre">{{ documento.plan_tratamiento.cliente.nombre_completo }}</div>
+                                    <div class="cliente-email">{{ documento.plan_tratamiento.cliente.email }}</div>
+                                    {% else %}
+                                    <div class="cliente-nombre" style="color: #94a3b8;">Sin cliente asociado</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="color: #64748b; font-size: 0.8125rem;">
+                                {{ documento.fecha_generacion|date:"d/m/Y" }}<br>
+                                <span style="color: #94a3b8;">{{ documento.fecha_generacion|date:"H:i" }}</span>
+                            </td>
+                            <td style="color: #64748b; font-size: 0.8125rem;">
+                                {{ documento.generado_por.nombre_completo|default:"Sistema" }}
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <a href="{% url 'descargar_documento' documento.id %}" 
+                                       class="btn-action btn-download"
+                                       title="Descargar PDF"
+                                       target="_blank">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <button onclick="enviarDocumento({{ documento.id }}, '{% if documento.cliente %}{{ documento.cliente.email }}{% elif documento.odontograma %}{{ documento.odontograma.paciente_email }}{% elif documento.plan_tratamiento %}{{ documento.plan_tratamiento.cliente.email }}{% endif %}')" 
+                                            class="btn-action btn-email"
+                                            title="Enviar por correo">
+                                        <i class="fas fa-envelope"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginación -->
+            {% if documentos.has_other_pages %}
+            <div class="pagination">
+                {% if documentos.has_previous %}
+                <a href="?page={{ documentos.previous_page_number }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}{% if cliente_busqueda %}&cliente={{ cliente_busqueda }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </a>
+                {% endif %}
+                
+                <span>
+                    Página {{ documentos.number }} de {{ documentos.paginator.num_pages }}
+                </span>
+                
+                {% if documentos.has_next %}
+                <a href="?page={{ documentos.next_page_number }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}{% if cliente_busqueda %}&cliente={{ cliente_busqueda }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-file-pdf"></i>
+                </div>
+                <h3 class="empty-state-title">No se encontraron documentos</h3>
+                <p class="empty-state-text">Intenta ajustar los filtros de búsqueda para encontrar lo que buscas</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para enviar documento por correo -->
+<div id="modalEnviarDocumento" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-envelope" style="color: var(--primary-color); margin-right: 8px;"></i>
+                Enviar Documento por Correo
+            </h3>
+            <button onclick="cerrarModalEnviar()" class="modal-close">&times;</button>
+        </div>
+        <form id="formEnviarDocumento" onsubmit="enviarDocumentoSubmit(event)">
+            <input type="hidden" id="documentoIdEnviar" name="documento_id">
+            <div class="form-group">
+                <label class="form-label">Email Destinatario:</label>
+                <input type="email" id="emailDestinatario" name="email" required class="form-input"
+                       placeholder="correo@ejemplo.com">
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="cerrarModalEnviar()" class="btn btn-secondary">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Enviar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function enviarDocumento(documentoId, emailDefault) {
+    document.getElementById('documentoIdEnviar').value = documentoId;
+    document.getElementById('emailDestinatario').value = emailDefault;
+    document.getElementById('modalEnviarDocumento').classList.add('show');
+}
+
+function cerrarModalEnviar() {
+    document.getElementById('modalEnviarDocumento').classList.remove('show');
+}
+
+function enviarDocumentoSubmit(event) {
+    event.preventDefault();
+    const documentoId = document.getElementById('documentoIdEnviar').value;
+    const email = document.getElementById('emailDestinatario').value;
+    
+    // Deshabilitar botón mientras se envía
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    
+    // Crear FormData
+    const formData = new FormData();
+    formData.append('email', email);
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/documentos/${documentoId}/enviar-correo/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalEnviar();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo enviar el documento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al enviar el documento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalEnviarDocumento').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalEnviar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalEnviar();
+    }
+});
+</script>
+
+{% endblock %}

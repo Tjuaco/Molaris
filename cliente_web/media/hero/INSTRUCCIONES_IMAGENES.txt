@@ -1,0 +1,42 @@
+INSTRUCCIONES PARA LAS IMÁGENES DEL HERO
+
+===========================================
+UBICACIÓN DE LAS IMÁGENES
+===========================================
+
+Coloca tus 2 imágenes en esta carpeta:
+cliente_web/media/hero/
+
+NOMBRES DE ARCHIVO REQUERIDOS:
+1. clinica_exterior.jpg  (o .png) - Imagen del exterior de la clínica
+2. clinica_interior.jpg  (o .png) - Imagen del interior de la clínica
+
+===========================================
+FORMATO RECOMENDADO
+===========================================
+
+- Formato: JPG o PNG
+- Resolución recomendada: 1920x1080 px (Full HD) o superior
+- Tamaño de archivo: Menor a 2MB cada una (para carga rápida)
+- Aspecto: Horizontal (landscape)
+
+===========================================
+NOTAS
+===========================================
+
+- Las imágenes cambiarán automáticamente cada 4 segundos
+- La animación de desvanecido es suave (2 segundos)
+- Hay un overlay turquesa con 40% de opacidad para mejorar la legibilidad del texto
+- Si quieres cambiar la opacidad del overlay, edita el archivo:
+  cliente_web/templates/inicio.html
+  Busca: background: rgba(20, 184, 166, 0.4);
+  Cambia el 0.4 por otro valor (0.3 = más transparente, 0.5 = más opaco)
+
+===========================================
+SI QUIERES CAMBIAR EL TIEMPO DE TRANSICIÓN
+===========================================
+
+Edita cliente_web/templates/inicio.html y busca:
+- setInterval(changeImage, 4000);  <- Cambia 4000 (4 segundos) por otro valor en milisegundos
+- transition: opacity 2s ease-in-out;  <- Cambia 2s por otro tiempo para la animación
+

@@ -1,0 +1,182 @@
+<!-- Header con Estadísticas -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-truck"></i> Proveedores</h1>
+        <p class="page-subtitle">Administra proveedores y sus relaciones con insumos</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-truck"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_proveedores.total_proveedores }}</div>
+                    <div class="stat-label">Total Proveedores</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_proveedores.proveedores_activos }}</div>
+                    <div class="stat-label">Activos</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_proveedores.proveedores_con_insumos }}</div>
+                    <div class="stat-label">Con Insumos</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-file-invoice"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_proveedores.solicitudes_pendientes }}</div>
+                    <div class="stat-label">Solicitudes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Proveedores -->
+<div class="section">
+    <div class="actions-bar">
+        <form method="GET" class="search-filters">
+            <input type="hidden" name="seccion" value="proveedores">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" name="search_proveedores" value="{{ search_proveedores }}" placeholder="Buscar proveedores...">
+            </div>
+            <select name="estado_proveedor" class="search-box" style="min-width: 150px; padding: 10px 12px;">
+                <option value="">Todos los estados</option>
+                <option value="activo" {% if estado_proveedor == 'activo' %}selected{% endif %}>Activos</option>
+                <option value="inactivo" {% if estado_proveedor == 'inactivo' %}selected{% endif %}>Inactivos</option>
+            </select>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+            {% if search_proveedores or estado_proveedor %}
+            <a href="?seccion=proveedores" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+            {% endif %}
+        </form>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="mostrarModalCrearProveedor()" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo Proveedor
+            </button>
+            <button onclick="mostrarModalSolicitud()" class="btn btn-success">
+                <i class="fas fa-paper-plane"></i> Nueva Solicitud
+            </button>
+        </div>
+    </div>
+    
+    {% if proveedores %}
+    <div class="proveedores-grid">
+        {% for proveedor in proveedores %}
+        <div class="proveedor-card {% if not proveedor.activo %}inactive{% endif %}">
+            <div class="proveedor-header">
+                <div class="proveedor-info-main">
+                    <div class="proveedor-avatar">
+                        <i class="fas fa-truck"></i>
+                    </div>
+                    <div>
+                        <div class="proveedor-name" style="font-size: 1.125rem; font-weight: 700; color: #1e293b; margin-bottom: 4px;">{{ proveedor.nombre }}</div>
+                        {% if proveedor.contacto_nombre %}
+                        <div class="proveedor-contact" style="font-size: 0.875rem; color: #64748b;">
+                            <i class="fas fa-user"></i> {{ proveedor.contacto_nombre }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <span class="status-badge {% if proveedor.activo %}status-active{% else %}status-inactive{% endif %}">
+                    <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                    {% if proveedor.activo %}Activo{% else %}Inactivo{% endif %}
+                </span>
+            </div>
+            
+            <div class="proveedor-details">
+                <div class="detail-item" style="font-size: 0.875rem;">
+                    <i class="fas fa-id-card"></i>
+                    <span><strong style="color: #1e293b;">RUT:</strong> <span style="font-family: monospace; color: #4b5563;">{{ proveedor.rut }}</span></span>
+                </div>
+                <div class="detail-item" style="font-size: 0.875rem;">
+                    <i class="fas fa-envelope"></i>
+                    <span style="color: #4b5563;">{{ proveedor.email }}</span>
+                </div>
+                <div class="detail-item" style="font-size: 0.875rem;">
+                    <i class="fas fa-phone"></i>
+                    <span style="color: #4b5563;">{{ proveedor.telefono }}</span>
+                </div>
+                {% if proveedor.direccion %}
+                <div class="detail-item" style="grid-column: 1 / -1; font-size: 0.875rem;">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span style="color: #4b5563;">{{ proveedor.direccion|truncatewords:10 }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% with proveedor.insumos_principales.all as insumos_proveedor %}
+            <div class="proveedor-insumos">
+                {% if insumos_proveedor %}
+                <span class="insumos-badge">
+                    <i class="fas fa-boxes"></i>
+                    {{ insumos_proveedor.count }} insumo{{ insumos_proveedor.count|pluralize }}
+                </span>
+                {% else %}
+                <span style="color: #9ca3af; font-size: 0.8125rem; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-box-open"></i> Sin insumos asociados
+                </span>
+                {% endif %}
+            </div>
+            {% endwith %}
+            
+            <div class="proveedor-actions">
+                <button onclick="editarProveedor({{ proveedor.id }}, '{{ proveedor.nombre|escapejs }}', '{{ proveedor.rut|escapejs }}', '{{ proveedor.email|escapejs }}', '{{ proveedor.telefono|escapejs }}', '{{ proveedor.direccion|default:''|escapejs }}', '{{ proveedor.contacto_nombre|default:''|escapejs }}', '{{ proveedor.sitio_web|default:''|escapejs }}', '{{ proveedor.notas|default:''|escapejs }}', {{ proveedor.activo|lower }})" class="btn-action btn-edit" title="Editar" style="font-size: 0.75rem; padding: 8px 12px; width: auto;">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
+                <button onclick="confirmarEliminarProveedor({{ proveedor.id }}, '{{ proveedor.nombre|escapejs }}')" class="btn-action btn-delete" title="Eliminar" style="font-size: 0.75rem; padding: 8px 12px; width: auto;">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th><i class="fas fa-truck"></i> Proveedor</th>
+                    <th><i class="fas fa-id-card"></i> RUT</th>
+                    <th><i class="fas fa-envelope"></i> Email</th>
+                    <th><i class="fas fa-phone"></i> Teléfono</th>
+                    <th><i class="fas fa-map-marker-alt"></i> Dirección</th>
+                    <th><i class="fas fa-boxes"></i> Insumos</th>
+                    <th><i class="fas fa-info-circle"></i> Estado</th>
+                    <th><i class="fas fa-cog"></i> Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 60px 20px;">
+                        <div class="empty-state">
+                            <i class="fas fa-truck"></i>
+                            <h3>No hay proveedores</h3>
+                            <p>Comienza agregando tu primer proveedor</p>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>

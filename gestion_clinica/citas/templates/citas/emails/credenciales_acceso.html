@@ -1,0 +1,83 @@
+{% extends 'citas/emails/base_email.html' %}
+{% load custom_filters %}
+
+{% block header_title %}{{ nombre_clinica }}{% endblock %}
+
+{% block content %}
+<h2>Bienvenido/a a nuestro Portal de Citas</h2>
+
+<p>Estimado/a <strong>{{ nombre_completo }}</strong>,</p>
+
+<p>Se ha creado tu cuenta para reservar citas online en nuestra clínica dental.</p>
+
+<div class="info-box">
+    <strong>Tus Credenciales de Acceso</strong>
+    <p style="margin-top: 15px;">
+        <strong style="color: #0d9488; display: block; margin-bottom: 8px;">Usuario:</strong>
+        <span style="font-family: 'Courier New', monospace; font-size: 18px; color: #1e293b; background: #f0fdfa; padding: 8px 12px; border-radius: 6px; display: inline-block;">{{ username }}</span>
+    </p>
+    <p style="margin-top: 15px;">
+        <strong style="color: #0d9488; display: block; margin-bottom: 8px;">Contraseña:</strong>
+        <span style="font-family: 'Courier New', monospace; font-size: 18px; color: #1e293b; background: #f0fdfa; padding: 8px 12px; border-radius: 6px; display: inline-block;">{{ password }}</span>
+    </p>
+</div>
+
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ url_login }}" class="email-button">Acceder al Portal de Citas</a>
+</div>
+
+<h3>¿Qué puedes hacer en el portal?</h3>
+
+<ul class="info-list">
+    <li>
+        <strong>📅 Reservar citas:</strong> Agenda tu próxima consulta de forma rápida y sencilla
+    </li>
+    <li>
+        <strong>👁️ Ver tus citas:</strong> Consulta el historial y estado de tus citas
+    </li>
+    <li>
+        <strong>✏️ Modificar citas:</strong> Cambia o cancela tus citas cuando lo necesites
+    </li>
+    <li>
+        <strong>🔐 Cambiar contraseña:</strong> Personaliza tu contraseña en cualquier momento
+    </li>
+</ul>
+
+<div class="alert-box">
+    <strong>🔒 Importante - Seguridad</strong>
+    <p>• Guarda estas credenciales en un lugar seguro</p>
+    <p>• Te recomendamos cambiar tu contraseña después del primer acceso</p>
+    <p>• No compartas tus credenciales con otras personas</p>
+    <p>• Si olvidaste tu contraseña, puedes recuperarla desde el portal</p>
+</div>
+
+<p style="margin-top: 25px;">Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.</p>
+
+<p style="margin-top: 20px;">¡Esperamos verte pronto!</p>
+{% endblock %}
+
+{% block clinic_name %}{{ nombre_clinica }}{% endblock %}
+
+{% block footer_content %}
+<p>Gracias por confiar en nosotros para su cuidado dental.</p>
+<div class="contact-info">
+    {% if direccion_clinica %}
+    <p><strong>📍 Dirección:</strong> {{ direccion_clinica }}</p>
+    {% endif %}
+    {% if telefono_clinica %}
+    <p><strong>📞 Teléfono:</strong> {{ telefono_clinica }}</p>
+    {% endif %}
+    {% if email_clinica %}
+    <p><strong>✉️ Email:</strong> <a href="mailto:{{ email_clinica }}">{{ email_clinica }}</a></p>
+    {% endif %}
+    {% if sitio_web_clinica %}
+    <p><strong>🌐 Sitio web:</strong> <a href="{{ sitio_web_clinica }}" target="_blank">{{ sitio_web_clinica }}</a></p>
+    {% endif %}
+</div>
+{% endblock %}
+
+
+
+
+
+

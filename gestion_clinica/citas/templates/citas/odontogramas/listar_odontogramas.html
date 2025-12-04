@@ -1,0 +1,1192 @@
+{% extends 'citas/base.html' %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Contenedor de Notificaciones -->
+<div id="notificationContainer" class="notification-container"></div>
+
+<style>
+    /* Sistema de Notificaciones */
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+    
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+    
+    .notification.success {
+        border-left-color: #10b981;
+        background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+    }
+    
+    .notification.error {
+        border-left-color: #ef4444;
+        background: linear-gradient(to right, #fef2f2 0%, white 8%);
+    }
+    
+    .notification.warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(to right, #fffbeb 0%, white 8%);
+    }
+    
+    .notification.info {
+        border-left-color: #3b82f6;
+        background: linear-gradient(to right, #eff6ff 0%, white 8%);
+    }
+    
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+    
+    .notification.success .notification-icon {
+        background: #10b981;
+        color: white;
+    }
+    
+    .notification.error .notification-icon {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+        color: white;
+    }
+    
+    .notification.info .notification-icon {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .notification-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+    
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+    }
+    
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+
+    /* Estilos para la lista de pacientes */
+    .pacientes-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .paciente-card {
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .paciente-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        border-color: var(--primary-color);
+    }
+
+    .paciente-header {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        padding: 20px 24px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+
+    .paciente-header:hover {
+        background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+        transform: translateX(4px);
+    }
+
+    .paciente-info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1;
+    }
+
+    .paciente-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .paciente-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .paciente-nombre {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 4px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .paciente-contacto {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 0.875rem;
+        color: #64748b;
+        margin-top: 4px;
+    }
+
+    .paciente-contacto-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .paciente-stats {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-left: auto;
+    }
+
+    .stat-badge {
+        background: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        min-width: 80px;
+    }
+
+    .stat-badge-number {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .stat-badge-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .paciente-toggle {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .paciente-toggle:hover {
+        background: var(--primary-dark);
+        transform: scale(1.1);
+    }
+
+    .paciente-toggle i {
+        font-size: 1rem;
+    }
+
+    /* Modal de Odontogramas */
+    .modal-odontogramas-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        animation: fadeIn 0.3s ease;
+    }
+
+    .modal-odontogramas-overlay.active {
+        display: flex;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .modal-odontogramas-container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+        width: min(90vw, 1000px);
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-odontogramas-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        padding: 24px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .modal-odontogramas-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .modal-odontogramas-close {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .modal-odontogramas-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+    }
+
+    .modal-odontogramas-body {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .modal-paciente-info {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .modal-paciente-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 2rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .modal-paciente-details h3 {
+        margin: 0 0 8px 0;
+        font-size: 1.25rem;
+        color: #1e293b;
+    }
+
+    .modal-paciente-contacto {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+
+    .modal-odontogramas-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .odontograma-item {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        transition: all 0.2s ease;
+    }
+
+    .odontograma-item:last-child {
+        border-bottom: none;
+    }
+
+    .odontograma-item:hover {
+        background: #f8fafc;
+    }
+
+    .odontograma-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 12px;
+    }
+
+    .odontograma-fecha {
+        font-size: 0.875rem;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .odontograma-info {
+        flex: 1;
+    }
+
+    .odontograma-motivo {
+        font-size: 0.875rem;
+        color: #374151;
+        margin: 8px 0;
+        line-height: 1.5;
+    }
+
+    .odontograma-badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+    }
+
+    .badge {
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .badge-higiene {
+        background: #e0f2fe;
+        color: #0c4a6e;
+    }
+
+    .badge-estado {
+        background: #f0fdf4;
+        color: #065f46;
+    }
+
+    .badge-cita {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .odontograma-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .btn-action {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-view {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .btn-view:hover {
+        background: #2563eb;
+    }
+
+    .btn-edit {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .btn-edit:hover {
+        background: #d97706;
+    }
+
+    .btn-pdf {
+        background: #ef4444;
+        color: white;
+    }
+
+    .btn-pdf:hover {
+        background: #dc2626;
+    }
+
+    .btn-delete {
+        background: #6b7280;
+        color: white;
+    }
+
+    .btn-delete:hover {
+        background: #4b5563;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 24px;
+        background: white;
+        border-radius: 12px;
+        border: 2px dashed #e5e7eb;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+        color: #374151;
+        margin: 0 0 8px 0;
+        font-size: 1.25rem;
+    }
+
+    .empty-state p {
+        color: #64748b;
+        margin: 0 0 24px 0;
+    }
+</style>
+
+<!-- Header con Stats a la Derecha -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-tooth"></i> Administrador de Odontogramas</h1>
+        <p class="page-subtitle">Gestiona las fichas odontológicas de tus pacientes</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon primary">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.total_pacientes|default:0 }}</div>
+                    <div class="stat-label">Pacientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success">
+                    <i class="fas fa-tooth"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.total_odontogramas }}</div>
+                    <div class="stat-label">Total Odontogramas</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon warning">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.odontogramas_mes }}</div>
+                    <div class="stat-label">Este Mes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-users"></i> Mis Pacientes y sus Odontogramas
+            </h2>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.875rem;">
+                Organizados por paciente para una mejor gestión
+            </p>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <form method="GET" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <div style="display: flex; gap: 16px; align-items: end;">
+            <div style="flex: 1;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Buscar:</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Nombre, email o motivo..." 
+                       style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+            </div>
+            <div>
+                <button type="submit" class="btn" style="padding: 8px 16px;">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </div>
+        </div>
+    </form>
+    
+    <!-- Lista de pacientes con odontogramas -->
+    {% if pacientes_con_odontogramas %}
+        <div class="pacientes-container">
+            {% for paciente in pacientes_con_odontogramas %}
+            <div class="paciente-card">
+                <div class="paciente-header" onclick="abrirModalOdontogramas({{ forloop.counter0 }})">
+                    <div class="paciente-info">
+                        <div class="paciente-avatar">
+                            {{ paciente.nombre_completo|first|upper }}
+                        </div>
+                        <div class="paciente-details">
+                            <h3 class="paciente-nombre">
+                                {{ paciente.nombre_completo }}
+                        </h3>
+                            <div class="paciente-contacto">
+                                <div class="paciente-contacto-item">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>{{ paciente.email }}</span>
+                            </div>
+                                {% if paciente.telefono %}
+                                <div class="paciente-contacto-item">
+                                    <i class="fas fa-phone"></i>
+                                    <span>{{ paciente.telefono }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                        </div>
+                    </div>
+                    <div class="paciente-stats">
+                        <div class="stat-badge">
+                            <div class="stat-badge-number">{{ paciente.total_odontogramas }}</div>
+                            <div class="stat-badge-label">Fichas</div>
+                </div>
+                </div>
+                    <button class="paciente-toggle" type="button">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-tooth empty-state-icon"></i>
+            <h3>No hay fichas odontológicas</h3>
+            <p>Aún no has creado ninguna ficha odontológica.</p>
+            <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; max-width: 500px; margin: 0 auto;">
+                <p style="margin: 0; color: #0c4a6e; font-size: 0.875rem;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Para crear una ficha:</strong> Ve a "Mis Citas" y selecciona una cita para crear su ficha odontológica.
+                </p>
+            </div>
+            <a href="{% url 'mis_citas_dentista' %}" class="btn btn-success" style="margin-top: 20px; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fas fa-calendar-check"></i> Ir a Mis Citas
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Odontogramas del Paciente -->
+<div id="modalOdontogramas" class="modal-odontogramas-overlay" onclick="if(event.target === this) cerrarModalOdontogramas()">
+    <div class="modal-odontogramas-container">
+        <div class="modal-odontogramas-header">
+            <h2>
+                <i class="fas fa-tooth"></i>
+                <span id="modalPacienteNombre">Odontogramas del Paciente</span>
+            </h2>
+            <button class="modal-odontogramas-close" onclick="cerrarModalOdontogramas()">
+                <i class="fas fa-times"></i>
+            </button>
+            </div>
+        <div class="modal-odontogramas-body">
+            <div id="modalPacienteInfo" class="modal-paciente-info">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div id="modalOdontogramasList" class="modal-odontogramas-list">
+                <!-- Se llena dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación de Eliminación -->
+<div id="modalConfirmarEliminacion" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-container-simple">
+        <div class="modal-header" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+            <h3><i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación</h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarEliminacion()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 1rem; color: #374151; margin-bottom: 20px; text-align: center;">
+                ¿Estás seguro de que deseas eliminar la ficha odontológica de <strong id="confirmElimPaciente"></strong>
+                creada el <strong id="confirmElimFecha"></strong>?
+            </p>
+            <p style="font-size: 0.875rem; color: #64748b; text-align: center;">
+                Esta acción no se puede deshacer y se eliminarán todos los datos asociados a esta ficha.
+            </p>
+            <input type="hidden" id="odontogramaIdParaEliminar" value="">
+            <input type="hidden" id="odontogramaUrlEliminar" value="">
+            </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="cerrarModalConfirmarEliminacion()">
+                <i class="fas fa-times"></i>
+                Cancelar
+            </button>
+            <button type="button" class="btn-delete-edit" id="btnConfirmarEliminacion" onclick="confirmarEliminarOdontograma()">
+                <i class="fas fa-trash-alt"></i>
+                Sí, eliminar ficha
+            </button>
+        </div>
+    </div>
+</div>
+
+    <style>
+    .modal-overlay {
+    position: fixed;
+    inset: 0;
+        display: flex;
+    align-items: center;
+    justify-content: center;
+        z-index: 10001;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+        animation: fadeIn 0.3s ease;
+}
+
+    .modal-container-simple {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+        width: min(90vw, 500px);
+        max-width: 500px;
+    overflow: hidden;
+        animation: slideUp 0.3s ease;
+}
+
+    .modal-header {
+    padding: 20px 24px;
+        color: white;
+    display: flex;
+    justify-content: space-between;
+        align-items: center;
+}
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+        gap: 10px;
+    }
+
+    .modal-close {
+        background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+        cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+    .modal-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+    .modal-body {
+    padding: 24px;
+}
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 2px solid #e2e8f0;
+        padding: 10px 20px;
+        border-radius: 8px;
+    font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+    align-items: center;
+    gap: 8px;
+        text-decoration: none;
+    }
+
+    .btn-secondary:hover {
+        background: #e2e8f0;
+        border-color: #cbd5e1;
+    }
+
+    .btn-delete-edit {
+        background: #ef4444;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-delete-edit:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+    </style>
+
+<script>
+// Datos de pacientes (se pasan desde el template)
+const pacientesData = [
+    {% for paciente in pacientes_con_odontogramas %}
+    {
+        nombre: "{{ paciente.nombre_completo|escapejs }}",
+        email: "{{ paciente.email|escapejs }}",
+        telefono: "{{ paciente.telefono|escapejs }}",
+        total: {{ paciente.total_odontogramas }},
+        odontogramas: [
+            {% for odontograma in paciente.odontogramas %}
+            {
+                id: {{ odontograma.id }},
+                fecha_creacion: "{{ odontograma.fecha_creacion|date:'d/m/Y H:i' }}",
+                fecha_actualizacion: "{{ odontograma.fecha_actualizacion|date:'d/m/Y H:i' }}",
+                motivo: "{{ odontograma.motivo_consulta|escapejs|truncatechars:150 }}",
+                higiene: "{{ odontograma.get_higiene_oral_display }}",
+                estado: "{{ odontograma.get_estado_general_display }}",
+                proxima_cita: {% if odontograma.proxima_cita %}"{{ odontograma.proxima_cita|date:'d/m/Y' }}"{% else %}null{% endif %},
+                tiene_cita: {% if odontograma.cita %}true{% else %}false{% endif %},
+                cita_fecha: {% if odontograma.cita %}"{{ odontograma.cita.fecha_hora|date:'d/m/Y H:i' }}"{% else %}null{% endif %},
+                cita_estado: {% if odontograma.cita %}"{{ odontograma.cita.get_estado_display }}"{% else %}null{% endif %},
+                url_detalle: "{% url 'detalle_odontograma' odontograma.id %}",
+                url_editar: "{% url 'editar_odontograma' odontograma.id %}",
+                url_pdf: "{% url 'exportar_odontograma_pdf' odontograma.id %}",
+                url_eliminar: "{% url 'eliminar_odontograma' odontograma.id %}",
+                paciente_nombre: "{{ odontograma.paciente_nombre|escapejs }}"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+// Función para mostrar notificaciones
+function showNotification(type, message, duration = 5000) {
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(notification);
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+
+// Función para abrir modal de odontogramas
+function abrirModalOdontogramas(index) {
+    const paciente = pacientesData[index];
+    if (!paciente) return;
+    
+    const modal = document.getElementById('modalOdontogramas');
+    const modalNombre = document.getElementById('modalPacienteNombre');
+    const modalInfo = document.getElementById('modalPacienteInfo');
+    const modalList = document.getElementById('modalOdontogramasList');
+    
+    // Actualizar nombre en header
+    modalNombre.textContent = `Odontogramas de ${paciente.nombre}`;
+    
+    // Actualizar información del paciente
+    let infoHTML = `
+        <div class="modal-paciente-avatar">${paciente.nombre.charAt(0).toUpperCase()}</div>
+        <div class="modal-paciente-details">
+            <h3>${paciente.nombre}</h3>
+            <div class="modal-paciente-contacto">
+                <div class="paciente-contacto-item">
+                    <i class="fas fa-envelope"></i>
+                    <span>${paciente.email}</span>
+                </div>
+    `;
+    if (paciente.telefono) {
+        infoHTML += `
+                <div class="paciente-contacto-item">
+                    <i class="fas fa-phone"></i>
+                    <span>${paciente.telefono}</span>
+                </div>
+        `;
+    }
+    infoHTML += `
+            </div>
+        </div>
+    `;
+    modalInfo.innerHTML = infoHTML;
+    
+    // Generar lista de odontogramas
+    if (paciente.odontogramas.length === 0) {
+        modalList.innerHTML = `
+            <div class="empty-state" style="padding: 40px;">
+                <i class="fas fa-tooth empty-state-icon"></i>
+                <h3>No hay odontogramas</h3>
+                <p>Este paciente aún no tiene fichas odontológicas registradas.</p>
+            </div>
+        `;
+    } else {
+        let odontogramasHTML = '';
+        paciente.odontogramas.forEach(odo => {
+            let fechaHTML = `
+                <div class="odontograma-fecha">
+                    <i class="fas fa-calendar"></i>
+                    <strong>Creado:</strong> ${odo.fecha_creacion}
+            `;
+            if (odo.fecha_actualizacion !== odo.fecha_creacion) {
+                fechaHTML += ` | <i class="fas fa-edit"></i> <strong>Actualizado:</strong> ${odo.fecha_actualizacion}`;
+            }
+            fechaHTML += `</div>`;
+            
+            let citaHTML = '';
+            if (odo.tiene_cita) {
+                citaHTML = `
+                    <div style="margin-top: 8px; padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px;">
+                        <div style="font-size: 0.75rem; color: #92400e;">
+                            <i class="fas fa-calendar-check"></i> 
+                            <strong>Cita:</strong> ${odo.cita_fecha} | ${odo.cita_estado}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let proximaCitaHTML = '';
+            if (odo.proxima_cita) {
+                proximaCitaHTML = `
+                    <span class="badge badge-cita">
+                        <i class="fas fa-calendar-alt"></i> Próxima: ${odo.proxima_cita}
+                    </span>
+                `;
+            }
+            
+            odontogramasHTML += `
+                <div class="odontograma-item">
+                    <div class="odontograma-header">
+                        <div class="odontograma-info">
+                            ${fechaHTML}
+                            <div class="odontograma-motivo">
+                                <strong><i class="fas fa-stethoscope"></i> Motivo:</strong> ${odo.motivo}
+                            </div>
+                            ${citaHTML}
+                        </div>
+                    </div>
+                    <div class="odontograma-badges">
+                        <span class="badge badge-higiene">
+                            <i class="fas fa-tooth"></i> Higiene: ${odo.higiene}
+                        </span>
+                        <span class="badge badge-estado">
+                            <i class="fas fa-heartbeat"></i> Estado: ${odo.estado}
+                        </span>
+                        ${proximaCitaHTML}
+                    </div>
+                    <div class="odontograma-actions">
+                        <a href="${odo.url_editar}" class="btn-action btn-edit">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        <a href="${odo.url_pdf}" class="btn-action btn-pdf" target="_blank">
+                            <i class="fas fa-file-pdf"></i> Descargar PDF
+                        </a>
+                        <a href="#" class="btn-action btn-delete" onclick="abrirModalConfirmarEliminacion(event, ${odo.id}, '${odo.paciente_nombre}', '${odo.fecha_creacion}', '${odo.url_eliminar}');">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+        modalList.innerHTML = odontogramasHTML;
+    }
+    
+    // Mostrar modal
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// Función para cerrar modal
+function cerrarModalOdontogramas() {
+    const modal = document.getElementById('modalOdontogramas');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Función para abrir modal de confirmación de eliminación
+function abrirModalConfirmarEliminacion(event, odontogramaId, nombre, fecha, urlEliminar) {
+    event.preventDefault();
+    
+    document.getElementById('confirmElimPaciente').textContent = nombre;
+    document.getElementById('confirmElimFecha').textContent = fecha;
+    document.getElementById('odontogramaIdParaEliminar').value = odontogramaId;
+    document.getElementById('odontogramaUrlEliminar').value = urlEliminar;
+    
+    const modal = document.getElementById('modalConfirmarEliminacion');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+// Función para cerrar modal de confirmación
+function cerrarModalConfirmarEliminacion() {
+    const modal = document.getElementById('modalConfirmarEliminacion');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+// Función para confirmar y eliminar odontograma
+function confirmarEliminarOdontograma() {
+    const urlEliminar = document.getElementById('odontogramaUrlEliminar').value;
+    const btnConfirmar = document.getElementById('btnConfirmarEliminacion');
+    
+    if (!urlEliminar) {
+        showNotification('error', 'Error: No se pudo obtener la URL de eliminación.');
+        return;
+    }
+    
+    // Deshabilitar botón y mostrar loading
+    if (btnConfirmar) {
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
+    }
+    
+    // Realizar eliminación
+    fetch(urlEliminar, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json().catch(() => ({ success: true }));
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Error al eliminar la ficha odontológica.');
+            });
+        }
+    })
+    .then(data => {
+        showNotification('success', data.message || 'Ficha odontológica eliminada exitosamente.');
+        cerrarModalConfirmarEliminacion();
+        // Recargar página después de un breve delay
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', error.message || 'Error al eliminar la ficha odontológica.');
+        if (btnConfirmar) {
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerHTML = '<i class="fas fa-trash-alt"></i> Sí, eliminar ficha';
+        }
+    });
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalOdontogramas();
+    }
+});
+</script>
+
+{% endblock %}

@@ -8,11 +8,12 @@ from django.contrib.auth.models import User
 
 class ClienteDocumento(models.Model):
     """
-    Modelo para acceder a la tabla citas_cliente del sistema de gestión.
+    Modelo para acceder a la tabla pacientes_cliente del sistema de gestión.
     Se usa para relacionar usuarios del sistema cliente con sus documentos.
+    NOTA: Actualizado para usar pacientes_cliente en lugar de citas_cliente
     """
     class Meta:
-        db_table = 'citas_cliente'
+        db_table = 'pacientes_cliente'  # CORREGIDO: usar pacientes_cliente en lugar de citas_cliente
         managed = False  # Django no creará ni eliminará la tabla
     
     id = models.BigAutoField(primary_key=True)
@@ -52,11 +53,12 @@ class ClienteDocumento(models.Model):
 
 class Odontograma(models.Model):
     """
-    Modelo para acceder a la tabla citas_odontograma.
+    Modelo para acceder a la tabla historial_clinico_odontograma.
     Contiene las fichas odontológicas/odontogramas de los pacientes en PDF.
+    NOTA: Actualizado para usar historial_clinico_odontograma en lugar de citas_odontograma
     """
     class Meta:
-        db_table = 'citas_odontograma'
+        db_table = 'historial_clinico_odontograma'  # CORREGIDO: usar historial_clinico_odontograma
         managed = False
         ordering = ['-fecha_creacion']
     
@@ -85,11 +87,12 @@ class Odontograma(models.Model):
 
 class Radiografia(models.Model):
     """
-    Modelo para acceder a la tabla citas_radiografia.
+    Modelo para acceder a la tabla historial_clinico_radiografia.
     Contiene las radiografías de los pacientes.
+    NOTA: Actualizado para usar historial_clinico_radiografia en lugar de citas_radiografia
     """
     class Meta:
-        db_table = 'citas_radiografia'
+        db_table = 'historial_clinico_radiografia'  # CORREGIDO: usar historial_clinico_radiografia
         managed = False
         ordering = ['-fecha_carga']
     

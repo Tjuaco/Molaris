@@ -2,13 +2,27 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema de Gestión - Clínica Dental{% endblock %}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         /* ============================================================================
-           VARIABLES DE TEMA
+           VARIABLES DE TEMA - CLÍNICA DENTAL
+           Color principal: Turquesa (limpio y profesional)
            ============================================================================ */
         :root {
+            /* Tema Turquesa - Principal (Por defecto) */
+            --primary-color: #14b8a6;
+            --primary-dark: #0d9488;
+            --primary-darker: #0f766e;
+            --primary-light: #2dd4bf;
+            --primary-lighter: #5eead4;
+            --primary-bg: #f0fdfa;
+            --primary-text: #134e4a;
+        }
+        
+        /* Tema Azul */
+        [data-theme="blue"] {
             --primary-color: #3b82f6;
             --primary-dark: #2563eb;
             --primary-darker: #1d4ed8;
@@ -18,59 +32,15 @@
             --primary-text: #1e40af;
         }
         
-        /* Tema Verde */
-        [data-theme="green"] {
-            --primary-color: #10b981;
-            --primary-dark: #059669;
-            --primary-darker: #047857;
-            --primary-light: #34d399;
-            --primary-lighter: #6ee7b7;
-            --primary-bg: #d1fae5;
-            --primary-text: #065f46;
-        }
-        
-        /* Tema Morado */
-        [data-theme="purple"] {
-            --primary-color: #8b5cf6;
-            --primary-dark: #7c3aed;
-            --primary-darker: #6d28d9;
-            --primary-light: #a78bfa;
-            --primary-lighter: #c4b5fd;
-            --primary-bg: #ede9fe;
-            --primary-text: #5b21b6;
-        }
-        
-        /* Tema Naranja */
-        [data-theme="orange"] {
-            --primary-color: #f59e0b;
-            --primary-dark: #d97706;
-            --primary-darker: #b45309;
-            --primary-light: #fbbf24;
-            --primary-lighter: #fcd34d;
-            --primary-bg: #fef3c7;
-            --primary-text: #92400e;
-        }
-        
-        /* Tema Rojo */
-        [data-theme="red"] {
-            --primary-color: #ef4444;
-            --primary-dark: #dc2626;
-            --primary-darker: #b91c1c;
-            --primary-light: #f87171;
-            --primary-lighter: #fca5a5;
-            --primary-bg: #fee2e2;
-            --primary-text: #991b1b;
-        }
-        
-        /* Tema Turquesa */
-        [data-theme="teal"] {
-            --primary-color: #14b8a6;
-            --primary-dark: #0d9488;
-            --primary-darker: #0f766e;
-            --primary-light: #2dd4bf;
-            --primary-lighter: #5eead4;
-            --primary-bg: #ccfbf1;
-            --primary-text: #115e59;
+        /* Tema Celeste */
+        [data-theme="sky"] {
+            --primary-color: #0ea5e9;
+            --primary-dark: #0284c7;
+            --primary-darker: #0369a1;
+            --primary-light: #38bdf8;
+            --primary-lighter: #7dd3fc;
+            --primary-bg: #f0f9ff;
+            --primary-text: #0c4a6e;
         }
         
         * {
@@ -525,6 +495,33 @@
             gap: 8px;
         }
         
+        .navbar-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            color: #64748b;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        
+        .navbar-nav-item:hover {
+            background: #f1f5f9;
+            color: var(--primary-color);
+        }
+        
+        .navbar-nav-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .navbar-nav-item.active:hover {
+            background: var(--primary-darker);
+        }
+        
         .nav-item {
             display: flex;
             align-items: center;
@@ -568,7 +565,7 @@
         .navbar-actions {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
         }
         
         .user-menu {
@@ -843,6 +840,22 @@
             max-width: 1200px;
             margin: 0 auto;
             width: 100%;
+        }
+        
+        /* Contenedor común para todas las secciones principales */
+        .section-container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Personal container - unificado para todas las secciones */
+        .personal-container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
         }
         
         .page-header {
@@ -1293,37 +1306,110 @@
             position: sticky;
             top: 64px;
             z-index: 999;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
         
         .secondary-navbar-content {
             max-width: 100%;
             margin: 0 auto;
-            padding: 10px 0;
+            padding: 3px 0;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .function-buttons {
             display: flex;
-            gap: 6px;
+            gap: 0;
             flex-wrap: nowrap;
             justify-content: flex-start;
-            padding: 2px 0;
+            padding: 0;
+            align-items: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+            width: 100%;
+        }
+        
+        .function-buttons::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .function-buttons::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 2px;
+        }
+        
+        .function-buttons::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+        
+        .function-buttons::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        .nav-section-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            align-items: flex-start;
+            flex-shrink: 0;
+            min-width: fit-content;
+        }
+        
+        .nav-section-label {
+            font-size: 0.5rem;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 0 4px;
+            margin: 0;
+            opacity: 0.8;
+            line-height: 1;
+            white-space: nowrap;
+            flex-shrink: 0;
+            display: block;
+        }
+        
+        .nav-section {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+        }
+        
+        .nav-separator {
+            width: 1px;
+            height: 14px;
+            background: linear-gradient(to bottom, transparent, #cbd5e1, transparent);
+            margin: 0 2px;
+            flex-shrink: 0;
+            align-self: center;
         }
         
         .function-btn {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 12px;
+            gap: 3px;
+            padding: 3px 6px;
             background: white;
             color: #64748b;
             text-decoration: none;
-            border-radius: 8px;
-            font-size: 0.8rem;
+            border-radius: 3px;
+            font-size: 0.63rem;
             font-weight: 500;
             border: 1px solid #e2e8f0;
             transition: all 0.2s ease;
             white-space: nowrap;
             min-width: fit-content;
+            flex-shrink: 0;
+            line-height: 1.1;
         }
         
         .function-btn:hover {
@@ -1342,7 +1428,12 @@
         }
         
         .function-btn i {
-            font-size: 0.9rem;
+            font-size: 0.68rem;
+            flex-shrink: 0;
+        }
+        
+        .function-btn span {
+            white-space: nowrap;
         }
         
         /* Optimización para pantallas grandes */
@@ -1359,8 +1450,17 @@
         
         /* Optimización para pantallas medianas */
         @media (min-width: 1024px) and (max-width: 1399px) {
-            .function-buttons {
+            .nav-section-label {
+                font-size: 0.63rem;
+            }
+            
+            .nav-section {
                 gap: 5px;
+            }
+            
+            .nav-separator {
+                margin: 0 6px;
+                height: 26px;
             }
             
             .function-btn {
@@ -1372,8 +1472,17 @@
         
         /* Optimización para tablets y pantallas pequeñas */
         @media (min-width: 601px) and (max-width: 1023px) {
-            .function-buttons {
+            .nav-section-label {
+                font-size: 0.6rem;
+            }
+            
+            .nav-section {
                 gap: 4px;
+            }
+            
+            .nav-separator {
+                margin: 0 4px;
+                height: 24px;
             }
             
             .function-btn {
@@ -1387,6 +1496,17 @@
             }
         }
         
+        /* Ajustes para diferentes niveles de zoom */
+        @media (max-width: 1200px) {
+            .function-buttons {
+                overflow-x: auto;
+            }
+            
+            .nav-section-group {
+                min-width: auto;
+            }
+        }
+        
         /* Responsive para navbar secundario */
         @media (max-width: 600px) {
             .secondary-navbar {
@@ -1394,12 +1514,34 @@
             }
             
             .function-buttons {
+                gap: 0;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+                scrollbar-color: #cbd5e1 transparent;
+            }
+            
+            .function-buttons::-webkit-scrollbar {
+                height: 4px;
+            }
+            
+            .nav-section-label {
+                display: none;
+            }
+            
+            .nav-section {
                 gap: 4px;
+                flex-shrink: 0;
+            }
+            
+            .nav-separator {
+                margin: 0 3px;
+                height: 20px;
             }
             
             .function-btn {
                 padding: 8px 10px;
-                font-size: 0.75rem;
+                font-size: clamp(0.7rem, 0.75rem, 0.8rem);
             }
             
             .function-btn span {
@@ -1408,6 +1550,29 @@
             
             .function-btn i {
                 font-size: 1rem;
+            }
+        }
+        
+        /* Ajustes para diferentes niveles de zoom */
+        @media (max-width: 1200px) {
+            .function-buttons {
+                overflow-x: auto;
+            }
+            
+            .nav-section-group {
+                min-width: auto;
+            }
+        }
+        
+        /* Mejoras para zoom alto (150%+) */
+        @media (min-resolution: 1.5dppx) {
+            .function-btn {
+                padding: 7px 11px;
+                font-size: clamp(0.7rem, 0.75rem, 0.8rem);
+            }
+            
+            .nav-section-label {
+                font-size: clamp(0.6rem, 0.65rem, 0.7rem);
             }
         }
         
@@ -1477,7 +1642,22 @@
             }
             
             .function-buttons {
+                gap: 0;
+                overflow-x: auto;
+            }
+            
+            .nav-section-label {
+                display: none;
+            }
+            
+            .nav-section {
                 gap: 6px;
+                flex-shrink: 0;
+            }
+            
+            .nav-separator {
+                margin: 0 4px;
+                height: 24px;
             }
             
             .function-btn {
@@ -1494,299 +1674,33 @@
             }
         }
         
-        /* ========== SISTEMA DE NOTIFICACIONES ========== */
-        .notification-btn {
-            position: relative;
-            cursor: pointer;
+        /* ========== BREADCRUMBS ========== */
+        .breadcrumbs {
+            display: none !important;
         }
-
-        .notification-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            background: #ef4444;
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 10px;
-            min-width: 18px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
-            animation: pulse 2s infinite;
+        
+        .breadcrumb-list {
+            display: none !important;
         }
-
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.1);
-            }
-        }
-
-        .notifications-panel {
-            position: fixed;
-            top: 0;
-            right: -420px;
-            width: 420px;
-            height: 100vh;
-            background: white;
-            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
-            z-index: 2000;
-            transition: right 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .notifications-panel.open {
-            right: 0;
-        }
-
-        .notifications-header {
-            padding: 20px 24px;
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .notifications-header h3 {
-            margin: 0;
-            font-size: 1.25rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .close-notifications {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-        }
-
-        .close-notifications:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .notifications-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            background: #f8fafc;
-        }
-
-        .notification-item {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
-            display: flex;
-            gap: 14px;
-            align-items: flex-start;
-            border: 2px solid #e2e8f0;
-            transition: all 0.2s ease;
-            position: relative;
-        }
-
-        .notification-item:hover {
-            transform: translateX(-4px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .notification-item.unread {
-            border-left: 4px solid #3b82f6;
-            background: #eff6ff;
-        }
-
-        .notification-item.unread.info {
-            border-left-color: #3b82f6;
-        }
-
-        .notification-item.unread.warning {
-            border-left-color: #f59e0b;
-            background: #fffbeb;
-        }
-
-        .notification-item.unread.success {
-            border-left-color: #10b981;
-            background: #f0fdf4;
-        }
-
-        .notification-item.read {
-            opacity: 0.7;
-        }
-
-        .notification-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .notification-item.info .notification-icon {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .notification-item.warning .notification-icon {
-            background: #fef3c7;
-            color: #d97706;
-        }
-
-        .notification-item.success .notification-icon {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .notification-item.read .notification-icon {
-            background: #f1f5f9;
-            color: #64748b;
-        }
-
-        .notification-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .notification-title {
-            font-weight: 600;
-            color: #1e293b;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-        }
-
-        .notification-text {
-            color: #64748b;
-            font-size: 0.85rem;
-            line-height: 1.4;
-            margin-bottom: 6px;
-        }
-
-        .notification-time {
-            color: #94a3b8;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .mark-read-btn {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            transition: all 0.2s ease;
-            opacity: 0;
-        }
-
-        .notification-item.unread:hover .mark-read-btn {
-            opacity: 1;
-        }
-
-        .mark-read-btn:hover {
-            background: #2563eb;
-            transform: scale(1.1);
-        }
-
-        .notifications-footer {
-            padding: 16px 24px;
-            border-top: 1px solid #e2e8f0;
-            background: white;
-        }
-
-        .mark-all-read-btn {
-            width: 100%;
-            padding: 12px;
-            background: #f8fafc;
-            border: 2px solid #e2e8f0;
-            color: #64748b;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .mark-all-read-btn:hover {
-            background: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-        }
-
-        .notifications-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1999;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .notifications-overlay.open {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Responsive para notificaciones */
-        @media (max-width: 768px) {
-            .notifications-panel {
-                width: 100%;
-                right: -100%;
-            }
-
-            .notification-badge {
-                right: 8px;
-                top: 8px;
-            }
+        
+        .breadcrumb-item {
+            display: none !important;
         }
 
         /* ========== PANEL DE INFORMACIÓN DE LA CLÍNICA ========== */
         .info-clinica-btn {
             position: fixed;
-            left: 0;
+            right: 0;
             top: 50%;
             transform: translateY(-50%);
             background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
             color: white;
             border: none;
             padding: 16px 12px;
-            border-radius: 0 12px 12px 0;
+            border-radius: 12px 0 0 12px;
             cursor: pointer;
             z-index: 1050;
-            box-shadow: 2px 0 12px rgba(59, 130, 246, 0.4);
+            box-shadow: -2px 0 12px rgba(59, 130, 246, 0.4);
             transition: all 0.3s ease;
             writing-mode: vertical-rl;
             text-orientation: mixed;
@@ -1796,8 +1710,8 @@
         }
 
         .info-clinica-btn:hover {
-            padding-left: 16px;
-            box-shadow: 4px 0 20px rgba(59, 130, 246, 0.6);
+            padding-right: 16px;
+            box-shadow: -4px 0 20px rgba(59, 130, 246, 0.6);
         }
 
         .info-clinica-btn i {
@@ -1810,19 +1724,19 @@
         .info-clinica-panel {
             position: fixed;
             top: 0;
-            left: -450px;
+            right: -450px;
             width: 450px;
             height: 100vh;
             background: white;
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
             z-index: 2001;
-            transition: left 0.3s ease;
+            transition: right 0.3s ease;
             display: flex;
             flex-direction: column;
         }
 
         .info-clinica-panel.open {
-            left: 0;
+            right: 0;
         }
 
         .info-clinica-header {
@@ -1980,7 +1894,7 @@
         @media (max-width: 768px) {
             .info-clinica-panel {
                 width: 100%;
-                left: -100%;
+                right: -100%;
             }
 
             .info-clinica-btn {
@@ -1989,350 +1903,6 @@
             }
         }
 
-        /* ========== SISTEMA DE MENSAJERÍA ========== */
-        /* Botón de mensajes en navbar */
-        .mensajes-btn {
-            position: relative;
-            background: none;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            color: #64748b;
-            font-size: 1.2rem;
-            transition: all 0.2s ease;
-        }
-
-        .mensajes-btn:hover {
-            background: #f1f5f9;
-            color: #3b82f6;
-        }
-
-        .mensajes-badge {
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            background: #ef4444;
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 10px;
-            min-width: 18px;
-            text-align: center;
-        }
-
-        .mensajes-badge:empty {
-            display: none;
-        }
-
-        /* Panel lateral de mensajes */
-        .mensajes-panel {
-            position: fixed;
-            top: 0;
-            left: -450px;
-            width: 450px;
-            height: 100vh;
-            background: white;
-            box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
-            z-index: 1100;
-            transition: left 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .mensajes-panel.open {
-            left: 0;
-        }
-
-        .mensajes-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1099;
-            display: none;
-            backdrop-filter: blur(4px);
-        }
-
-        .mensajes-overlay.show {
-            display: block;
-        }
-
-        /* Header del panel */
-        .mensajes-header {
-            padding: 20px 24px;
-            border-bottom: 2px solid #e5e7eb;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-
-        .mensajes-header h3 {
-            margin: 0;
-            font-size: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .close-mensajes {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .close-mensajes:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Tabs */
-        .mensajes-tabs {
-            display: flex;
-            border-bottom: 2px solid #e5e7eb;
-            background: #f9fafb;
-            flex-shrink: 0;
-        }
-
-        .msg-tab {
-            flex: 1;
-            padding: 12px 16px;
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            font-weight: 500;
-            color: #6b7280;
-            transition: all 0.2s;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .msg-tab.active {
-            color: #3b82f6;
-            border-bottom-color: #3b82f6;
-            background: white;
-        }
-
-        .msg-tab:hover:not(.active) {
-            background: #f3f4f6;
-            color: #3b82f6;
-        }
-
-        /* Contenido */
-        .mensajes-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-        }
-
-        /* Lista de mensajes */
-        .mensajes-lista {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .mensaje-item {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .mensaje-item:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .mensaje-item.no-leido {
-            background: #eff6ff;
-            border-color: #3b82f6;
-        }
-
-        .mensaje-item.urgente {
-            border-left: 4px solid #ef4444;
-        }
-
-        .mensaje-header-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 8px;
-        }
-
-        .mensaje-remitente {
-            font-weight: 600;
-            color: #1f2937;
-            font-size: 0.95rem;
-        }
-
-        .mensaje-fecha {
-            font-size: 0.75rem;
-            color: #9ca3af;
-        }
-
-        .mensaje-asunto {
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 4px;
-            font-size: 0.9rem;
-        }
-
-        .mensaje-preview {
-            color: #6b7280;
-            font-size: 0.85rem;
-            line-height: 1.4;
-            max-height: 40px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .mensaje-tipo-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            margin-top: 6px;
-        }
-
-        .mensaje-tipo-badge.general {
-            background: #e5e7eb;
-            color: #6b7280;
-        }
-
-        .mensaje-tipo-badge.odontograma {
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-
-        .mensaje-tipo-badge.cita {
-            background: #d1fae5;
-            color: #059669;
-        }
-
-        .mensaje-tipo-badge.urgente {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-
-        /* Formulario nuevo mensaje */
-        .form-nuevo-mensaje {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .form-group-msg {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .form-group-msg label {
-            font-weight: 500;
-            color: #374151;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .form-control-msg {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-
-        .form-control-msg:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        textarea.form-control-msg {
-            resize: vertical;
-            min-height: 100px;
-            font-family: inherit;
-        }
-
-        .btn-enviar-mensaje {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-enviar-mensaje:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-        }
-
-        .loading-mensajes {
-            text-align: center;
-            padding: 40px 20px;
-            color: #9ca3af;
-        }
-
-        .empty-mensajes {
-            text-align: center;
-            padding: 60px 20px;
-            color: #9ca3af;
-        }
-
-        .empty-mensajes i {
-            font-size: 3rem;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        /* Responsive mensajes */
-        @media (max-width: 768px) {
-            .mensajes-panel {
-                width: 100%;
-                left: -100%;
-            }
-
-            .msg-tab {
-                font-size: 0.75rem;
-                padding: 10px 8px;
-            }
-
-            .msg-tab span {
-                display: none;
-            }
-        }
 
         /* Estilos adicionales para contenido específico */
         {% block extra_css %}{% endblock %}
@@ -2343,22 +1913,23 @@
         <!-- Navbar Horizontal -->
         <nav class="navbar">
             <div class="navbar-content">
-                <a href="{% url 'panel_trabajador' %}" class="navbar-brand">
+                {% if perfil.es_dentista %}
+                <a href="{% url 'dashboard_dentista' %}" class="navbar-brand">
                     <i class="fas fa-tooth"></i>
-                    <span>Clínica Dental</span>
+                    <span>Molaris (Clínica San Felipe)</span>
                 </a>
+                {% else %}
+                <a href="{% url 'dashboard' %}" class="navbar-brand">
+                    <i class="fas fa-tooth"></i>
+                    <span>Molaris (Clínica San Felipe)</span>
+                </a>
+                {% endif %}
                 
                 <div class="navbar-nav" id="navbarNav">
                     <!-- Navegación principal movida al navbar secundario -->
                 </div>
                 
                 <div class="navbar-actions">
-                    <!-- Botón de Mensajería -->
-                    <button class="mensajes-btn" onclick="toggleMensajesPanel()" title="Mensajes">
-                        <i class="fas fa-envelope"></i>
-                        <span class="mensajes-badge" id="mensajesBadge">0</span>
-                    </button>
-                    
                     <div class="user-menu" onclick="toggleUserDropdown(event)">
                         <div class="user-avatar">
                             {{ perfil.nombre_completo|first|upper }}
@@ -2389,45 +1960,25 @@
                                 <i class="fas fa-palette"></i> Tema del Sistema
                             </div>
                             <div class="theme-selector">
-                                <button class="theme-option" onclick="changeTheme('blue')" data-theme="blue" title="Azul (Por defecto)">
+                                <button class="theme-option" onclick="changeTheme('teal')" data-theme="teal" title="Turquesa (Principal)">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #14b8a6, #0d9488);"></div>
+                                    <span>Turquesa</span>
+                                    <i class="fas fa-check theme-check"></i>
+                                </button>
+                                <button class="theme-option" onclick="changeTheme('blue')" data-theme="blue" title="Azul">
                                     <div class="theme-color" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
                                     <span>Azul</span>
                                     <i class="fas fa-check theme-check"></i>
                                 </button>
-                                <button class="theme-option" onclick="changeTheme('green')" data-theme="green" title="Verde">
-                                    <div class="theme-color" style="background: linear-gradient(135deg, #10b981, #059669);"></div>
-                                    <span>Verde</span>
-                                    <i class="fas fa-check theme-check"></i>
-                                </button>
-                                <button class="theme-option" onclick="changeTheme('purple')" data-theme="purple" title="Morado">
-                                    <div class="theme-color" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
-                                    <span>Morado</span>
-                                    <i class="fas fa-check theme-check"></i>
-                                </button>
-                                <button class="theme-option" onclick="changeTheme('orange')" data-theme="orange" title="Naranja">
-                                    <div class="theme-color" style="background: linear-gradient(135deg, #f59e0b, #d97706);"></div>
-                                    <span>Naranja</span>
-                                    <i class="fas fa-check theme-check"></i>
-                                </button>
-                                <button class="theme-option" onclick="changeTheme('red')" data-theme="red" title="Rojo">
-                                    <div class="theme-color" style="background: linear-gradient(135deg, #ef4444, #dc2626);"></div>
-                                    <span>Rojo</span>
-                                    <i class="fas fa-check theme-check"></i>
-                                </button>
-                                <button class="theme-option" onclick="changeTheme('teal')" data-theme="teal" title="Turquesa">
-                                    <div class="theme-color" style="background: linear-gradient(135deg, #14b8a6, #0d9488);"></div>
-                                    <span>Turquesa</span>
+                                <button class="theme-option" onclick="changeTheme('sky')" data-theme="sky" title="Celeste">
+                                    <div class="theme-color" style="background: linear-gradient(135deg, #0ea5e9, #0284c7);"></div>
+                                    <span>Celeste</span>
                                     <i class="fas fa-check theme-check"></i>
                                 </button>
                             </div>
                         </div>
                         
                         <div class="dropdown-divider"></div>
-                        
-                        <a href="{% url 'mi_perfil' %}" class="dropdown-item">
-                            <i class="fas fa-user"></i>
-                            <span>Mi Perfil</span>
-                        </a>
                         
                         <a href="{% url 'logout' %}" class="dropdown-item logout-item">
                             <i class="fas fa-sign-out-alt"></i>
@@ -2441,186 +1992,6 @@
             </div>
         </nav>
         
-        <!-- Panel de Notificaciones -->
-        <div class="notifications-panel" id="notificationsPanel">
-            <div class="notifications-header">
-                <h3><i class="fas fa-bell"></i> Notificaciones</h3>
-                <button class="close-notifications" onclick="closeNotifications()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="notifications-body">
-                <!-- Notificación de Cita Próxima -->
-                <div class="notification-item unread info">
-                    <div class="notification-icon">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div class="notification-content">
-                        <div class="notification-title">Cita próxima en 1 hora</div>
-                        <div class="notification-text">María González - Limpieza Dental - 15:00</div>
-                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 10 minutos</div>
-                    </div>
-                    <button class="mark-read-btn" onclick="markAsRead(this)">
-                        <i class="fas fa-check"></i>
-                    </button>
-                </div>
-
-                <!-- Notificación de Stock Bajo -->
-                <div class="notification-item unread warning">
-                    <div class="notification-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="notification-content">
-                        <div class="notification-title">Stock bajo de insumo</div>
-                        <div class="notification-text">Anestesia local - Solo quedan 3 unidades</div>
-                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 2 horas</div>
-                    </div>
-                    <button class="mark-read-btn" onclick="markAsRead(this)">
-                        <i class="fas fa-check"></i>
-                    </button>
-                </div>
-
-                <!-- Notificación de Nueva Cita -->
-                <div class="notification-item unread success">
-                    <div class="notification-icon">
-                        <i class="fas fa-calendar-plus"></i>
-                    </div>
-                    <div class="notification-content">
-                        <div class="notification-title">Nueva cita reservada</div>
-                        <div class="notification-text">Juan Pérez ha reservado una cita para el 25/10/2025</div>
-                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 3 horas</div>
-                    </div>
-                    <button class="mark-read-btn" onclick="markAsRead(this)">
-                        <i class="fas fa-check"></i>
-                    </button>
-                </div>
-
-                <!-- Notificación Leída -->
-                <div class="notification-item read">
-                    <div class="notification-icon">
-                        <i class="fas fa-user-md"></i>
-                    </div>
-                    <div class="notification-content">
-                        <div class="notification-title">Nuevo dentista agregado</div>
-                        <div class="notification-text">Dr. Carlos Ruiz se ha unido al equipo</div>
-                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 1 día</div>
-                    </div>
-                </div>
-
-                <!-- Notificación Leída -->
-                <div class="notification-item read">
-                    <div class="notification-icon">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="notification-content">
-                        <div class="notification-title">Cita completada</div>
-                        <div class="notification-text">Ana Fernández - Endodoncia completada exitosamente</div>
-                        <div class="notification-time"><i class="fas fa-clock"></i> Hace 2 días</div>
-                    </div>
-                </div>
-            </div>
-            <div class="notifications-footer">
-                <button class="mark-all-read-btn" onclick="markAllAsRead()">
-                    <i class="fas fa-check-double"></i> Marcar todas como leídas
-                </button>
-            </div>
-        </div>
-
-        <!-- Panel de Mensajería -->
-        <div class="mensajes-panel" id="mensajesPanel">
-            <div class="mensajes-header">
-                <h3><i class="fas fa-envelope"></i> Mensajes</h3>
-                <button class="close-mensajes" onclick="closeMensajes()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <!-- Tabs -->
-            <div class="mensajes-tabs">
-                <button class="msg-tab active" data-tab="recibidos" onclick="cambiarTabMensajes('recibidos')">
-                    <i class="fas fa-inbox"></i> Recibidos
-                </button>
-                <button class="msg-tab" data-tab="enviados" onclick="cambiarTabMensajes('enviados')">
-                    <i class="fas fa-paper-plane"></i> Enviados
-                </button>
-                <button class="msg-tab" data-tab="nuevo" onclick="cambiarTabMensajes('nuevo')">
-                    <i class="fas fa-plus"></i> Nuevo
-                </button>
-            </div>
-            
-            <!-- Contenido: Mensajes Recibidos -->
-            <div class="mensajes-content" id="tab-recibidos">
-                <div id="listaMensajesRecibidos" class="mensajes-lista">
-                    <div class="loading-mensajes">
-                        <i class="fas fa-spinner fa-spin"></i> Cargando mensajes...
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Contenido: Mensajes Enviados -->
-            <div class="mensajes-content" id="tab-enviados" style="display: none;">
-                <div id="listaMensajesEnviados" class="mensajes-lista">
-                    <div class="loading-mensajes">
-                        <i class="fas fa-spinner fa-spin"></i> Cargando mensajes...
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Contenido: Nuevo Mensaje -->
-            <div class="mensajes-content" id="tab-nuevo" style="display: none;">
-                <form id="formNuevoMensaje" class="form-nuevo-mensaje">
-                    {% csrf_token %}
-                    <div class="form-group-msg">
-                        <label><i class="fas fa-user"></i> Destinatario</label>
-                        <select id="destinatario" name="destinatario_id" required class="form-control-msg">
-                            <option value="">Seleccione un destinatario</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group-msg">
-                        <label><i class="fas fa-tag"></i> Tipo</label>
-                        <select id="tipo" name="tipo" required class="form-control-msg">
-                            <option value="general">Mensaje General</option>
-                            <option value="odontograma">Envío de Odontograma</option>
-                            <option value="cita">Información de Cita</option>
-                            <option value="urgente">Urgente</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group-msg" id="odontogramaGroup" style="display: none;">
-                        <label><i class="fas fa-tooth"></i> Odontograma (Opcional)</label>
-                        <input type="number" id="odontograma_id" name="odontograma_id" class="form-control-msg" placeholder="ID del odontograma">
-                    </div>
-                    
-                    <div class="form-group-msg">
-                        <label><i class="fas fa-heading"></i> Asunto</label>
-                        <input type="text" id="asunto" name="asunto" required class="form-control-msg" placeholder="Asunto del mensaje">
-                    </div>
-                    
-                    <div class="form-group-msg">
-                        <label><i class="fas fa-comment"></i> Mensaje</label>
-                        <textarea id="mensaje" name="mensaje" required class="form-control-msg" rows="6" placeholder="Escriba su mensaje aquí..."></textarea>
-                    </div>
-                    
-                    <div class="form-group-msg">
-                        <label><i class="fas fa-paperclip"></i> Archivo Adjunto (Opcional)</label>
-                        <input type="file" id="archivo_adjunto" name="archivo_adjunto" class="form-control-msg" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
-                        <small style="color: #6b7280; font-size: 0.75rem; margin-top: 4px; display: block;">
-                            Formatos permitidos: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Máx. 10MB)
-                        </small>
-                        <div id="archivo-preview" style="margin-top: 8px;"></div>
-                    </div>
-                    
-                    <button type="submit" class="btn-enviar-mensaje">
-                        <i class="fas fa-paper-plane"></i> Enviar Mensaje
-                    </button>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Overlay para cerrar mensajes -->
-        <div class="mensajes-overlay" id="mensajesOverlay" onclick="closeMensajes()"></div>
-
         <!-- Botón de Información de la Clínica -->
         <button class="info-clinica-btn" onclick="toggleInfoClinicaPanel()" title="Información de la Clínica">
             <i class="fas fa-info-circle"></i>
@@ -2661,120 +2032,172 @@
                 <div class="function-buttons">
                     {% if perfil.es_dentista %}
                     <!-- Navbar para Dentistas -->
-                    <a href="{% url 'mi_perfil' %}" class="function-btn {% if request.resolver_match.url_name == 'mi_perfil' %}active{% endif %}">
-                        <i class="fas fa-user"></i>
-                        <span>Perfil</span>
-                    </a>
-                    <a href="{% url 'gestionar_pacientes' %}" class="function-btn {% if request.resolver_match.url_name == 'gestionar_pacientes' or request.resolver_match.url_name == 'detalle_paciente' or request.resolver_match.url_name == 'agregar_nota_paciente' or request.resolver_match.url_name == 'estadisticas_pacientes' %}active{% endif %}">
-                        <i class="fas fa-user-friends"></i>
-                        <span>Pacientes</span>
-                    </a>
-                    <a href="{% url 'mis_citas_dentista' %}" class="function-btn {% if request.resolver_match.url_name == 'mis_citas_dentista' %}active{% endif %}">
-                        <i class="fas fa-calendar-check"></i>
-                        <span>Citas</span>
-                    </a>
-                    <a href="{% url 'ver_mi_horario' %}" class="function-btn {% if request.resolver_match.url_name == 'ver_mi_horario' %}active{% endif %}">
-                        <i class="fas fa-clock"></i>
-                        <span>Mi Horario</span>
-                    </a>
-                    <a href="{% url 'listar_odontogramas' %}" class="function-btn {% if 'odontograma' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-tooth"></i>
-                        <span>Odontograma</span>
-                    </a>
-                    <a href="{% url 'radiografias_listar' %}" class="function-btn {% if 'radiografia' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-x-ray"></i>
-                        <span>Radiografías</span>
-                    </a>
+                    <!-- Sección: Inicio -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Inicio</div>
+                        <div class="nav-section">
+                            <a href="{% url 'dashboard_dentista' %}" class="function-btn {% if request.resolver_match.url_name == 'dashboard_dentista' %}active{% endif %}">
+                                <i class="fas fa-home"></i>
+                                <span>Inicio</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Gestión -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Gestión</div>
+                        <div class="nav-section">
+                            <a href="{% url 'gestionar_pacientes' %}" class="function-btn {% if request.resolver_match.url_name == 'gestionar_pacientes' or request.resolver_match.url_name == 'estadisticas_pacientes' %}active{% endif %}">
+                                <i class="fas fa-user-friends"></i>
+                                <span>Pacientes</span>
+                            </a>
+                            <a href="{% url 'mis_citas_dentista' %}" class="function-btn {% if request.resolver_match.url_name == 'mis_citas_dentista' %}active{% endif %}">
+                                <i class="fas fa-calendar-check"></i>
+                                <span>Citas</span>
+                            </a>
+                            <a href="{% url 'ver_mi_horario' %}" class="function-btn {% if request.resolver_match.url_name == 'ver_mi_horario' %}active{% endif %}">
+                                <i class="fas fa-clock"></i>
+                                <span>Mi Horario</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Historial -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Historial</div>
+                        <div class="nav-section">
+                            <a href="{% url 'mis_pacientes' %}" class="function-btn {% if 'mis_pacientes' in request.resolver_match.url_name or 'odontograma' in request.resolver_match.url_name or 'radiografia' in request.resolver_match.url_name %}active{% endif %}">
+                                <i class="fas fa-users"></i>
+                                <span>Mis Pacientes</span>
+                            </a>
+                            <a href="{% url 'listar_planes_tratamiento' %}" class="function-btn {% if 'plan' in request.resolver_match.url_name or 'tratamiento' in request.resolver_match.url_name %}active{% endif %}">
+                                <i class="fas fa-clipboard-list"></i>
+                                <span>Planes de Tratamiento</span>
+                            </a>
+                        </div>
+                    </div>
                     {% else %}
                     <!-- Navbar para Administrativos -->
-                    <a href="{% url 'panel_trabajador' %}" class="function-btn {% if request.resolver_match.url_name == 'panel_trabajador' %}active{% endif %}">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Citas</span>
-                    </a>
-                    <a href="{% url 'gestor_clientes' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_clientes' %}active{% endif %}">
-                        <i class="fas fa-users"></i>
-                        <span>Clientes</span>
-                    </a>
-                    <a href="{% url 'gestor_insumos' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_insumos' %}active{% endif %}">
-                        <i class="fas fa-boxes"></i>
-                        <span>Insumos</span>
-                    </a>
-                    <a href="{% url 'gestor_proveedores' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_proveedores' %}active{% endif %}">
-                        <i class="fas fa-truck"></i>
-                        <span>Proveedores</span>
-                    </a>
-                    <a href="{% url 'gestor_servicios' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_servicios' or request.resolver_match.url_name == 'crear_servicio' or request.resolver_match.url_name == 'editar_servicio' or request.resolver_match.url_name == 'eliminar_servicio' %}active{% endif %}">
-                        <i class="fas fa-tasks"></i>
-                        <span>Servicios</span>
-                    </a>
-                    <a href="{% url 'gestor_personal' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_personal' %}active{% endif %}">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Personal</span>
-                    </a>
-                    <a href="{% url 'dashboard_reportes' %}" class="function-btn {% if request.resolver_match.url_name == 'dashboard_reportes' %}active{% endif %}">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Reportes</span>
-                    </a>
-                    <a href="{% url 'gestor_finanzas' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_finanzas' %}active{% endif %}">
-                        <i class="fas fa-dollar-sign"></i>
-                        <span>Finanzas</span>
-                    </a>
+                    <!-- Sección: Dashboard -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Inicio</div>
+                        <div class="nav-section">
+                            <a href="{% url 'dashboard' %}" class="function-btn {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                                <i class="fas fa-home"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Operaciones -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Operaciones</div>
+                        <div class="nav-section">
+                            <a href="{% url 'panel_trabajador' %}" class="function-btn {% if request.resolver_match.url_name == 'panel_trabajador' %}active{% endif %}">
+                                <i class="fas fa-calendar-alt"></i>
+                                <span>Citas</span>
+                            </a>
+                            <a href="{% url 'gestor_personal' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_personal' %}active{% endif %}">
+                                <i class="fas fa-user-tie"></i>
+                                <span>Personal</span>
+                            </a>
+                            <a href="{% url 'gestor_clientes' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_clientes' %}active{% endif %}">
+                                <i class="fas fa-users"></i>
+                                <span>Clientes</span>
+                            </a>
+                            <a href="{% url 'listar_planes_tratamiento' %}" class="function-btn {% if 'plan' in request.resolver_match.url_name or 'tratamiento' in request.resolver_match.url_name %}active{% endif %}">
+                                <i class="fas fa-clipboard-list"></i>
+                                <span>Tratamientos</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Recursos -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Recursos</div>
+                        <div class="nav-section">
+                            <a href="{% url 'gestor_servicios' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_servicios' or request.resolver_match.url_name == 'crear_servicio' or request.resolver_match.url_name == 'editar_servicio' or request.resolver_match.url_name == 'eliminar_servicio' %}active{% endif %}">
+                                <i class="fas fa-tasks"></i>
+                                <span>Servicios</span>
+                            </a>
+                            <a href="{% url 'gestor_inventario_unificado' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_inventario_unificado' or request.resolver_match.url_name == 'gestor_insumos' or request.resolver_match.url_name == 'gestor_proveedores' or request.resolver_match.url_name == 'gestor_pedidos' or request.resolver_match.url_name == 'crear_pedido' or request.resolver_match.url_name == 'detalle_pedido' %}active{% endif %}">
+                                <i class="fas fa-warehouse"></i>
+                                <span>Inventario</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Análisis -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Análisis</div>
+                        <div class="nav-section">
+                            <a href="{% url 'reportes' %}" class="function-btn {% if request.resolver_match.url_name == 'reportes' %}active{% endif %}">
+                                <i class="fas fa-file-excel"></i>
+                                <span>Reportes</span>
+                            </a>
+                            <a href="{% url 'estadisticas' %}" class="function-btn {% if request.resolver_match.url_name == 'estadisticas' %}active{% endif %}">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Estadísticas</span>
+                            </a>
+                            <a href="{% url 'gestor_finanzas' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_finanzas' %}active{% endif %}">
+                                <i class="fas fa-dollar-sign"></i>
+                                <span>Finanzas</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Documentos -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Documentos</div>
+                        <div class="nav-section">
+                            <a href="{% url 'gestor_documentos' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_documentos' %}active{% endif %}">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>Documentos</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-separator"></div>
+                    
+                    <!-- Sección: Administración -->
+                    <div class="nav-section-group">
+                        <div class="nav-section-label">Administración</div>
+                        <div class="nav-section">
+                            <a href="{% url 'gestor_auditoria' %}" class="function-btn {% if request.resolver_match.url_name == 'gestor_auditoria' %}active{% endif %}">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Auditoría</span>
+                            </a>
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
         
         <!-- Contenido Principal -->
-        <div class="main-content {% if perfil.es_dentista and request.resolver_match.url_name == 'mi_perfil' %}with-dentist-card{% endif %}">
-            {% if perfil.es_dentista and request.resolver_match.url_name == 'mi_perfil' %}
-            <!-- Ficha del Dentista (solo para dentistas en la vista de perfil) -->
-            <div class="dentist-info-card">
-                <div class="dentist-card-header">
-                    <div class="dentist-avatar-small">
-                        {{ perfil.nombre_completo|first|upper }}
-                        <div class="online-indicator"></div>
-                    </div>
-                    <div class="dentist-info-text">
-                        <div class="dentist-name-small">{{ perfil.nombre_completo }}</div>
-                        <div class="dentist-role-small">{{ perfil.get_rol_display }}</div>
-                        <div class="dentist-status">🟢 En línea</div>
-                    </div>
-                </div>
-                <div class="dentist-card-details">
-                    <div class="dentist-detail-item">
-                        <i class="fas fa-envelope"></i>
-                        <span>{{ perfil.user.email }}</span>
-                    </div>
-                    {% if perfil.telefono %}
-                    <div class="dentist-detail-item">
-                        <i class="fas fa-phone"></i>
-                        <span>{{ perfil.telefono }}</span>
-                    </div>
-                    {% endif %}
-                    <div class="dentist-detail-item">
-                        <i class="fas fa-calendar"></i>
-                        <span>Miembro desde {{ perfil.user.date_joined|date:"M Y" }}</span>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
+        <div class="main-content">
             
             <!-- Wrapper del contenido principal -->
-            <div class="content-wrapper">
-                <div class="page-header">
+            <div class="content-wrapper" style="margin-top: 0; padding-top: 0; gap: 8px;">
+                <!-- Breadcrumbs eliminados -->
+                
+                <div class="page-header" style="margin-top: 0;">
                     <h1 class="page-title">{% block page_title %}<i class="fas fa-calendar-alt"></i> Gestión de Citas{% endblock %}</h1>
                     <p class="page-subtitle">{% block page_subtitle %}Administra las citas de la clínica dental{% endblock %}</p>
                 </div>
             
-            {% if messages %}
-            <div class="section" style="background:#f0fdf4; border-color:#bbf7d0;">
-                {% for message in messages %}
-                    <div style="margin-bottom:6px; color:#166534;">
-                        <i class="fas fa-check-circle"></i> {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-            {% endif %}
             
                 {% block content %}
                 <!-- El contenido específico de cada página va aquí -->
@@ -2782,18 +2205,15 @@
             </div> <!-- Cerrar content-wrapper -->
         </div>
     </div>
-    
-    <!-- Overlay para notificaciones -->
-    <div class="notifications-overlay" id="notificationsOverlay" onclick="closeNotifications()"></div>
 
     <script>
         // ============================================================================
         // SISTEMA DE TEMAS
         // ============================================================================
         
-        // Cargar tema al iniciar
+        // Cargar tema al iniciar (Turquesa por defecto)
         document.addEventListener('DOMContentLoaded', function() {
-            const savedTheme = localStorage.getItem('clinicaTheme') || 'blue';
+            const savedTheme = localStorage.getItem('clinicaTheme') || 'teal';
             applyTheme(savedTheme);
             updateThemeButtons(savedTheme);
         });
@@ -2890,335 +2310,8 @@
             }
         });
 
-        // ========== FUNCIONES DE NOTIFICACIONES ==========
-        function toggleNotifications(event) {
-            event.stopPropagation();
-            const panel = document.getElementById('notificationsPanel');
-            const overlay = document.getElementById('notificationsOverlay');
-            
-            panel.classList.toggle('open');
-            overlay.classList.toggle('open');
-        }
-
-        function closeNotifications() {
-            const panel = document.getElementById('notificationsPanel');
-            const overlay = document.getElementById('notificationsOverlay');
-            
-            panel.classList.remove('open');
-            overlay.classList.remove('open');
-        }
-
-        function markAsRead(button) {
-            const notificationItem = button.closest('.notification-item');
-            notificationItem.classList.remove('unread');
-            notificationItem.classList.add('read');
-            button.remove();
-            updateNotificationBadge();
-        }
-
-        function markAllAsRead() {
-            const unreadItems = document.querySelectorAll('.notification-item.unread');
-            unreadItems.forEach(item => {
-                item.classList.remove('unread');
-                item.classList.add('read');
-                const button = item.querySelector('.mark-read-btn');
-                if (button) button.remove();
-            });
-            updateNotificationBadge();
-        }
-
-        function updateNotificationBadge() {
-            const unreadCount = document.querySelectorAll('.notification-item.unread').length;
-            const badge = document.getElementById('notificationBadge');
-            
-            // Verificar que el badge existe antes de intentar modificarlo
-            if (!badge) {
-                return;
-            }
-            
-            if (unreadCount > 0) {
-                badge.textContent = unreadCount;
-                badge.style.display = 'inline-block';
-            } else {
-                badge.style.display = 'none';
-            }
-        }
-
-        // Cerrar notificaciones con tecla ESC
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const panel = document.getElementById('notificationsPanel');
-                if (panel.classList.contains('open')) {
-                    closeNotifications();
-                }
-            }
-        });
-
-        // Inicializar el badge al cargar la página
-        document.addEventListener('DOMContentLoaded', function() {
-            updateNotificationBadge();
-        });
 
         // ========== SISTEMA DE MENSAJERÍA ==========
-        function toggleMensajesPanel() {
-            const panel = document.getElementById('mensajesPanel');
-            const overlay = document.getElementById('mensajesOverlay');
-            
-            panel.classList.toggle('open');
-            overlay.classList.toggle('show');
-            
-            if (panel.classList.contains('open')) {
-                cargarMensajes();
-                cargarUsuariosDisponibles();
-            }
-        }
-
-        function closeMensajes() {
-            const panel = document.getElementById('mensajesPanel');
-            const overlay = document.getElementById('mensajesOverlay');
-            
-            panel.classList.remove('open');
-            overlay.classList.remove('show');
-        }
-
-        function cambiarTabMensajes(tab) {
-            // Actualizar tabs activos
-            document.querySelectorAll('.msg-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.msg-tab[data-tab="${tab}"]`).classList.add('active');
-            
-            // Mostrar contenido correspondiente
-            document.querySelectorAll('.mensajes-content').forEach(c => c.style.display = 'none');
-            document.getElementById(`tab-${tab}`).style.display = 'block';
-            
-            // Mostrar/ocultar campo de odontograma según tipo
-            if (tab === 'nuevo') {
-                document.getElementById('tipo').addEventListener('change', function() {
-                    const odontogramaGroup = document.getElementById('odontogramaGroup');
-                    if (this.value === 'odontograma') {
-                        odontogramaGroup.style.display = 'block';
-                    } else {
-                        odontogramaGroup.style.display = 'none';
-                    }
-                });
-            }
-        }
-
-        async function cargarMensajes() {
-            try {
-                const response = await fetch('{% url "obtener_mensajes" %}');
-                const data = await response.json();
-                
-                if (data.mensajes) {
-                    mostrarMensajes(data.mensajes);
-                    actualizarBadgeMensajes(data.no_leidos);
-                }
-            } catch (error) {
-                console.error('Error al cargar mensajes:', error);
-            }
-        }
-
-        function mostrarMensajes(mensajes) {
-            const recibidos = mensajes.filter(m => m.es_recibido);
-            const enviados = mensajes.filter(m => !m.es_recibido);
-            
-            mostrarListaMensajes('listaMensajesRecibidos', recibidos, true);
-            mostrarListaMensajes('listaMensajesEnviados', enviados, false);
-        }
-
-        function mostrarListaMensajes(containerId, mensajes, esRecibido) {
-            const container = document.getElementById(containerId);
-            
-            if (mensajes.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-mensajes">
-                        <i class="fas fa-inbox"></i>
-                        <p>No hay mensajes</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            container.innerHTML = mensajes.map(m => `
-                <div class="mensaje-item ${m.estado === 'no_leido' ? 'no-leido' : ''} ${m.tipo === 'urgente' ? 'urgente' : ''}"
-                     onclick="verDetalleMensaje(${m.id}, ${esRecibido})">
-                    <div class="mensaje-header-item">
-                        <span class="mensaje-remitente">
-                            ${esRecibido ? m.remitente : m.destinatario}
-                        </span>
-                        <span class="mensaje-fecha">${m.fecha_envio}</span>
-                    </div>
-                    <div class="mensaje-asunto">${m.asunto}</div>
-                    <div class="mensaje-preview">${m.mensaje}</div>
-                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                        <span class="mensaje-tipo-badge ${m.tipo}">${getTipoLabel(m.tipo)}</span>
-                        ${m.odontograma_id ? '<i class="fas fa-tooth" style="color: #3b82f6;"></i>' : ''}
-                        ${m.tiene_archivo ? `
-                            <a href="${m.archivo_url}" target="_blank" onclick="event.stopPropagation();" 
-                               style="display: flex; align-items: center; gap: 4px; color: #3b82f6; text-decoration: none; font-size: 0.85rem;">
-                                <i class="fas fa-paperclip"></i>
-                                <span>${m.archivo_nombre}</span>
-                            </a>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function getTipoLabel(tipo) {
-            const labels = {
-                'general': 'General',
-                'odontograma': 'Odontograma',
-                'cita': 'Cita',
-                'urgente': 'Urgente'
-            };
-            return labels[tipo] || tipo;
-        }
-
-        async function cargarUsuariosDisponibles() {
-            try {
-                const response = await fetch('{% url "obtener_usuarios_disponibles" %}');
-                const data = await response.json();
-                
-                if (data.usuarios) {
-                    const select = document.getElementById('destinatario');
-                    select.innerHTML = '<option value="">Seleccione un destinatario</option>' +
-                        data.usuarios.map(u => 
-                            `<option value="${u.id}">${u.nombre} - ${u.rol}</option>`
-                        ).join('');
-                }
-            } catch (error) {
-                console.error('Error al cargar usuarios:', error);
-            }
-        }
-
-        async function verDetalleMensaje(mensajeId, esRecibido) {
-            if (esRecibido) {
-                // Marcar como leído
-                try {
-                    await fetch(`/trabajadores/mensajes/${mensajeId}/marcar-leido/`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                        }
-                    });
-                    cargarMensajes(); // Recargar para actualizar estado
-                } catch (error) {
-                    console.error('Error al marcar mensaje:', error);
-                }
-            }
-            // Aquí puedes agregar un modal para mostrar el mensaje completo
-        }
-
-        function actualizarBadgeMensajes(count) {
-            const badge = document.getElementById('mensajesBadge');
-            if (count > 0) {
-                badge.textContent = count;
-                badge.style.display = 'inline-block';
-            } else {
-                badge.textContent = '0';
-                badge.style.display = 'none';
-            }
-        }
-
-        // Preview de archivo adjunto
-        document.addEventListener('DOMContentLoaded', function() {
-            const archivoInput = document.getElementById('archivo_adjunto');
-            if (archivoInput) {
-                archivoInput.addEventListener('change', function() {
-                    const preview = document.getElementById('archivo-preview');
-                    const file = this.files[0];
-                    
-                    if (file) {
-                        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-                        const extension = file.name.split('.').pop().toLowerCase();
-                        let icon = 'fa-file';
-                        
-                        if (extension === 'pdf') icon = 'fa-file-pdf';
-                        else if (['jpg', 'jpeg', 'png'].includes(extension)) icon = 'fa-file-image';
-                        else if (['doc', 'docx'].includes(extension)) icon = 'fa-file-word';
-                        else if (['xls', 'xlsx'].includes(extension)) icon = 'fa-file-excel';
-                        
-                        preview.innerHTML = `
-                            <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f3f4f6; border-radius: 6px;">
-                                <i class="fas ${icon}" style="color: #3b82f6; font-size: 1.2rem;"></i>
-                                <div style="flex: 1;">
-                                    <div style="font-size: 0.85rem; color: #1f2937; font-weight: 500;">${file.name}</div>
-                                    <div style="font-size: 0.75rem; color: #6b7280;">${sizeMB} MB</div>
-                                </div>
-                                <button type="button" onclick="document.getElementById('archivo_adjunto').value=''; document.getElementById('archivo-preview').innerHTML='';" 
-                                        style="background: none; border: none; color: #ef4444; cursor: pointer;">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        `;
-                    } else {
-                        preview.innerHTML = '';
-                    }
-                });
-            }
-        });
-        
-        // Enviar mensaje
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('formNuevoMensaje');
-            if (form) {
-                form.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    const formData = new FormData(form);
-                    const btnEnviar = form.querySelector('.btn-enviar-mensaje');
-                    const btnOriginalText = btnEnviar.innerHTML;
-                    
-                    // Deshabilitar botón y mostrar loading
-                    btnEnviar.disabled = true;
-                    btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-                    
-                    try {
-                        const response = await fetch('{% url "enviar_mensaje" %}', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const data = await response.json();
-                        
-                        if (data.success) {
-                            alert('Mensaje enviado correctamente');
-                            form.reset();
-                            document.getElementById('archivo-preview').innerHTML = '';
-                            cambiarTabMensajes('recibidos');
-                            cargarMensajes();
-                        } else {
-                            alert('Error: ' + (data.error || 'No se pudo enviar el mensaje'));
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        alert('Error al enviar el mensaje');
-                    } finally {
-                        // Reactivar botón
-                        btnEnviar.disabled = false;
-                        btnEnviar.innerHTML = btnOriginalText;
-                    }
-                });
-            }
-        });
-
-        // Cerrar mensajes con tecla ESC
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const panel = document.getElementById('mensajesPanel');
-                if (panel.classList.contains('open')) {
-                    closeMensajes();
-                }
-            }
-        });
-
-        // Actualizar mensajes cada 30 segundos si el panel está abierto
-        setInterval(() => {
-            const panel = document.getElementById('mensajesPanel');
-            if (panel && panel.classList.contains('open')) {
-                cargarMensajes();
-            }
-        }, 30000);
 
         // ========== SISTEMA DE INFORMACIÓN DE LA CLÍNICA ==========
         function toggleInfoClinicaPanel() {
@@ -3427,6 +2520,518 @@
                     closeInfoClinica();
                 }
             }
+        });
+    </script>
+    
+    <!-- Modal Mi Perfil -->
+    <div id="modalMiPerfil" class="modal-perfil" style="display: none;">
+        <div class="modal-perfil-content">
+            <div class="modal-perfil-header">
+                <h2><i class="fas fa-user-circle"></i> Mi Perfil</h2>
+                <button class="modal-perfil-close" onclick="cerrarModalPerfil()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-perfil-body" id="modalPerfilContent">
+                <div style="text-align: center; padding: 40px;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i>
+                    <p style="margin-top: 16px; color: #64748b;">Cargando información...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        .modal-perfil {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .modal-perfil.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }
+        
+        .modal-perfil-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transform: scale(0.95);
+            opacity: 0;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        
+        .modal-perfil.show .modal-perfil-content {
+            transform: scale(1);
+            opacity: 1;
+        }
+        
+        .modal-perfil-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 2px solid #e2e8f0;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            color: white;
+            border-radius: 16px 16px 0 0;
+        }
+        
+        .modal-perfil-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .modal-perfil-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: all 0.2s;
+        }
+        
+        .modal-perfil-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+        
+        .modal-perfil-body {
+            padding: 24px;
+        }
+        
+        .perfil-modal-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0 auto 20px;
+            box-shadow: 0 4px 16px rgba(20, 184, 166, 0.3);
+        }
+        
+        .perfil-modal-name {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        
+        .perfil-modal-role {
+            text-align: center;
+            font-size: 1rem;
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .perfil-modal-specialty {
+            text-align: center;
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-bottom: 16px;
+        }
+        
+        .perfil-modal-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: 0 auto 24px;
+        }
+        
+        .perfil-modal-status.active {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .perfil-modal-status.inactive {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        .perfil-modal-info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .perfil-modal-info-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .perfil-modal-info-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .perfil-modal-info-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+        
+        .perfil-modal-info-label {
+            font-size: 0.7rem;
+            color: #64748b;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        
+        .perfil-modal-info-value {
+            font-size: 0.875rem;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        
+        .perfil-modal-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .perfil-modal-stat-card {
+            text-align: center;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .perfil-modal-stat-number {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        
+        .perfil-modal-stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        .perfil-modal-edit-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.25);
+        }
+        
+        .perfil-modal-edit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.35);
+            color: white;
+        }
+        
+        .perfil-modal-edit-btn i {
+            font-size: 0.875rem;
+        }
+        
+        @media (max-width: 768px) {
+            .modal-perfil-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+            
+            .perfil-modal-info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .perfil-modal-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    
+    <script>
+        function abrirModalPerfil() {
+            const modal = document.getElementById('modalMiPerfil');
+            if (!modal) return;
+            
+            // Mostrar el modal primero
+            modal.style.display = 'flex';
+            // Forzar reflow para que el navegador procese el cambio de display
+            void modal.offsetWidth;
+            // Agregar la clase para activar la animación
+            modal.classList.add('show');
+            
+            // Cargar información del perfil
+            fetch('{% url "obtener_perfil_json" %}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        mostrarPerfilEnModal(data);
+                    } else {
+                        document.getElementById('modalPerfilContent').innerHTML = `
+                            <div style="text-align: center; padding: 40px;">
+                                <i class="fas fa-exclamation-circle" style="font-size: 2rem; color: #ef4444; margin-bottom: 16px;"></i>
+                                <p style="color: #64748b;">Error al cargar la información del perfil</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('modalPerfilContent').innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <i class="fas fa-exclamation-circle" style="font-size: 2rem; color: #ef4444; margin-bottom: 16px;"></i>
+                            <p style="color: #64748b;">Error al cargar la información del perfil</p>
+                        </div>
+                    `;
+                });
+        }
+        
+        function cerrarModalPerfil() {
+            const modal = document.getElementById('modalMiPerfil');
+            if (modal) {
+                modal.classList.remove('show');
+                // Esperar a que termine la animación antes de ocultar completamente
+                setTimeout(() => {
+                    if (!modal.classList.contains('show')) {
+                        modal.style.display = 'none';
+                    }
+                }, 200);
+            }
+        }
+        
+        function mostrarPerfilEnModal(data) {
+            const perfil = data.perfil;
+            const stats = data.estadisticas;
+            const inicial = perfil.nombre_completo.charAt(0).toUpperCase();
+            
+            let statsHtml = '';
+            if (data.es_dentista && stats.citas_totales > 0) {
+                statsHtml = `
+                    <div style="margin-top: 24px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
+                        <h4 style="margin: 0 0 16px 0; font-size: 1rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-chart-bar" style="color: var(--primary-color);"></i>
+                            Estadísticas de Citas
+                        </h4>
+                        <div class="perfil-modal-stats">
+                            <div class="perfil-modal-stat-card">
+                                <div class="perfil-modal-stat-number">${stats.citas_totales}</div>
+                                <div class="perfil-modal-stat-label">Total Citas</div>
+                            </div>
+                            <div class="perfil-modal-stat-card">
+                                <div class="perfil-modal-stat-number">${stats.citas_completadas}</div>
+                                <div class="perfil-modal-stat-label">Completadas</div>
+                            </div>
+                            <div class="perfil-modal-stat-card">
+                                <div class="perfil-modal-stat-number">${stats.citas_pendientes}</div>
+                                <div class="perfil-modal-stat-label">Pendientes</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (data.es_administrativo && (stats.citas_totales > 0 || stats.clientes_gestionados > 0)) {
+                statsHtml = `
+                    <div style="margin-top: 24px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
+                        <h4 style="margin: 0 0 16px 0; font-size: 1rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-chart-bar" style="color: var(--primary-color);"></i>
+                            Estadísticas de Gestión
+                        </h4>
+                        <div class="perfil-modal-stats">
+                            ${stats.citas_totales > 0 ? `
+                            <div class="perfil-modal-stat-card">
+                                <div class="perfil-modal-stat-number">${stats.citas_totales}</div>
+                                <div class="perfil-modal-stat-label">Citas Creadas</div>
+                            </div>
+                            ` : ''}
+                            ${stats.citas_completadas > 0 ? `
+                            <div class="perfil-modal-stat-card">
+                                <div class="perfil-modal-stat-number">${stats.citas_completadas}</div>
+                                <div class="perfil-modal-stat-label">Completadas</div>
+                            </div>
+                            ` : ''}
+                            ${stats.clientes_gestionados > 0 ? `
+                            <div class="perfil-modal-stat-card">
+                                <div class="perfil-modal-stat-number">${stats.clientes_gestionados}</div>
+                                <div class="perfil-modal-stat-label">Clientes Activos</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const html = `
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <div class="perfil-modal-avatar">${inicial}</div>
+                    <div class="perfil-modal-name">${perfil.nombre_completo}</div>
+                    <div class="perfil-modal-role">${perfil.rol}</div>
+                    ${perfil.especialidad ? `<div class="perfil-modal-specialty">${perfil.especialidad}</div>` : ''}
+                    <div class="perfil-modal-status ${perfil.activo ? 'active' : 'inactive'}" style="display: inline-flex;">
+                        <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                        ${perfil.activo ? 'Activo' : 'Inactivo'}
+                    </div>
+                </div>
+                
+                <div class="perfil-modal-info-grid">
+                    <div class="perfil-modal-info-item">
+                        <div class="perfil-modal-info-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="perfil-modal-info-content">
+                            <span class="perfil-modal-info-label">Email</span>
+                            <span class="perfil-modal-info-value">${perfil.email}</span>
+                        </div>
+                    </div>
+                    <div class="perfil-modal-info-item">
+                        <div class="perfil-modal-info-icon">
+                            <i class="fas fa-phone"></i>
+                        </div>
+                        <div class="perfil-modal-info-content">
+                            <span class="perfil-modal-info-label">Teléfono</span>
+                            <span class="perfil-modal-info-value">${perfil.telefono}</span>
+                        </div>
+                    </div>
+                    <div class="perfil-modal-info-item">
+                        <div class="perfil-modal-info-icon">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="perfil-modal-info-content">
+                            <span class="perfil-modal-info-label">Usuario</span>
+                            <span class="perfil-modal-info-value">${perfil.username}</span>
+                        </div>
+                    </div>
+                    <div class="perfil-modal-info-item">
+                        <div class="perfil-modal-info-icon">
+                            <i class="fas fa-calendar-plus"></i>
+                        </div>
+                        <div class="perfil-modal-info-content">
+                            <span class="perfil-modal-info-label">Miembro desde</span>
+                            <span class="perfil-modal-info-value">${perfil.fecha_registro}</span>
+                        </div>
+                    </div>
+                    <div class="perfil-modal-info-item">
+                        <div class="perfil-modal-info-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="perfil-modal-info-content">
+                            <span class="perfil-modal-info-label">Último acceso</span>
+                            <span class="perfil-modal-info-value">${perfil.ultimo_acceso}</span>
+                        </div>
+                    </div>
+                    ${perfil.numero_colegio ? `
+                    <div class="perfil-modal-info-item">
+                        <div class="perfil-modal-info-icon">
+                            <i class="fas fa-id-card"></i>
+                        </div>
+                        <div class="perfil-modal-info-content">
+                            <span class="perfil-modal-info-label">N° Colegio</span>
+                            <span class="perfil-modal-info-value">${perfil.numero_colegio}</span>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                ${statsHtml}
+                
+                <div style="margin-top: 24px; padding-top: 24px; border-top: 2px solid #e2e8f0; text-align: center;">
+                    <a href="{% url 'editar_perfil' %}" class="perfil-modal-edit-btn">
+                        <i class="fas fa-edit"></i>
+                        Editar Perfil
+                    </a>
+                </div>
+            `;
+            
+            document.getElementById('modalPerfilContent').innerHTML = html;
+        }
+        
+        // Event listeners para botones "Mi Perfil"
+        document.addEventListener('DOMContentLoaded', function() {
+            // Botón del dashboard (si existe)
+            const btnDashboard = document.getElementById('btnMiPerfilDashboard');
+            if (btnDashboard) {
+                btnDashboard.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    abrirModalPerfil();
+                });
+            }
+            
+            // Cerrar modal al hacer clic fuera
+            const modal = document.getElementById('modalMiPerfil');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        cerrarModalPerfil();
+                    }
+                });
+            }
+            
+            // Cerrar modal con tecla ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('modalMiPerfil');
+                    if (modal && modal.classList.contains('show')) {
+                        cerrarModalPerfil();
+                    }
+                }
+            });
         });
     </script>
     

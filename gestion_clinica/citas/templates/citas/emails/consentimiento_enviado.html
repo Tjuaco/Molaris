@@ -1,0 +1,89 @@
+{% extends 'citas/emails/base_email.html' %}
+{% load custom_filters %}
+
+{% block header_title %}{{ nombre_clinica }}{% endblock %}
+
+{% block content %}
+<h2>Consentimiento Informado</h2>
+
+<p>Estimado/a <strong>{{ cliente_nombre }}</strong>,</p>
+
+<p>Le enviamos el consentimiento informado para su revisión y firma:</p>
+
+<div class="info-box">
+    <strong>Título</strong>
+    <p>{{ titulo }}</p>
+    
+    <strong>Tipo de Procedimiento</strong>
+    <p>{{ tipo_procedimiento }}</p>
+    
+    {% if fecha_creacion %}
+    <strong>Fecha de Creación</strong>
+    <p>{{ fecha_creacion|date:"d/m/Y H:i" }}</p>
+    {% endif %}
+</div>
+
+<h3>Opciones para Firmar el Consentimiento</h3>
+
+<p>Puede firmar el consentimiento de las siguientes formas:</p>
+
+<ul class="info-list">
+    <li>
+        <strong>1. Presencialmente:</strong> Acuda a nuestra clínica y la recepcionista le ayudará a firmarlo.
+    </li>
+    <li>
+        <strong>2. En línea (Sistema Web):</strong> Acceda a su cuenta en nuestro sistema web y firme el consentimiento desde allí.
+    </li>
+    <li>
+        <strong>3. En línea (Enlace Directo):</strong> Puede firmar directamente haciendo clic en el botón a continuación.
+    </li>
+</ul>
+
+{% if url_firma_gestion %}
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ url_firma_gestion }}" class="email-button">Firmar Consentimiento</a>
+</div>
+{% endif %}
+
+{% if url_firma_web %}
+<div style="text-align: center; margin: 20px 0;">
+    <a href="{{ url_firma_web }}" class="email-button email-button-secondary">Acceder al Sistema Web</a>
+</div>
+{% endif %}
+
+<div class="alert-box">
+    <strong>⚠️ Importante</strong>
+    <p>• Este enlace es único y personal. No lo comparta con otras personas.</p>
+    <p>• El enlace es válido por 30 días.</p>
+    <p>• Una vez firmado, el consentimiento será registrado en nuestro sistema.</p>
+</div>
+
+<p>El documento PDF del consentimiento se encuentra adjunto a este correo para su revisión.</p>
+
+<p>Si tiene alguna consulta sobre el procedimiento o el consentimiento, no dude en contactarnos.</p>
+
+<p>Saludos cordiales,<br>
+<strong>{{ nombre_clinica }}</strong></p>
+{% endblock %}
+
+{% block clinic_name %}{{ nombre_clinica }}{% endblock %}
+
+{% block contact_info %}
+{% if direccion_clinica %}<p><strong>Dirección:</strong> {{ direccion_clinica }}</p>{% endif %}
+{% if telefono_clinica %}<p><strong>Teléfono:</strong> {{ telefono_clinica }}</p>{% endif %}
+{% if email_clinica %}<p><strong>Email:</strong> <a href="mailto:{{ email_clinica }}">{{ email_clinica }}</a></p>{% endif %}
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

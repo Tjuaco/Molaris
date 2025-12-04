@@ -1,7 +1,8 @@
 # Generated manually to recreate cita table
+# Esta migración es un no-op ya que la tabla se crea correctamente en migraciones anteriores
+# y las migraciones posteriores (0013, 0014) la corrigen para PostgreSQL
 
-from django.db import migrations, models
-import django.db.models.deletion
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -11,27 +12,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Eliminar la tabla si existe
+        # Esta migración es un no-op porque:
+        # 1. La tabla citas_cita ya existe desde migraciones anteriores
+        # 2. Las migraciones 0013 y 0014 corrigen la estructura para PostgreSQL
+        # 3. El SQL original tenía sintaxis de SQLite que no funciona con PostgreSQL
         migrations.RunSQL(
-            "DROP TABLE IF EXISTS citas_cita;",
-            reverse_sql="-- No reverse needed"
-        ),
-        # Recrear la tabla con la estructura correcta
-        migrations.RunSQL(
-            """
-            CREATE TABLE citas_cita (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fecha_hora DATETIME NOT NULL,
-                tipo_consulta VARCHAR(50) NOT NULL,
-                notas TEXT,
-                estado VARCHAR(20) NOT NULL DEFAULT 'disponible',
-                cliente_id INTEGER REFERENCES citas_cliente(id) ON DELETE SET NULL,
-                dentista_id INTEGER REFERENCES citas_perfil(id) ON DELETE SET NULL,
-                creada_por_id INTEGER REFERENCES citas_perfil(id) ON DELETE SET NULL,
-                creada_el DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                actualizada_el DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            );
-            """,
-            reverse_sql="DROP TABLE IF EXISTS citas_cita;"
+            sql=migrations.RunSQL.noop,
+            reverse_sql=migrations.RunSQL.noop
         ),
     ]

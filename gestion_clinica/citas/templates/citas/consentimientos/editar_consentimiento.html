@@ -1,0 +1,98 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Editar Consentimiento - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-edit"></i> Editar Consentimiento{% endblock %}
+{% block page_subtitle %}Modifica el consentimiento informado{% endblock %}
+
+{% block content %}
+<div class="section">
+    <form method="post" id="formEditarConsentimiento">
+        {% csrf_token %}
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+            <!-- Tipo de Procedimiento -->
+            <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Tipo de Procedimiento <span style="color: #ef4444;">*</span>
+                </label>
+                <select name="tipo_procedimiento" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+                    {% for tipo_val, tipo_nombre in tipos_procedimiento %}
+                    <option value="{{ tipo_val }}" {% if consentimiento.tipo_procedimiento == tipo_val %}selected{% endif %}>
+                        {{ tipo_nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Fecha de Vencimiento -->
+            <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Fecha de Vencimiento (Opcional)
+                </label>
+                <input type="date" name="fecha_vencimiento" 
+                       value="{% if consentimiento.fecha_vencimiento %}{{ consentimiento.fecha_vencimiento|date:'Y-m-d' }}{% endif %}"
+                       style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+            </div>
+        </div>
+        
+        <!-- Título -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                Título del Consentimiento <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="text" name="titulo" required value="{{ consentimiento.titulo }}"
+                   style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+        </div>
+        
+        <!-- Contenido -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                Contenido del Consentimiento <span style="color: #ef4444;">*</span>
+            </label>
+            <textarea name="contenido" required rows="8"
+                      style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;">{{ consentimiento.contenido }}</textarea>
+        </div>
+        
+        <!-- Riesgos -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                Riesgos del Procedimiento
+            </label>
+            <textarea name="riesgos" rows="4"
+                      style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;">{{ consentimiento.riesgos|default:"" }}</textarea>
+        </div>
+        
+        <!-- Beneficios -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                Beneficios Esperados
+            </label>
+            <textarea name="beneficios" rows="4"
+                      style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;">{{ consentimiento.beneficios|default:"" }}</textarea>
+        </div>
+        
+        <!-- Alternativas -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                Alternativas de Tratamiento
+            </label>
+            <textarea name="alternativas" rows="4"
+                      style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;">{{ consentimiento.alternativas|default:"" }}</textarea>
+        </div>
+        
+        <!-- Botones -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 32px;">
+            <a href="{% if consentimiento.plan_tratamiento %}{% url 'detalle_plan_tratamiento' consentimiento.plan_tratamiento.id %}{% else %}{% url 'detalle_consentimiento' consentimiento.id %}{% endif %}" class="btn" style="background: #6b7280; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">
+                Cancelar
+            </a>
+            <button type="submit" class="btn" style="background: var(--primary-color); color: white; padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+

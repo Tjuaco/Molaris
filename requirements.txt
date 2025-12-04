@@ -1,7 +1,273 @@
+# Django y framework REST
 Django==5.2.5
 djangorestframework==3.14.0
-psycopg2-binary==2.9.9
-reportlab==4.0.7
-requests==2.31.0
-Pillow==10.1.0
+django-cors-headers==4.3.1
 
+# Base de datos
+psycopg2-binary==2.9.11
+mysqlclient==2.2.7
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1
+
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1
+
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1
+
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1
+
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1
+
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1
+
+
+# Utilidades
+python-decouple==3.8
+pytz==2025.2
+tzdata==2025.2
+
+# Generación de PDFs y documentos
+reportlab==4.4.4
+Pillow==11.3.0
+openpyxl==3.1.5
+
+# HTTP y APIs
+requests==2.32.5
+aiohttp==3.12.15
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+
+# Autenticación
+PyJWT==2.10.1
+
+# Comunicaciones
+twilio==9.2.3
+
+# Utilidades adicionales
+attrs==25.3.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+et_xmlfile==2.0.0
+frozenlist==1.7.0
+idna==3.10
+multidict==6.6.4
+propcache==0.3.2
+sqlparse==0.5.3
+urllib3==2.5.0
+yarl==1.20.1
+asgiref==3.9.1

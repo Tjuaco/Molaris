@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro - Clínica Dental</title>
+    <title>Registro - Clínica San Felipe</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -14,7 +14,7 @@
 
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
             min-height: 100vh;
             color: #333;
             position: relative;
@@ -29,8 +29,8 @@
 
         .back-btn {
             background: rgba(255, 255, 255, 0.9);
-            color: #3b82f6;
-            border: 2px solid #3b82f6;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
             padding: 12px 20px;
             border-radius: 25px;
             text-decoration: none;
@@ -43,10 +43,10 @@
         }
 
         .back-btn:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(20, 184, 166, 0.4);
         }
 
         .register-container { 
@@ -69,7 +69,7 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #3b82f6, #2563eb);
+            background: linear-gradient(90deg, #14b8a6, #0d9488);
         }
 
         .register-header { 
@@ -81,7 +81,7 @@
             color: #333; 
             margin: 0 0 15px 0; 
             font-size: 2.2rem;
-            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -104,7 +104,7 @@
         }
 
         .feature-highlight i {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 1.5rem;
             margin-bottom: 10px;
         }
@@ -148,9 +148,23 @@
         .form-group input:focus,
         .form-group textarea:focus { 
             outline: none; 
-            border-color: #3b82f6; 
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #14b8a6; 
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
             transform: translateY(-2px);
+        }
+        
+        /* Estilos para radio buttons de método de verificación */
+        .form-group input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+            cursor: pointer;
+            accent-color: #14b8a6;
+        }
+        
+        .form-group input[type="radio"]:checked + span {
+            color: #0f766e;
+            font-weight: 600;
         }
 
         .form-group input[type="text"][name="telefono"] {
@@ -160,7 +174,7 @@
 
         .btn-register { 
             width: 100%; 
-            background: linear-gradient(45deg, #3b82f6, #2563eb); 
+            background: linear-gradient(45deg, #14b8a6, #0d9488); 
             color: white; 
             border: none; 
             padding: 16px; 
@@ -176,7 +190,7 @@
 
         .btn-register:hover { 
             transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);
         }
 
         .btn-register:active {
@@ -191,18 +205,18 @@
         }
 
         .login-link a { 
-            color: #3b82f6; 
+            color: #14b8a6; 
             text-decoration: none; 
             font-weight: 600;
             padding: 10px 20px;
-            border: 2px solid #3b82f6;
+            border: 2px solid #14b8a6;
             border-radius: 25px;
             transition: all 0.3s ease;
             display: inline-block;
         }
 
         .login-link a:hover { 
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
@@ -229,9 +243,9 @@
         }
 
         .message.success { 
-            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             color: white;
-            border-left: 4px solid #1e40af;
+            border-left: 4px solid #0f766e;
         }
 
         .message.error { 
@@ -331,7 +345,7 @@
 
     <div class="register-container">
         <div class="register-header">
-            <h1><i class="fas fa-tooth"></i> Clínica Dental</h1>
+            <h1><i class="fas fa-tooth"></i> Clínica San Felipe</h1>
             <p>Crea tu cuenta para acceder al sistema de reservas</p>
         </div>
 
@@ -368,10 +382,18 @@
             {% endif %}
 
             <div class="form-group">
-                <label for="{{ form.username.id_for_label }}">
+                <label for="id_username">
                     <i class="fas fa-user"></i> Usuario: <span class="required">*</span>
                 </label>
-                {{ form.username }}
+                <input type="text" 
+                       name="username" 
+                       id="id_username" 
+                       maxlength="150"
+                       onblur="validarUsername(this.value);"
+                       oninput="clearError('username-error');"
+                       style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; box-sizing: border-box; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.9); font-family: inherit;"
+                       required>
+                <div id="username-error" class="errorlist" style="display: none;"></div>
                 {% if form.username.errors %}
                     <ul class="errorlist">
                         {% for error in form.username.errors %}
@@ -382,10 +404,18 @@
             </div>
 
             <div class="form-group">
-                <label for="{{ form.email.id_for_label }}">
+                <label for="id_email">
                     <i class="fas fa-envelope"></i> Email: <span class="required">*</span>
                 </label>
-                {{ form.email }}
+                <input type="email" 
+                       name="email" 
+                       id="id_email" 
+                       maxlength="254"
+                       onblur="validarEmail(this.value);"
+                       oninput="clearError('email-error');"
+                       style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; box-sizing: border-box; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.9); font-family: inherit;"
+                       required>
+                <div id="email-error" class="errorlist" style="display: none;"></div>
                 {% if form.email.errors %}
                     <ul class="errorlist">
                         {% for error in form.email.errors %}
@@ -429,6 +459,35 @@
                 {% endif %}
             </div>
 
+            <!-- Método de Verificación -->
+            <div class="form-group" style="background: #f0fdfa; padding: 20px; border-radius: 12px; border: 2px solid #14b8a6; margin: 20px 0;">
+                <label style="display: block; margin-bottom: 15px; font-weight: 600; color: #0f766e;">
+                    <i class="fas fa-shield-alt"></i> Método de Verificación: <span class="required">*</span>
+                </label>
+                {% if form.metodo_verificacion.help_text %}
+                    <div class="help-text" style="margin-bottom: 15px; color: #64748b; font-size: 0.9rem;">
+                        {{ form.metodo_verificacion.help_text }}
+                    </div>
+                {% endif %}
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    {% for choice in form.metodo_verificacion %}
+                        <label style="display: flex; align-items: center; padding: 15px; background: white; border: 2px solid #e0e0e0; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; {% if choice.data.selected %}border-color: #14b8a6; background: #f0fdfa;{% endif %}" 
+                               onmouseover="this.style.borderColor='#14b8a6'; this.style.background='#f0fdfa';" 
+                               onmouseout="{% if not choice.data.selected %}this.style.borderColor='#e0e0e0'; this.style.background='white';{% endif %}">
+                            {{ choice.tag }}
+                            <span style="margin-left: 12px; font-size: 16px; color: #333;">{{ choice.choice_label }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                {% if form.metodo_verificacion.errors %}
+                    <ul class="errorlist" style="margin-top: 10px;">
+                        {% for error in form.metodo_verificacion.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
             <div class="form-group">
                 <label for="{{ form.nombre_completo.id_for_label }}">
                     <i class="fas fa-user-circle"></i> Nombre Completo: <span class="required">*</span>
@@ -444,15 +503,25 @@
             </div>
 
             <div class="form-group">
-                <label for="{{ form.telefono.id_for_label }}">
+                <label for="id_telefono">
                     <i class="fas fa-phone"></i> Teléfono: <span class="required">*</span>
                 </label>
                 <div style="position: relative;">
                     <div style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #666; font-weight: 600; pointer-events: none; z-index: 10;">
                         +56 9
                     </div>
-                    {{ form.telefono }}
+                    <input type="text" 
+                           name="telefono" 
+                           id="id_telefono" 
+                           maxlength="8" 
+                           pattern="[0-9]{8}" 
+                           placeholder="12345678"
+                           oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 8); validarTelefono(this.value);"
+                           onblur="validarTelefono(this.value);"
+                           style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; box-sizing: border-box; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.9); font-family: inherit; padding-left: 60px;"
+                           required>
                 </div>
+                <div id="telefono-error" class="errorlist" style="display: none;"></div>
                 {% if form.telefono.errors %}
                     <ul class="errorlist">
                         {% for error in form.telefono.errors %}
@@ -461,18 +530,26 @@
                     </ul>
                 {% endif %}
                 <div class="help-text">
-                    <strong>Formato:</strong> Solo ingresa los 8 dígitos después del 9<br>
-                    <strong>Ejemplo:</strong> Si tu número es +56 9 1234 5678, ingresa solo: <strong>12345678</strong><br>
-                    <span style="color: #3b82f6; font-weight: 600;">✓ El prefijo +56 9 ya está incluido automáticamente</span><br>
-                    <span style="color: #dc3545; font-weight: 600;">⚠️ Se enviará un código de verificación a este número</span>
+                    <span style="color: #666; font-size: 12px; display: block; margin-top: 5px;">
+                        <i class="fas fa-info-circle"></i> Solo ingresa los 8 dígitos del número celular chileno (sin espacios, guiones ni otros caracteres)
+                    </span>
                 </div>
             </div>
 
             <div class="form-group">
-                <label for="{{ form.rut.id_for_label }}">
+                <label for="id_rut">
                     <i class="fas fa-fingerprint"></i> RUT: <span class="required">*</span>
                 </label>
-                {{ form.rut }}
+                <input type="text" 
+                       name="rut" 
+                       id="id_rut" 
+                       maxlength="12"
+                       placeholder="12345678-9"
+                       onblur="validarRUT(this.value);"
+                       oninput="clearError('rut-error'); formatearRUT(this);"
+                       style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; box-sizing: border-box; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.9); font-family: inherit;"
+                       required>
+                <div id="rut-error" class="errorlist" style="display: none;"></div>
                 {% if form.rut.errors %}
                     <ul class="errorlist">
                         {% for error in form.rut.errors %}
@@ -538,5 +615,177 @@
             Tu información está protegida con encriptación SSL
         </div>
     </div>
+
+    <script>
+        // Función para limpiar errores
+        function clearError(errorId) {
+            const errorDiv = document.getElementById(errorId);
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+                errorDiv.innerHTML = '';
+            }
+        }
+
+        // Función para mostrar error
+        function showError(errorId, message) {
+            const errorDiv = document.getElementById(errorId);
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = '<li style="color: #dc3545; font-size: 14px; margin: 5px 0; list-style: none; padding: 0;"><i class="fas fa-exclamation-circle"></i> ' + message + '</li>';
+            }
+        }
+
+        // Validar username
+        function validarUsername(username) {
+            if (!username || username.trim() === '') {
+                clearError('username-error');
+                return;
+            }
+
+            fetch('{% url "validar_username" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({username: username})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.disponible) {
+                    showError('username-error', 'Este nombre de usuario ya está en uso. Por favor, elige otro.');
+                } else {
+                    clearError('username-error');
+                }
+            })
+            .catch(error => {
+                console.error('Error al validar username:', error);
+            });
+        }
+
+        // Validar email
+        function validarEmail(email) {
+            if (!email || email.trim() === '') {
+                clearError('email-error');
+                return;
+            }
+
+            // Validar formato básico de email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showError('email-error', 'Por favor ingresa un email válido.');
+                return;
+            }
+
+            fetch('{% url "validar_email" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({email: email})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.disponible) {
+                    showError('email-error', 'Este email ya está registrado en el sistema. Si ya tienes cuenta, inicia sesión.');
+                } else {
+                    clearError('email-error');
+                }
+            })
+            .catch(error => {
+                console.error('Error al validar email:', error);
+            });
+        }
+
+        // Validar RUT
+        function validarRUT(rut) {
+            if (!rut || rut.trim() === '') {
+                clearError('rut-error');
+                return;
+            }
+
+            // Validar formato básico de RUT
+            const rutRegex = /^\d{7,8}-[\dkK]$/;
+            if (!rutRegex.test(rut)) {
+                showError('rut-error', 'El RUT debe tener el formato: 12345678-9 (con guión y dígito verificador)');
+                return;
+            }
+
+            fetch('{% url "validar_rut" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({rut: rut})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.disponible) {
+                    showError('rut-error', 'Este RUT ya está registrado en el sistema. Si ya tienes cuenta, inicia sesión.');
+                } else {
+                    clearError('rut-error');
+                }
+            })
+            .catch(error => {
+                console.error('Error al validar RUT:', error);
+            });
+        }
+
+        // Validar teléfono
+        function validarTelefono(telefono) {
+            const errorDiv = document.getElementById('telefono-error');
+            
+            if (!telefono || telefono.trim() === '') {
+                clearError('telefono-error');
+                return;
+            }
+
+            // Validar que sean exactamente 8 dígitos
+            if (telefono.length !== 8) {
+                showError('telefono-error', 'El teléfono debe tener exactamente 8 dígitos.');
+                return;
+            }
+
+            if (!/^\d{8}$/.test(telefono)) {
+                showError('telefono-error', 'El teléfono solo debe contener números (8 dígitos).');
+                return;
+            }
+
+            fetch('{% url "validar_telefono" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({telefono: telefono})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.disponible) {
+                    showError('telefono-error', 'Este número de teléfono ya está registrado en el sistema.');
+                } else {
+                    clearError('telefono-error');
+                }
+            })
+            .catch(error => {
+                console.error('Error al validar teléfono:', error);
+            });
+        }
+
+        // Formatear RUT automáticamente
+        function formatearRUT(input) {
+            let value = input.value.replace(/[^0-9kK]/g, '');
+            
+            if (value.length > 0) {
+                // Si tiene más de 1 dígito, agregar guión antes del último carácter
+                if (value.length > 1) {
+                    value = value.slice(0, -1) + '-' + value.slice(-1);
+                }
+                input.value = value;
+            }
+        }
+    </script>
 </body>
 </html>

@@ -1,0 +1,250 @@
+{% load custom_filters %}
+<!-- Header con Estadísticas -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-boxes"></i> Insumos</h1>
+        <p class="page-subtitle">Administra el inventario de insumos y materiales</p>
+    </div>
+    <div class="dashboard-compact" style="flex-shrink: 0;">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_insumos.total_insumos }}</div>
+                    <div class="stat-label">Total Insumos</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_insumos.insumos_stock_bajo }}</div>
+                    <div class="stat-label">Stock Bajo</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_insumos.insumos_proximo_vencimiento }}</div>
+                    <div class="stat-label">Por Vencer</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_insumos.insumos_agotados }}</div>
+                    <div class="stat-label">Agotados</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Insumos -->
+<div class="section">
+    <div class="actions-bar">
+        <form method="GET" class="search-filters">
+            <input type="hidden" name="seccion" value="insumos">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" name="search_insumos" value="{{ search_insumos }}" placeholder="Buscar insumos...">
+            </div>
+            <select name="categoria" class="search-box" style="min-width: 180px; padding: 10px 12px;">
+                <option value="">Todas las categorías</option>
+                {% for value, label in categorias %}
+                <option value="{{ value }}" {% if categoria == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="estado_insumo" class="search-box" style="min-width: 150px; padding: 10px 12px;">
+                <option value="">Todos los estados</option>
+                {% for value, label in estados_insumo %}
+                <option value="{{ value }}" {% if estado_insumo == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+            {% if search_insumos or categoria or estado_insumo %}
+            <a href="?seccion=insumos" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+            {% endif %}
+        </form>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="abrirModalCrearInsumo()" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo Insumo
+            </button>
+            <a href="{% url 'exportar_insumos_pdf' %}" class="btn btn-success">
+                <i class="fas fa-file-pdf"></i> Exportar PDF
+            </a>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th><i class="fas fa-box"></i> Insumo</th>
+                    <th><i class="fas fa-tags"></i> Categoría</th>
+                    <th><i class="fas fa-cubes"></i> Stock</th>
+                    <th><i class="fas fa-dollar-sign"></i> Precio</th>
+                    <th><i class="fas fa-truck"></i> Proveedor</th>
+                    <th><i class="fas fa-map-marker-alt"></i> Ubicación</th>
+                    <th><i class="fas fa-info-circle"></i> Estado</th>
+                    <th><i class="fas fa-cog"></i> Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if insumos %}
+                {% for insumo in insumos %}
+                <tr class="insumo-row {% if insumo.stock_bajo or insumo.estado == 'agotado' or insumo.fecha_vencimiento and insumo.fecha_vencimiento <= today %}alert-row{% endif %}">
+                    <td>
+                        <div class="insumo-cell-content">
+                            <div class="insumo-image-wrapper">
+                                {% if insumo.imagen %}
+                                    <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}" class="insumo-image">
+                                {% else %}
+                                    <div class="insumo-icon-placeholder">
+                                        <i class="fas fa-box"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="insumo-info">
+                                <strong class="insumo-name">{{ insumo.nombre }}</strong>
+                                {% if insumo.descripcion %}
+                                <span class="insumo-description">{{ insumo.descripcion|truncatewords:8 }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="categoria-badge categoria-{{ insumo.categoria }}">
+                            <i class="fas fa-tag"></i> {{ insumo.get_categoria_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="stock-info">
+                            <strong class="stock-amount stock-{% if insumo.stock_bajo %}bajo{% elif insumo.estado == 'agotado' %}agotado{% else %}normal{% endif %}">
+                                {{ insumo.cantidad_actual }} {{ insumo.unidad_medida }}
+                            </strong>
+                            <span class="stock-minimum">Mín: {{ insumo.cantidad_minima }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if insumo.precio_unitario %}
+                        <strong class="precio-amount">{{ insumo.precio_unitario|pesos_chilenos }}</strong>
+                        {% else %}
+                        <span class="precio-empty">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if insumo.proveedor_principal %}
+                        <div class="proveedor-info">
+                            <i class="fas fa-truck"></i>
+                            <span>{{ insumo.proveedor_principal.nombre }}</span>
+                        </div>
+                        {% else %}
+                        <span class="proveedor-empty">Sin proveedor</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if insumo.ubicacion %}
+                        <div class="ubicacion-info">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>{{ insumo.ubicacion }}</span>
+                        </div>
+                        {% else %}
+                        <span class="ubicacion-empty">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if insumo.stock_bajo %}
+                        <span class="estado-badge estado-stock-bajo">
+                            <i class="fas fa-exclamation-triangle"></i> Stock Bajo
+                        </span>
+                        {% elif insumo.estado == 'agotado' %}
+                        <span class="estado-badge estado-agotado">
+                            <i class="fas fa-ban"></i> Agotado
+                        </span>
+                        {% elif insumo.proximo_vencimiento %}
+                        <span class="estado-badge estado-vencimiento">
+                            <i class="fas fa-clock"></i> Por Vencer
+                        </span>
+                        {% else %}
+                        <span class="estado-badge estado-disponible">
+                            <i class="fas fa-check-circle"></i> Disponible
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{% url 'editar_insumo' insumo.id %}" class="btn-action btn-edit" title="Editar insumo">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button onclick="confirmarEliminarInsumo({{ insumo.id }}, '{{ insumo.nombre|escapejs }}')" class="btn-action btn-delete" title="Eliminar insumo">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 60px 20px;">
+                        <div class="empty-state">
+                            <i class="fas fa-boxes"></i>
+                            <h3>No hay insumos</h3>
+                            <p>Comienza agregando tu primer insumo</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    {% if insumos.has_other_pages %}
+    <div class="pagination">
+        <div class="pagination-info">
+            Mostrando {{ insumos.start_index }} - {{ insumos.end_index }} de {{ insumos.paginator.count }} insumos
+        </div>
+        <div class="pagination-controls">
+            {% if insumos.has_previous %}
+                <a href="?seccion=insumos&page_insumos=1{% if search_insumos %}&search_insumos={{ search_insumos }}{% endif %}{% if categoria %}&categoria={{ categoria }}{% endif %}{% if estado_insumo %}&estado_insumo={{ estado_insumo }}{% endif %}" class="page-btn" title="Primera página">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?seccion=insumos&page_insumos={{ insumos.previous_page_number }}{% if search_insumos %}&search_insumos={{ search_insumos }}{% endif %}{% if categoria %}&categoria={{ categoria }}{% endif %}{% if estado_insumo %}&estado_insumo={{ estado_insumo }}{% endif %}" class="page-btn" title="Anterior">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fas fa-angle-double-left"></i></span>
+                <span class="page-btn disabled"><i class="fas fa-angle-left"></i></span>
+            {% endif %}
+            
+            <span class="page-current">
+                Página {{ insumos.number }} de {{ insumos.paginator.num_pages }}
+            </span>
+            
+            {% if insumos.has_next %}
+                <a href="?seccion=insumos&page_insumos={{ insumos.next_page_number }}{% if search_insumos %}&search_insumos={{ search_insumos }}{% endif %}{% if categoria %}&categoria={{ categoria }}{% endif %}{% if estado_insumo %}&estado_insumo={{ estado_insumo }}{% endif %}" class="page-btn" title="Siguiente">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="?seccion=insumos&page_insumos={{ insumos.paginator.num_pages }}{% if search_insumos %}&search_insumos={{ search_insumos }}{% endif %}{% if categoria %}&categoria={{ categoria }}{% endif %}{% if estado_insumo %}&estado_insumo={{ estado_insumo }}{% endif %}" class="page-btn" title="Última página">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fas fa-angle-right"></i></span>
+                <span class="page-btn disabled"><i class="fas fa-angle-double-right"></i></span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>

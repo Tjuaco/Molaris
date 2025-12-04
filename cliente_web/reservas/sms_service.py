@@ -443,6 +443,7 @@ Saludos,
 def enviar_codigo_verificacion_sms(telefono: str, codigo: str):
     """
     Envía código de verificación por SMS usando Email-to-SMS.
+    En modo desarrollo (sin configuración de email), muestra el código en consola.
     """
     # Normalizar teléfono
     telefono_normalizado = _normalizar_telefono_chile(telefono)
@@ -454,6 +455,22 @@ def enviar_codigo_verificacion_sms(telefono: str, codigo: str):
     
     if not email_sms:
         raise ValueError(f"No se pudo detectar la operadora para el teléfono {telefono}. Por favor, verifica que el número sea correcto y sea de una operadora chilena (Movistar, Entel, Claro, WOM).")
+    
+    # Verificar si hay configuración de email válida
+    email_host = getattr(settings, 'EMAIL_HOST', None)
+    email_host_user = getattr(settings, 'EMAIL_HOST_USER', None)
+    
+    # Si no hay configuración válida de email, usar modo desarrollo
+    if not email_host or not email_host_user or email_host_user == 'tu-email@gmail.com':
+        # Modo desarrollo: mostrar código en consola
+        logger.warning(f"[MODO DESARROLLO] Código de verificación para {telefono_normalizado}: {codigo}")
+        print(f"\n{'='*60}")
+        print(f"[MODO DESARROLLO] Código de verificación SMS")
+        print(f"Teléfono: {telefono_normalizado}")
+        print(f"Email SMS: {email_sms}")
+        print(f"CÓDIGO: {codigo}")
+        print(f"{'='*60}\n")
+        return True
     
     # Mensaje SMS optimizado (sin asunto, solo cuerpo)
     mensaje = f"""Clinica Dental - Codigo de Verificacion

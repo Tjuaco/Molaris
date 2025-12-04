@@ -1,0 +1,2255 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Gestor de Finanzas - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    /* Sobrescribir estilos del contenedor padre para que no haya padding */
+    .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+    
+    body > .app-container > .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+</style>
+<div class="finanzas-wrapper" style="display: flex; gap: 0; padding: 0; margin: 0; width: 100%;">
+    <!-- Menú Lateral Izquierdo (Solo Información) -->
+    <div class="finanzas-sidebar-left">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-dollar-sign"></i> Finanzas</h3>
+        </div>
+        <div class="sidebar-panel-finanzas">
+            <div class="quick-stat-finanzas">
+                <span class="quick-stat-label">Balance Total</span>
+                <span class="quick-stat-value">{{ balance_total|pesos_chilenos }}</span>
+            </div>
+            <div class="quick-stat-finanzas">
+                <span class="quick-stat-label">Ingresos Mes</span>
+                <span class="quick-stat-value ingresos">{{ ingresos_mes|pesos_chilenos }}</span>
+            </div>
+            <div class="quick-stat-finanzas">
+                <span class="quick-stat-label">Egresos Mes</span>
+                <span class="quick-stat-value egresos">{{ egresos_mes|pesos_chilenos }}</span>
+            </div>
+            <div class="quick-stat-finanzas">
+                <span class="quick-stat-label">Balance Mes</span>
+                <span class="quick-stat-value balance" style="color: {% if balance_mes >= 0 %}#10b981{% else %}#fbbf24{% endif %};"><!-- stylelint-disable-line -->
+                    {{ balance_mes|pesos_chilenos }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contenido Principal -->
+    <div class="finanzas-main-content">
+    <!-- Header -->
+        <div class="header-with-stats" style="margin-bottom: 24px;">
+        <div class="page-header">
+                <h1 class="page-title" style="color: #1e293b !important;"><i class="fas fa-dollar-sign"></i> Gestor de Finanzas</h1>
+                <p class="page-subtitle" style="color: #64748b !important;">Gestión completa de ingresos, egresos y análisis financiero</p>
+        </div>
+    </div>
+
+        <!-- Resumen Financiero Principal -->
+        <div class="resumen-financiero-principal" style="background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 16px; padding: 32px; color: white; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(20, 184, 166, 0.3);">
+            <h3 style="margin: 0 0 24px 0; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-chart-line"></i> Resumen Financiero
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
+                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Balance Total</div>
+                    <div style="font-size: 28px; font-weight: 700;">{{ balance_total|pesos_chilenos }}</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Ingresos del Mes</div>
+                    <div style="font-size: 28px; font-weight: 700;">{{ ingresos_mes|pesos_chilenos }}</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Egresos del Mes</div>
+                    <div style="font-size: 28px; font-weight: 700;">{{ egresos_mes|pesos_chilenos }}</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Balance del Mes</div>
+                    <div style="color: {% if balance_mes >= 0 %}#10b981{% else %}#fbbf24{% endif %}; font-size: 28px; font-weight: 700;"><!-- stylelint-disable-line -->
+                        {{ balance_mes|pesos_chilenos }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menú de Tabs Horizontal -->
+        <div class="finanzas-tabs-horizontal" style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; background: white; padding: 0; border-radius: 0;">
+            <button class="finanzas-tab-btn-horizontal active" data-tab="ingresos" onclick="mostrarTabFinanzas('ingresos')" style="padding: 14px 24px; background: transparent; border: none; border-bottom: 3px solid transparent; color: #64748b; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s ease; margin-bottom: -2px;">
+            <i class="fas fa-arrow-up"></i>
+            <span>Ingresos</span>
+        </button>
+            <button class="finanzas-tab-btn-horizontal" data-tab="egresos" onclick="mostrarTabFinanzas('egresos')" style="padding: 14px 24px; background: transparent; border: none; border-bottom: 3px solid transparent; color: #64748b; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s ease; margin-bottom: -2px;">
+            <i class="fas fa-arrow-down"></i>
+            <span>Egresos</span>
+        </button>
+    </div>
+
+    <!-- Sección: Ingresos -->
+    <div id="section-ingresos" class="finanzas-tab-content active">
+        <!-- Estadísticas Simplificadas -->
+        <div class="finanzas-stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+            <div class="finanzas-stat-card">
+                <div class="finanzas-stat-icon" style="background: var(--primary-color);">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="finanzas-stat-content">
+                    <div class="finanzas-stat-label">Ingresos Totales</div>
+                    <div class="finanzas-stat-value">{{ total_ingresos|pesos_chilenos }}</div>
+                </div>
+            </div>
+            
+            <div class="finanzas-stat-card">
+                <div class="finanzas-stat-icon" style="background: var(--primary-color);">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="finanzas-stat-content">
+                    <div class="finanzas-stat-label">Ingresos del Mes</div>
+                    <div class="finanzas-stat-value">{{ ingresos_mes|pesos_chilenos }}</div>
+                </div>
+            </div>
+            
+            <div class="finanzas-stat-card">
+                <div class="finanzas-stat-icon" style="background: var(--primary-color);">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="finanzas-stat-content">
+                    <div class="finanzas-stat-label">Ingresos del Año</div>
+                    <div class="finanzas-stat-value">{{ ingresos_año|pesos_chilenos }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Filtros Simplificado -->
+        <div class="filtros-panel-finanzas" style="background: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 2px solid #e2e8f0;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Fecha Desde</label>
+                    <input type="date" id="fecha-desde-ingresos" class="form-control-finanzas" style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+            </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Fecha Hasta</label>
+                    <input type="date" id="fecha-hasta-ingresos" class="form-control-finanzas" style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+                    </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Tipo</label>
+                    <select id="tipo-ingreso-filtro" class="form-control-finanzas" style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+                        <option value="">Todos</option>
+                        <option value="cita">Citas</option>
+                        <option value="manual">Manuales</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Buscar</label>
+                    <input type="text" id="buscar-ingresos" class="form-control-finanzas" placeholder="Buscar..." style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Registros de Ingresos -->
+        <div class="finanzas-card">
+            <div class="finanzas-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3><i class="fas fa-list" style="color: var(--primary-color);"></i> Registros de Ingresos</h3>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="exportarIngresosExcel()" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-file-excel"></i> Exportar
+                    </button>
+                <button onclick="mostrarModal('modalIngresoManual')" class="btn-agregar-finanzas" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-plus"></i> Agregar
+                </button>
+                </div>
+            </div>
+            <div class="finanzas-card-body">
+                {% if todos_ingresos %}
+                <div style="overflow-x: auto;">
+                    <table class="table-finanzas-simple" id="tabla-ingresos-filtrada">
+                    <thead>
+                        <tr>
+                                <th onclick="ordenarTabla('tabla-ingresos-filtrada', 0)" style="cursor: pointer;">
+                                    Fecha <i class="fas fa-sort"></i>
+                                </th>
+                                <th onclick="ordenarTabla('tabla-ingresos-filtrada', 1)" style="cursor: pointer;">
+                                    Descripción <i class="fas fa-sort"></i>
+                                </th>
+                                <th>Tipo</th>
+                                <th>Cliente/Dentista</th>
+                                <th onclick="ordenarTabla('tabla-ingresos-filtrada', 4)" style="cursor: pointer;">
+                                    Monto <i class="fas fa-sort"></i>
+                                </th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in todos_ingresos %}
+                            <tr data-tipo="{% if item.tipo == 'cita' %}cita{% else %}manual{% endif %}" 
+                                data-descripcion="{% if item.tipo == 'cita' %}{{ item.cita.tipo_servicio.nombre|default:item.cita.tipo_consulta|default:'Cita' }}{% else %}{{ item.ingreso_manual.descripcion }}{% endif %}"
+                                data-fecha="{% if item.tipo == 'cita' %}{{ item.cita.fecha_hora|date:'Y-m-d' }}{% else %}{{ item.ingreso_manual.fecha|date:'Y-m-d' }}{% endif %}"
+                                data-monto="{{ item.monto }}">
+                            <td>
+                                {% if item.tipo == 'cita' %}
+                                    {{ item.cita.fecha_hora|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    {{ item.ingreso_manual.fecha|date:"d/m/Y" }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tipo == 'cita' %}
+                                    {% if item.cita.tipo_servicio %}
+                                        {{ item.cita.tipo_servicio.nombre }}
+                                    {% else %}
+                                        {{ item.cita.tipo_consulta|default:"Cita" }}
+                                    {% endif %}
+                                    <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                        <i class="fas fa-calendar-check"></i> Cita Completada
+                                    </small>
+                                {% else %}
+                                    {{ item.ingreso_manual.descripcion }}
+                                    <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                        <i class="fas fa-hand-holding-usd"></i> Ingreso Manual
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tipo == 'cita' %}
+                                    <span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                        CITA
+                                    </span>
+                                {% else %}
+                                    <span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                        MANUAL
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tipo == 'cita' %}
+                                    {% if item.cita.cliente %}
+                                        {{ item.cita.cliente.nombre_completo|default:"Sin cliente" }}
+                                    {% endif %}
+                                    {% if item.cita.dentista %}
+                                        <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                            Dr/a. {{ item.cita.dentista.nombre_completo }}
+                                        </small>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: #94a3b8;">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right precio-cell">{{ item.monto|pesos_chilenos }}</td>
+                            <td class="text-center">
+                                {% if item.tipo == 'ingreso_manual' %}
+                                    <a href="{% url 'eliminar_ingreso_manual' item.ingreso_manual.id %}" onclick="return confirm('¿Estás seguro de eliminar este ingreso manual?');" class="btn-eliminar-finanzas" style="color: #ef4444; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;" title="Eliminar ingreso manual">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                {% elif item.tipo == 'cita' %}
+                                    <a href="{% url 'eliminar_ingreso_cita' item.cita.id %}" onclick="return confirm('¿Estás seguro de eliminar este ingreso de la cita del historial financiero? La cita se mantendrá pero no aparecerá en los cálculos.');" class="btn-eliminar-finanzas" style="color: #ef4444; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;" title="Eliminar ingreso de cita">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                {% else %}
+                                    <span style="color: #64748b; font-size: 12px;">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state-finanzas">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No hay ingresos registrados aún.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Sección: Egresos -->
+    <div id="section-egresos" class="finanzas-tab-content">
+        <!-- Estadísticas Simplificadas -->
+        <div class="finanzas-stats-grid" style="display: grid !important; grid-template-columns: repeat(3, 1fr) !important; margin-bottom: 24px !important; visibility: visible !important; opacity: 1 !important; position: relative !important;">
+            <div class="finanzas-stat-card">
+                <div class="finanzas-stat-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="finanzas-stat-content">
+                    <div class="finanzas-stat-label">Egresos Totales</div>
+                    <div class="finanzas-stat-value" style="color: #ef4444;">{{ total_egresos|pesos_chilenos }}</div>
+                </div>
+            </div>
+            
+            <div class="finanzas-stat-card">
+                <div class="finanzas-stat-icon" style="background: linear-gradient(135deg, #f97316, #ea580c);">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="finanzas-stat-content">
+                    <div class="finanzas-stat-label">Egresos del Mes</div>
+                    <div class="finanzas-stat-value" style="color: #f97316;">{{ egresos_mes|pesos_chilenos }}</div>
+                </div>
+            </div>
+            
+            <div class="finanzas-stat-card">
+                <div class="finanzas-stat-icon" style="background: linear-gradient(135deg, #dc2626, #991b1b);">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="finanzas-stat-content">
+                    <div class="finanzas-stat-label">Egresos del Año</div>
+                    <div class="finanzas-stat-value" style="color: #dc2626;">{{ egresos_año|pesos_chilenos }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Filtros Simplificado -->
+        <div class="filtros-panel-finanzas" style="background: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 2px solid #e2e8f0;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Fecha Desde</label>
+                    <input type="date" id="fecha-desde-egresos" class="form-control-finanzas" style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+            </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Fecha Hasta</label>
+                    <input type="date" id="fecha-hasta-egresos" class="form-control-finanzas" style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+                    </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Tipo</label>
+                    <select id="tipo-egreso-filtro" class="form-control-finanzas" style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+                        <option value="">Todos</option>
+                        <option value="compra">Compras</option>
+                        <option value="solicitud">Solicitudes</option>
+                        <option value="egreso_manual">Manuales</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">Buscar</label>
+                    <input type="text" id="buscar-egresos" class="form-control-finanzas" placeholder="Buscar..." style="width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Registros de Egresos -->
+        <div class="finanzas-card">
+            <div class="finanzas-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3><i class="fas fa-list" style="color: #ef4444;"></i> Registros de Egresos</h3>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="exportarEgresosExcel()" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-file-excel"></i> Exportar
+                    </button>
+                <button onclick="mostrarModal('modalEgresoManual')" class="btn-agregar-finanzas" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);">
+                    <i class="fas fa-plus"></i> Agregar
+                </button>
+                </div>
+            </div>
+            <div class="finanzas-card-body">
+                {% if movimientos_recientes %}
+                <div style="overflow-x: auto;">
+                    <table class="table-finanzas-simple" id="tabla-egresos-filtrada">
+                    <thead>
+                        <tr>
+                            <th onclick="ordenarTabla('tabla-egresos-filtrada', 0)" style="cursor: pointer;">
+                                Fecha <i class="fas fa-sort"></i>
+                            </th>
+                            <th onclick="ordenarTabla('tabla-egresos-filtrada', 1)" style="cursor: pointer;">
+                                Descripción <i class="fas fa-sort"></i>
+                            </th>
+                            <th>Tipo</th>
+                            <th>Proveedor/Responsable</th>
+                            <th onclick="ordenarTabla('tabla-egresos-filtrada', 4)" style="cursor: pointer;">
+                                Monto <i class="fas fa-sort"></i>
+                            </th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in movimientos_recientes %}
+                            <tr data-tipo="{{ item.tipo }}"
+                                data-descripcion="{% if item.tipo == 'compra' %}{{ item.movimiento.insumo.nombre|default:'Sin nombre' }}{% elif item.tipo == 'solicitud' %}{{ item.solicitud.insumo.nombre|default:'Sin nombre' }}{% else %}{{ item.egreso_manual.descripcion }}{% endif %}"
+                                data-fecha="{% if item.tipo == 'compra' %}{{ item.movimiento.fecha_movimiento|date:'Y-m-d' }}{% elif item.tipo == 'solicitud' %}{{ item.solicitud.fecha_solicitud|date:'Y-m-d' }}{% else %}{{ item.egreso_manual.fecha|date:'Y-m-d' }}{% endif %}"
+                                data-monto="{{ item.total }}">
+                            <td>
+                                {% if item.tipo == 'compra' %}
+                                    {{ item.movimiento.fecha_movimiento|date:"d/m/Y H:i" }}
+                                {% elif item.tipo == 'solicitud' %}
+                                    {{ item.solicitud.fecha_solicitud|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    {{ item.egreso_manual.fecha|date:"d/m/Y" }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tipo == 'compra' %}
+                                    {{ item.movimiento.insumo.nombre|default:"Sin nombre" }}
+                                    <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                        <i class="fas fa-box"></i> Compra de Inventario
+                                    </small>
+                                {% elif item.tipo == 'solicitud' %}
+                                    {{ item.solicitud.insumo.nombre|default:"Sin nombre" }}
+                                    <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                        <i class="fas fa-paper-plane"></i> Solicitud a Proveedor
+                                    </small>
+                                {% else %}
+                                    {{ item.egreso_manual.descripcion }}
+                                    <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                        <i class="fas fa-hand-holding-usd"></i> Egreso Manual
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tipo == 'compra' %}
+                                    <span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                        COMPRA
+                                    </span>
+                                {% elif item.tipo == 'solicitud' %}
+                                    <span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                        SOLICITUD
+                                    </span>
+                                {% else %}
+                                    <span style="background: #f3f4f6; color: #374151; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                        MANUAL
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tipo == 'compra' %}
+                                    {% if item.movimiento.realizado_por %}
+                                        {{ item.movimiento.realizado_por.nombre_completo|default:"Sistema" }}
+                                {% else %}
+                                        <span style="color: #94a3b8;">Sistema</span>
+                                    {% endif %}
+                                    {% if item.movimiento.insumo and item.movimiento.cantidad %}
+                                        <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                            {{ item.movimiento.cantidad }} {{ item.movimiento.insumo.unidad_medida|default:"" }}
+                                        </small>
+                                    {% endif %}
+                                {% elif item.tipo == 'solicitud' %}
+                                    {% if item.solicitud.proveedor %}
+                                        {{ item.solicitud.proveedor.nombre|default:"Sin proveedor" }}
+                                    {% else %}
+                                        <span style="color: #94a3b8;">Sin proveedor</span>
+                                    {% endif %}
+                                    {% if item.solicitud.solicitado_por %}
+                                        <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                                            Solicitado por: {{ item.solicitud.solicitado_por.nombre_completo }}
+                                        </small>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: #94a3b8;">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right precio-cell" style="color: #ef4444;">{{ item.total|pesos_chilenos }}</td>
+                            <td class="text-center">
+                                {% if item.tipo == 'egreso_manual' %}
+                                    <button onclick="confirmarEliminarEgreso('manual', {{ item.egreso_manual.id }}, '{{ item.egreso_manual.descripcion|escapejs }}', {{ item.total }})" class="btn-eliminar-finanzas" style="color: #ef4444; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; background: none; border: none;" title="Eliminar egreso manual">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                {% elif item.tipo == 'compra' %}
+                                    <button onclick="confirmarEliminarEgreso('compra', {{ item.movimiento.id }}, '{{ item.movimiento.insumo.nombre|escapejs }}', {{ item.total }})" class="btn-eliminar-finanzas" style="color: #ef4444; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; background: none; border: none;" title="Eliminar compra">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                {% elif item.tipo == 'solicitud' %}
+                                    <button onclick="confirmarEliminarEgreso('solicitud', {{ item.solicitud.id }}, '{{ item.solicitud.insumo.nombre|escapejs }}', {{ item.total }})" class="btn-eliminar-finanzas" style="color: #ef4444; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; background: none; border: none;" title="Eliminar egreso de solicitud">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                {% else %}
+                                    <span style="color: #64748b; font-size: 12px;">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #fef2f2; font-weight: 700; border-top: 2px solid #ef4444;">
+                            <td colspan="4" style="text-align: right; padding: 16px; color: #991b1b;">Total:</td>
+                            <td class="text-right precio-cell" style="font-size: 16px; color: #ef4444; font-weight: 700;" id="total-egresos-tabla">{{ total_egresos|pesos_chilenos }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                </div>
+                {% else %}
+                <div class="empty-state-finanzas">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No hay egresos registrados aún.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ============================================================================
+   ESTILOS PARA GESTOR DE FINANZAS
+   ============================================================================ */
+
+.personal-container {
+    padding: 0;
+}
+
+/* Tabs de Navegación */
+.finanzas-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.finanzas-tab-btn {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #64748b;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    margin-bottom: -2px;
+}
+
+.finanzas-tab-btn:hover {
+    color: var(--primary-color);
+    background: var(--primary-bg);
+}
+
+.finanzas-tab-btn.active {
+    color: #14b8a6;
+    border-bottom-color: #14b8a6;
+    background: #f0fdfa;
+}
+
+.finanzas-tab-btn i {
+    font-size: 16px;
+}
+
+/* Contenido de Tabs */
+.finanzas-tab-content {
+    display: none !important;
+    width: 100%;
+    opacity: 0;
+    visibility: hidden;
+    position: relative;
+}
+
+.finanzas-tab-content.active {
+    display: block !important;
+    width: 100%;
+    opacity: 1 !important;
+    visibility: visible !important;
+    position: relative !important;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Estilos para tabs horizontales */
+.finanzas-tabs-horizontal {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #e2e8f0;
+    background: white;
+    padding: 0;
+}
+
+.finanzas-tab-btn-horizontal {
+    padding: 14px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #64748b;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    margin-bottom: -2px;
+}
+
+.finanzas-tab-btn-horizontal:hover {
+    color: #14b8a6;
+    background: #f0fdfa;
+}
+
+.finanzas-tab-btn-horizontal.active {
+    color: #14b8a6;
+    border-bottom-color: #14b8a6;
+    background: #f0fdfa;
+}
+
+.finanzas-tab-btn-horizontal i {
+    font-size: 16px;
+}
+
+/* Secciones de Finanzas */
+.finanzas-section {
+    display: none !important;
+    width: 100% !important;
+    opacity: 0;
+    visibility: hidden;
+    animation: fadeIn 0.3s ease;
+}
+
+.finanzas-section.active {
+    display: block !important;
+    width: 100% !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    animation: fadeIn 0.3s ease;
+    position: relative !important;
+}
+
+/* Forzar visibilidad de elementos dentro de la sección activa */
+.finanzas-section.active .finanzas-stats-grid {
+    display: grid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.finanzas-section.active .filtros-panel-finanzas {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.finanzas-section.active .finanzas-card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.finanzas-section.active table {
+    display: table !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.finanzas-section.active .empty-state-finanzas {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Menú Lateral de Finanzas */
+.nav-menu-item-finanzas {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    color: #475569;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+}
+
+.nav-menu-item-finanzas:hover {
+    background: #f0fdfa;
+    color: #0d9488;
+    transform: translateX(4px);
+}
+
+.nav-menu-item-finanzas.active {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+}
+
+.nav-menu-item-finanzas.active i,
+.nav-menu-item-finanzas.active span {
+    color: #ffffff !important;
+}
+
+.nav-menu-item-finanzas i {
+    width: 20px;
+    text-align: center;
+    color: #14b8a6;
+}
+
+.nav-menu-item-finanzas.active i {
+    color: #ffffff !important;
+}
+
+.nav-menu-item-finanzas span {
+    color: inherit;
+}
+
+/* Estadísticas */
+.finanzas-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.finanzas-stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.finanzas-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    border-color: var(--primary-light);
+}
+
+.finanzas-stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.finanzas-stat-content {
+    flex: 1;
+}
+
+.finanzas-stat-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.finanzas-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.finanzas-stat-card:hover .finanzas-stat-value {
+    color: #14b8a6;
+}
+
+/* Tarjetas */
+.finanzas-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 2px solid #e2e8f0;
+    margin-bottom: 24px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.finanzas-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    border-color: var(--primary-light);
+}
+
+.finanzas-card-header {
+    padding: 20px 24px;
+    background: var(--primary-bg);
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.finanzas-card-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.finanzas-card-body {
+    padding: 24px;
+}
+
+/* Tabla Simple */
+.table-finanzas-simple {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-finanzas-simple thead {
+    background: var(--primary-bg);
+}
+
+.table-finanzas-simple thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--primary-light);
+}
+
+.table-finanzas-simple tbody tr {
+    border-bottom: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.table-finanzas-simple tbody tr:hover {
+    background: var(--primary-bg);
+}
+
+.table-finanzas-simple tbody td {
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #1e293b;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.precio-cell {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: 15px;
+}
+
+/* Estado Vacío */
+.empty-state-finanzas {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+}
+
+.empty-state-finanzas i {
+    font-size: 48px;
+    color: #cbd5e1;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.empty-state-finanzas p {
+    margin: 0;
+    font-size: 15px;
+    color: #64748b;
+}
+
+/* Estilos para secciones compactas */
+.finanzas-card-compact {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 2px solid #e2e8f0;
+    margin-bottom: 24px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.finanzas-card-compact:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    border-color: var(--primary-light);
+}
+
+.finanzas-card-header-compact {
+    padding: 12px 16px;
+    background: var(--primary-bg);
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.finanzas-card-header-compact h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.finanzas-card-body-compact {
+    padding: 16px;
+}
+
+.mes-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.mes-item-compact {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.mes-item-compact:hover {
+    background: var(--primary-bg);
+    border-color: var(--primary-light);
+    transform: translateY(-2px);
+}
+
+.mes-nombre-compact {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+
+.mes-valor-compact {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 4px;
+}
+
+.mes-citas-compact {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.empty-state-compact {
+    text-align: center;
+    padding: 20px;
+    color: #64748b;
+}
+
+.empty-state-compact i {
+    font-size: 32px;
+    color: #cbd5e1;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.empty-state-compact p {
+    margin: 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+/* Asegurar que el wrapper de finanzas tenga el layout correcto */
+.finanzas-wrapper {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.finanzas-main-content {
+    flex: 1;
+    min-width: 0;
+    margin-left: 260px !important;
+    padding: 12px 24px;
+    padding-top: 12px;
+    background: #ffffff;
+    overflow-x: hidden;
+    overflow-y: visible;
+    min-height: 100vh;
+    position: relative;
+    width: calc(100% - 260px) !important;
+    max-width: calc(100vw - 260px) !important;
+    box-sizing: border-box;
+}
+
+/* Asegurar que los tabs de contenido dentro del main-content sean visibles */
+.finanzas-main-content .finanzas-tab-content.active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+.finanzas-section {
+    width: 100%;
+    max-width: 100%;
+    min-height: auto;
+}
+
+.finanzas-section.active {
+    min-height: auto;
+    height: auto;
+}
+
+.finanzas-sidebar-left {
+    width: 260px;
+    flex-shrink: 0;
+    padding: 20px 0;
+    margin: 0;
+    background: white;
+    border-right: 2px solid #e5e7eb;
+    height: 100%;
+    min-height: calc(100vh - 99px);
+    position: fixed;
+    top: 99px;
+    left: 0;
+    z-index: 100;
+    overflow-y: auto;
+    max-height: calc(100vh - 99px);
+    box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+}
+
+/* Header del sidebar - diseño estándar */
+.finanzas-sidebar-left .sidebar-header {
+    padding: 0 20px 20px;
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 20px;
+    padding-top: 12px;
+    background: #f0fdfa;
+    border-radius: 0;
+}
+
+.finanzas-sidebar-left .sidebar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.finanzas-sidebar-left .sidebar-header h3 i {
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+/* Estilos para el panel del sidebar de finanzas */
+.sidebar-panel-finanzas {
+    background: white;
+    border-radius: 0;
+    padding: 0 20px;
+    box-shadow: none;
+}
+
+.quick-stat-finanzas {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.quick-stat-finanzas:last-child {
+    border-bottom: none;
+}
+
+.quick-stat-label {
+    font-size: 0.875rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.quick-stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.quick-stat-value.ingresos {
+    color: var(--primary-color);
+}
+
+.quick-stat-value.egresos {
+    color: #ef4444;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .finanzas-sidebar-left {
+        display: none;
+    }
+    
+    .finanzas-main-content {
+        margin-left: 0;
+        width: 100%;
+        max-width: 100%;
+        padding: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .finanzas-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .finanzas-tabs {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .finanzas-tab-btn {
+        width: 100%;
+        justify-content: center;
+        border-bottom: 1px solid #e2e8f0;
+        border-left: 3px solid transparent;
+        border-right: none;
+    }
+    
+    .finanzas-tab-btn.active {
+        border-left-color: #14b8a6;
+        border-bottom-color: #e2e8f0;
+    }
+    
+    .finanzas-sidebar-left {
+        flex-direction: column;
+    }
+    
+    .resumen-financiero-principal > div {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+// Función para mostrar tab desde el menú horizontal (método simplificado)
+function mostrarTabFinanzas(tabName) {
+    console.log('Mostrando tab:', tabName);
+    
+    // Ocultar todos los tabs de contenido (método simple y directo)
+    document.querySelectorAll('.finanzas-tab-content').forEach(tab => {
+        tab.classList.remove('active');
+        tab.style.setProperty('display', 'none', 'important');
+        tab.style.setProperty('opacity', '0', 'important');
+        tab.style.setProperty('visibility', 'hidden', 'important');
+    });
+    
+    // Remover active de todos los botones de tabs
+    document.querySelectorAll('.finanzas-tab-btn-horizontal').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.setProperty('color', '#64748b', 'important');
+        btn.style.setProperty('border-bottom-color', 'transparent', 'important');
+        btn.style.setProperty('background', 'transparent', 'important');
+    });
+    
+    // Mostrar el tab seleccionado (método simple)
+    const targetTab = document.getElementById('section-' + tabName);
+    if (targetTab) {
+        targetTab.classList.add('active');
+        targetTab.style.setProperty('display', 'block', 'important');
+        targetTab.style.setProperty('opacity', '1', 'important');
+        targetTab.style.setProperty('visibility', 'visible', 'important');
+        targetTab.style.setProperty('position', 'relative', 'important');
+        targetTab.style.setProperty('width', '100%', 'important');
+        targetTab.style.setProperty('min-height', 'auto', 'important');
+        targetTab.style.setProperty('height', 'auto', 'important');
+        
+        // Forzar visibilidad de elementos hijos
+        const children = targetTab.querySelectorAll('*');
+        children.forEach(child => {
+            const computedStyle = window.getComputedStyle(child);
+            const tagName = child.tagName.toLowerCase();
+            
+            if (computedStyle.display === 'none' && !child.classList.contains('finanzas-tab-content')) {
+                if (tagName === 'table') {
+                    child.style.setProperty('display', 'table', 'important');
+                } else if (child.classList.contains('finanzas-stats-grid')) {
+                    child.style.setProperty('display', 'grid', 'important');
+                } else if (child.classList.contains('filtros-panel-finanzas') || child.classList.contains('finanzas-card')) {
+                    child.style.setProperty('display', 'block', 'important');
+                } else {
+                    child.style.removeProperty('display');
+                }
+            }
+            if (computedStyle.visibility === 'hidden') {
+                child.style.setProperty('visibility', 'visible', 'important');
+            }
+            if (computedStyle.opacity === '0') {
+                child.style.setProperty('opacity', '1', 'important');
+            }
+        });
+        
+        console.log('Tab activado:', targetTab.id, 'Display:', targetTab.style.display);
+    } else {
+        console.error('No se encontró el tab: section-' + tabName);
+    }
+    
+    // Activar el botón del tab correspondiente
+    const targetBtn = document.querySelector('[data-tab="' + tabName + '"]');
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+        targetBtn.style.setProperty('color', '#14b8a6', 'important');
+        targetBtn.style.setProperty('border-bottom-color', '#14b8a6', 'important');
+        targetBtn.style.setProperty('background', '#f0fdfa', 'important');
+    }
+    
+    // Inicializar gráficos según la sección (si existen)
+    setTimeout(() => {
+        if (tabName === 'ingresos') {
+            if (typeof inicializarGraficosIngresos === 'function') {
+                inicializarGraficosIngresos();
+            }
+        } else if (tabName === 'egresos') {
+            if (typeof inicializarGraficosEgresos === 'function') {
+                inicializarGraficosEgresos();
+            }
+        }
+    }, 100);
+}
+
+// Función mejorada para cambiar de tab (mantener compatibilidad)
+function mostrarTab(tabName) {
+    mostrarTabFinanzas(tabName);
+}
+
+// Funciones para filtros
+function limpiarFiltrosIngresos() {
+    document.getElementById('fecha-desde-ingresos').value = '';
+    document.getElementById('fecha-hasta-ingresos').value = '';
+    document.getElementById('tipo-ingreso-filtro').value = '';
+    document.getElementById('buscar-ingresos').value = '';
+    filtrarIngresos();
+}
+
+function limpiarFiltrosEgresos() {
+    document.getElementById('fecha-desde-egresos').value = '';
+    document.getElementById('fecha-hasta-egresos').value = '';
+    document.getElementById('tipo-egreso-filtro').value = '';
+    document.getElementById('buscar-egresos').value = '';
+    filtrarEgresos();
+}
+
+function filtrarEgresos() {
+    const fechaDesde = document.getElementById('fecha-desde-egresos').value;
+    const fechaHasta = document.getElementById('fecha-hasta-egresos').value;
+    const tipo = document.getElementById('tipo-egreso-filtro').value;
+    const buscar = document.getElementById('buscar-egresos').value.toLowerCase();
+    
+    const filas = document.querySelectorAll('#tabla-egresos-filtrada tbody tr');
+    let totalFiltrado = 0;
+    
+    filas.forEach(fila => {
+        let mostrar = true;
+        
+        if (tipo && fila.dataset.tipo !== tipo) mostrar = false;
+        if (buscar && !fila.dataset.descripcion.toLowerCase().includes(buscar)) mostrar = false;
+        if (fechaDesde && fila.dataset.fecha < fechaDesde) mostrar = false;
+        if (fechaHasta && fila.dataset.fecha > fechaHasta) mostrar = false;
+        
+        fila.style.display = mostrar ? '' : 'none';
+        
+        if (mostrar) {
+            totalFiltrado += parseFloat(fila.dataset.monto || 0);
+        }
+    });
+    
+    const totalCell = document.getElementById('total-egresos-tabla');
+    if (totalCell) {
+        totalCell.textContent = new Intl.NumberFormat('es-CL', {
+            style: 'currency',
+            currency: 'CLP',
+            minimumFractionDigits: 0
+        }).format(totalFiltrado);
+    }
+}
+
+function filtrarIngresos() {
+    const fechaDesde = document.getElementById('fecha-desde-ingresos').value;
+    const fechaHasta = document.getElementById('fecha-hasta-ingresos').value;
+    const tipo = document.getElementById('tipo-ingreso-filtro').value;
+    const buscar = document.getElementById('buscar-ingresos').value.toLowerCase();
+    
+    const filas = document.querySelectorAll('#tabla-ingresos-filtrada tbody tr');
+    let totalFiltrado = 0;
+    
+    filas.forEach(fila => {
+        let mostrar = true;
+        
+        // Filtro por tipo
+        if (tipo && fila.dataset.tipo !== tipo) {
+            mostrar = false;
+        }
+        
+        // Filtro por búsqueda
+        if (buscar && !fila.dataset.descripcion.toLowerCase().includes(buscar)) {
+            mostrar = false;
+        }
+        
+        // Filtro por fecha
+        if (fechaDesde && fila.dataset.fecha < fechaDesde) {
+            mostrar = false;
+        }
+        if (fechaHasta && fila.dataset.fecha > fechaHasta) {
+            mostrar = false;
+        }
+        
+        fila.style.display = mostrar ? '' : 'none';
+        
+        if (mostrar) {
+            totalFiltrado += parseFloat(fila.dataset.monto || 0);
+        }
+    });
+    
+    // Actualizar total
+    const totalCell = document.getElementById('total-ingresos-tabla');
+    if (totalCell) {
+        totalCell.textContent = new Intl.NumberFormat('es-CL', {
+            style: 'currency',
+            currency: 'CLP',
+            minimumFractionDigits: 0
+        }).format(totalFiltrado);
+    }
+}
+
+// Función para ordenar tabla
+let ordenActual = {};
+function ordenarTabla(tablaId, columna) {
+    const tabla = document.getElementById(tablaId);
+    if (!tabla) return;
+    
+    const tbody = tabla.querySelector('tbody');
+    if (!tbody) return;
+    
+    const filas = Array.from(tbody.querySelectorAll('tr'));
+    
+    const orden = ordenActual[tablaId + '-' + columna] || 'asc';
+    ordenActual[tablaId + '-' + columna] = orden === 'asc' ? 'desc' : 'asc';
+    
+    filas.sort((a, b) => {
+        let valorA, valorB;
+        
+        if (columna === 0) { // Fecha
+            valorA = a.dataset.fecha || '';
+            valorB = b.dataset.fecha || '';
+        } else if (columna === 1) { // Descripción
+            valorA = a.dataset.descripcion || '';
+            valorB = b.dataset.descripcion || '';
+        } else if (columna === 2 && tablaId === 'tabla-egresos-filtrada') { // Tipo (solo para egresos)
+            valorA = a.dataset.tipo || '';
+            valorB = b.dataset.tipo || '';
+        } else if (columna === 4) { // Monto (columna 4 para ingresos, columna 4 para egresos también)
+            valorA = parseFloat(a.dataset.monto || 0);
+            valorB = parseFloat(b.dataset.monto || 0);
+        } else {
+            valorA = a.cells[columna] ? a.cells[columna].textContent.trim() : '';
+            valorB = b.cells[columna] ? b.cells[columna].textContent.trim() : '';
+        }
+        
+        if (columna === 4) {
+            return orden === 'asc' ? valorA - valorB : valorB - valorA;
+        } else {
+            return orden === 'asc' 
+                ? valorA.localeCompare(valorB)
+                : valorB.localeCompare(valorA);
+        }
+    });
+    
+    filas.forEach(fila => tbody.appendChild(fila));
+}
+
+// Variables globales para almacenar instancias de gráficos
+let chartEgresosMensual = null;
+let chartEgresosTipo = null;
+let chartIngresosMensual = null;
+let chartIngresosTipo = null;
+
+// Funciones para exportar
+function exportarIngresosExcel() {
+    window.location.href = '{% url "exportar_excel_finanzas" %}?tipo=ingresos';
+}
+
+function exportarEgresosExcel() {
+    window.location.href = '{% url "exportar_excel_finanzas" %}?tipo=egresos';
+}
+
+function generarReporteExcel(tipo) {
+    window.location.href = '{% url "exportar_excel_finanzas" %}?tipo=' + tipo;
+}
+
+// Funciones para modal de confirmación de eliminación de egreso
+function confirmarEliminarEgreso(tipo, id, descripcion, monto) {
+    const modal = document.getElementById('modalConfirmarEliminarEgreso');
+    const tipoInput = document.getElementById('egresoTipoParaEliminar');
+    const idInput = document.getElementById('egresoIdParaEliminar');
+    const tipoLabel = document.getElementById('egresoTipoEliminar');
+    const descripcionLabel = document.getElementById('egresoDescripcionEliminar');
+    const montoLabel = document.getElementById('egresoMontoEliminar');
+    const mensajeAdicional = document.getElementById('egresoMensajeAdicional');
+    
+    // Guardar datos
+    tipoInput.value = tipo;
+    idInput.value = id;
+    
+    // Formatear monto
+    const montoFormateado = new Intl.NumberFormat('es-CL', {
+        style: 'currency',
+        currency: 'CLP',
+        minimumFractionDigits: 0
+    }).format(monto);
+    
+    // Configurar mensajes según el tipo
+    if (tipo === 'manual') {
+        tipoLabel.textContent = 'Egreso Manual';
+        descripcionLabel.textContent = descripcion;
+        mensajeAdicional.textContent = 'Este egreso se eliminará completamente del historial financiero.';
+    } else if (tipo === 'compra') {
+        tipoLabel.textContent = 'Compra de Insumo';
+        descripcionLabel.textContent = descripcion;
+        mensajeAdicional.textContent = 'El movimiento se eliminará completamente del historial financiero.';
+    } else if (tipo === 'solicitud') {
+        tipoLabel.textContent = 'Egreso de Solicitud';
+        descripcionLabel.textContent = descripcion;
+        mensajeAdicional.textContent = 'La solicitud se mantendrá pero no aparecerá en los cálculos financieros.';
+    }
+    
+    montoLabel.textContent = montoFormateado;
+    
+    // Mostrar modal
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function cerrarModalConfirmarEliminarEgreso() {
+    const modal = document.getElementById('modalConfirmarEliminarEgreso');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function ejecutarEliminarEgreso() {
+    const tipo = document.getElementById('egresoTipoParaEliminar').value;
+    const id = document.getElementById('egresoIdParaEliminar').value;
+    
+    if (!tipo || !id) {
+        console.error('Error: No se pudo obtener la información del egreso.');
+        return;
+    }
+    
+    // Construir URL según el tipo
+    let url = '';
+    if (tipo === 'manual') {
+        url = '{% url "eliminar_egreso_manual" 999 %}'.replace('999', id);
+    } else if (tipo === 'compra') {
+        url = '{% url "eliminar_egreso_compra" 999 %}'.replace('999', id);
+    } else if (tipo === 'solicitud') {
+        url = '{% url "eliminar_egreso_solicitud" 999 %}'.replace('999', id);
+    }
+    
+    if (url) {
+        window.location.href = url;
+    } else {
+        console.error('Error: Tipo de egreso no válido.');
+    }
+}
+
+// Inicializar gráficos de ingresos
+function inicializarGraficosIngresos() {
+    if (typeof Chart === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = function() {
+            crearGraficosIngresos();
+        };
+        document.head.appendChild(script);
+    } else {
+        crearGraficosIngresos();
+    }
+}
+
+function crearGraficosIngresos() {
+    // Gráfico de Ingresos Mensual
+    const ctxIngresosMensual = document.getElementById('graficoIngresosMensual');
+    if (ctxIngresosMensual) {
+        // Destruir gráfico existente si existe
+        if (chartIngresosMensual) {
+            chartIngresosMensual.destroy();
+            chartIngresosMensual = null;
+        }
+        
+        // eslint-disable-next-line
+        // jshint ignore:start
+        // jslint ignore:start
+        const ingresosData = [{% for mes in ingresos_por_mes %}{{ mes.ingresos|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        const labels = [{% for mes in ingresos_por_mes %}'{{ mes.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+        // jslint ignore:end
+        // jshint ignore:end
+        // eslint-enable-next-line
+        
+        chartIngresosMensual = new Chart(ctxIngresosMensual.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: labels.length > 0 ? labels : ['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'],
+                datasets: [{
+                    label: 'Ingresos',
+                    data: ingresosData.length > 0 ? ingresosData : [0, 0, 0, 0, 0, 0],
+                    borderColor: '#10b981',
+                    backgroundColor: '#10b98140',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Ingresos: ' + new Intl.NumberFormat('es-CL', {
+                                    style: 'currency',
+                                    currency: 'CLP',
+                                    minimumFractionDigits: 0
+                                }).format(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return new Intl.NumberFormat('es-CL', {
+                                    style: 'currency',
+                                    currency: 'CLP',
+                                    minimumFractionDigits: 0
+                                }).format(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Gráfico de Ingresos por Tipo
+    const ctxIngresosTipo = document.getElementById('graficoIngresosTipo');
+    if (ctxIngresosTipo) {
+        // Destruir gráfico existente si existe
+        if (chartIngresosTipo) {
+            chartIngresosTipo.destroy();
+            chartIngresosTipo = null;
+        }
+        
+        let citas = 0, manuales = 0;
+        const filasIngresos = document.querySelectorAll('#tabla-ingresos-filtrada tbody tr');
+        filasIngresos.forEach(fila => {
+            const tipo = fila.dataset.tipo;
+            const monto = parseFloat(fila.dataset.monto || 0);
+            if (tipo === 'cita') {
+                citas += monto;
+            } else if (tipo === 'manual') {
+                manuales += monto;
+            }
+        });
+        
+        chartIngresosTipo = new Chart(ctxIngresosTipo.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Citas', 'Manuales'],
+                datasets: [{
+                    data: [citas, manuales],
+                    backgroundColor: ['#10b981', '#3b82f6'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                return context.label + ': ' + new Intl.NumberFormat('es-CL', {
+                                    style: 'currency',
+                                    currency: 'CLP',
+                                    minimumFractionDigits: 0
+                                }).format(context.parsed) + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+    // Inicializar gráficos de egresos
+    function inicializarGraficosEgresos() {
+        if (typeof Chart === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+            script.onload = function() {
+                crearGraficosEgresos();
+            };
+            document.head.appendChild(script);
+        } else {
+            crearGraficosEgresos();
+        }
+    }
+
+function crearGraficosEgresos() {
+        // Gráfico de Egresos Mensual
+        const ctxEgresosMensual = document.getElementById('graficoEgresosMensual');
+        if (ctxEgresosMensual) {
+            // Destruir gráfico existente si existe
+            if (chartEgresosMensual) {
+                chartEgresosMensual.destroy();
+                chartEgresosMensual = null;
+            }
+            
+            // eslint-disable-next-line
+            // jshint ignore:start
+            // jslint ignore:start
+            const egresosData = [{% for mes in egresos_por_mes %}{{ mes.egresos|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+            const labels = [{% for mes in egresos_por_mes %}'{{ mes.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+            // jslint ignore:end
+            // jshint ignore:end
+            // eslint-enable-next-line
+            
+            // Si no hay datos, mostrar gráfico vacío con mensaje
+            const hasData = egresosData.length > 0 && egresosData.some(val => val > 0);
+            const finalData = hasData ? egresosData : [0, 0, 0, 0, 0, 0];
+            const finalLabels = labels.length > 0 ? labels : ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+            
+            chartEgresosMensual = new Chart(ctxEgresosMensual.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: finalLabels,
+                    datasets: [{
+                        label: 'Egresos',
+                        data: finalData,
+                        borderColor: '#ef4444',
+                        backgroundColor: '#ef444440',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    if (!hasData) {
+                                        return 'No hay egresos registrados';
+                                    }
+                                    return 'Egresos: ' + new Intl.NumberFormat('es-CL', {
+                                        style: 'currency',
+                                        currency: 'CLP',
+                                        minimumFractionDigits: 0
+                                    }).format(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return new Intl.NumberFormat('es-CL', {
+                                        style: 'currency',
+                                        currency: 'CLP',
+                                        minimumFractionDigits: 0
+                                    }).format(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Gráfico de Egresos por Tipo
+        const ctxEgresosTipo = document.getElementById('graficoEgresosTipo');
+        if (ctxEgresosTipo) {
+            // Destruir gráfico existente si existe
+            if (chartEgresosTipo) {
+                chartEgresosTipo.destroy();
+                chartEgresosTipo = null;
+            }
+            
+            // Calcular totales por tipo desde los datos del servidor
+            let compras = 0, solicitudes = 0, manuales = 0;
+            const filasEgresos = document.querySelectorAll('#tabla-egresos-filtrada tbody tr');
+            filasEgresos.forEach(fila => {
+                const tipo = fila.dataset.tipo;
+                const monto = parseFloat(fila.dataset.monto || 0);
+                if (tipo === 'compra') {
+                    compras += monto;
+                } else if (tipo === 'solicitud') {
+                    solicitudes += monto;
+                } else if (tipo === 'egreso_manual') {
+                    manuales += monto;
+                }
+            });
+            
+            // Si no hay datos, mostrar gráfico vacío
+            const hasDataTipo = compras > 0 || solicitudes > 0 || manuales > 0;
+            
+            chartEgresosTipo = new Chart(ctxEgresosTipo.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Compras', 'Solicitudes', 'Manuales'],
+                    datasets: [{
+                        data: [compras, solicitudes, manuales],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            display: hasDataTipo
+                        },
+                        tooltip: {
+                            enabled: hasDataTipo,
+                            callbacks: {
+                                label: function(context) {
+                                    if (!hasDataTipo) {
+                                        return 'No hay egresos registrados';
+                                    }
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                    return context.label + ': ' + new Intl.NumberFormat('es-CL', {
+                                        style: 'currency',
+                                        currency: 'CLP',
+                                        minimumFractionDigits: 0
+                                    }).format(context.parsed) + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    },
+                    onHover: (event, activeElements) => {
+                        if (!hasDataTipo) {
+                            event.native.target.style.cursor = 'default';
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Event listeners para filtros
+    document.addEventListener('DOMContentLoaded', function() {
+        const filtrosIngresos = ['fecha-desde-ingresos', 'fecha-hasta-ingresos', 'tipo-ingreso-filtro', 'buscar-ingresos'];
+        filtrosIngresos.forEach(id => {
+            const elemento = document.getElementById(id);
+            if (elemento) {
+                elemento.addEventListener('change', filtrarIngresos);
+                elemento.addEventListener('input', filtrarIngresos);
+            }
+        });
+        
+        const filtrosEgresos = ['fecha-desde-egresos', 'fecha-hasta-egresos', 'tipo-egreso-filtro', 'buscar-egresos'];
+        filtrosEgresos.forEach(id => {
+            const elemento = document.getElementById(id);
+            if (elemento) {
+                elemento.addEventListener('change', filtrarEgresos);
+                elemento.addEventListener('input', filtrarEgresos);
+            }
+        });
+    
+    // Función para forzar visibilidad de una sección y sus hijos
+    function forzarVisibilidadSeccion(section) {
+        section.style.removeProperty('height');
+        section.style.removeProperty('overflow');
+        section.style.setProperty('display', 'block', 'important');
+        section.style.setProperty('opacity', '1', 'important');
+        section.style.setProperty('width', '100%', 'important');
+        section.style.setProperty('visibility', 'visible', 'important');
+        section.style.setProperty('position', 'relative', 'important');
+        section.style.setProperty('min-height', 'auto', 'important');
+        section.style.setProperty('height', 'auto', 'important');
+        
+        // Asegurar que todos los elementos hijos sean visibles
+        const childElements = section.querySelectorAll('*');
+        childElements.forEach(child => {
+            const computedStyle = window.getComputedStyle(child);
+            // Solo modificar elementos que están ocultos y no son otras secciones
+            if (!child.classList.contains('finanzas-section')) {
+                if (computedStyle.display === 'none') {
+                    // Intentar restaurar el display original basado en el tipo de elemento
+                    const tagName = child.tagName.toLowerCase();
+                    if (tagName === 'table') {
+                        child.style.setProperty('display', 'table', 'important');
+                    } else if (tagName === 'tr' || tagName === 'thead' || tagName === 'tbody' || tagName === 'tfoot') {
+                        child.style.setProperty('display', 'table-row', 'important');
+                    } else if (tagName === 'td' || tagName === 'th') {
+                        child.style.setProperty('display', 'table-cell', 'important');
+                    } else if (tagName === 'div' && child.classList.contains('finanzas-stats-grid')) {
+                        child.style.setProperty('display', 'grid', 'important');
+                    } else {
+                        child.style.removeProperty('display');
+                    }
+                }
+                if (computedStyle.visibility === 'hidden') {
+                    child.style.setProperty('visibility', 'visible', 'important');
+                }
+                if (computedStyle.opacity === '0') {
+                    child.style.setProperty('opacity', '1', 'important');
+                }
+            }
+        });
+    }
+    
+    // Asegurar que el tab activo se muestre correctamente al cargar la página
+    function inicializarTabs() {
+        // Ocultar todos los tabs primero
+        document.querySelectorAll('.finanzas-tab-content').forEach(tab => {
+            tab.classList.remove('active');
+            tab.style.setProperty('display', 'none', 'important');
+            tab.style.setProperty('opacity', '0', 'important');
+            tab.style.setProperty('visibility', 'hidden', 'important');
+        });
+        
+        // Remover active de todos los botones
+        document.querySelectorAll('.finanzas-tab-btn-horizontal').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.setProperty('color', '#64748b', 'important');
+            btn.style.setProperty('border-bottom-color', 'transparent', 'important');
+            btn.style.setProperty('background', 'transparent', 'important');
+        });
+        
+        // Activar el tab que tiene la clase 'active' en el HTML (por defecto 'ingresos')
+        const activeTab = document.querySelector('.finanzas-tab-content.active');
+        if (activeTab) {
+            const tabId = activeTab.id.replace('section-', '');
+            mostrarTabFinanzas(tabId);
+        } else {
+            // Si no hay tab activo, activar 'ingresos' por defecto
+            mostrarTabFinanzas('ingresos');
+        }
+    }
+    
+    // Inicializar tabs al cargar la página
+    inicializarTabs();
+    
+    // También inicializar después de un pequeño delay para asegurar que el DOM esté completamente cargado
+    setTimeout(inicializarTabs, 100);
+    
+});
+
+// Funciones para modales
+function mostrarModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    }
+}
+
+function cerrarModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('show');
+    document.body.style.overflow = '';
+    }
+}
+</script>
+
+<!-- Modal: Agregar Ingreso Manual -->
+<div id="modalIngresoManual" class="modal-finanzas">
+    <div class="modal-content-finanzas">
+        <div class="modal-header-finanzas">
+            <h3><i class="fas fa-plus-circle"></i> Agregar Ingreso Manual</h3>
+            <button onclick="cerrarModal('modalIngresoManual')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_ingreso_manual' %}">
+            {% csrf_token %}
+            <div class="modal-body-finanzas">
+                <div class="form-group-finanzas">
+                    <label>Monto *</label>
+                    <input type="number" name="monto" step="1" min="1" required class="form-control-finanzas" placeholder="0">
+                </div>
+                <div class="form-group-finanzas">
+                    <label>Descripción *</label>
+                    <input type="text" name="descripcion" required class="form-control-finanzas" placeholder="Ej: Venta de productos, Servicio adicional...">
+                </div>
+                <div class="form-group-finanzas">
+                    <label>Fecha *</label>
+                    <input type="date" name="fecha" required class="form-control-finanzas" value="{% now 'Y-m-d' %}">
+                </div>
+                <div class="form-group-finanzas">
+                    <label>Notas</label>
+                    <textarea name="notas" rows="3" class="form-control-finanzas" placeholder="Notas adicionales..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer-finanzas">
+                <button type="button" onclick="cerrarModal('modalIngresoManual')" class="btn-secondary-finanzas">Cancelar</button>
+                <button type="submit" class="btn-primary-finanzas">Guardar Ingreso</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Agregar Egreso Manual -->
+<div id="modalEgresoManual" class="modal-finanzas">
+    <div class="modal-content-finanzas">
+        <div class="modal-header-finanzas">
+            <h3><i class="fas fa-plus-circle"></i> Agregar Egreso Manual</h3>
+            <button onclick="cerrarModal('modalEgresoManual')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_egreso_manual' %}">
+            {% csrf_token %}
+            <div class="modal-body-finanzas">
+                <div class="form-group-finanzas">
+                    <label>Monto *</label>
+                    <input type="number" name="monto" step="1" min="1" required class="form-control-finanzas" placeholder="0">
+                </div>
+                <div class="form-group-finanzas">
+                    <label>Descripción *</label>
+                    <input type="text" name="descripcion" required class="form-control-finanzas" placeholder="Ej: Pago de servicios, Alquiler, Mantenimiento...">
+                </div>
+                <div class="form-group-finanzas">
+                    <label>Fecha *</label>
+                    <input type="date" name="fecha" required class="form-control-finanzas" value="{% now 'Y-m-d' %}">
+                </div>
+                <div class="form-group-finanzas">
+                    <label>Notas</label>
+                    <textarea name="notas" rows="3" class="form-control-finanzas" placeholder="Notas adicionales..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer-finanzas">
+                <button type="button" onclick="cerrarModal('modalEgresoManual')" class="btn-secondary-finanzas">Cancelar</button>
+                <button type="submit" class="btn-primary-finanzas">Guardar Egreso</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Confirmación de Eliminación de Egreso -->
+<div id="modalConfirmarEliminarEgreso" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-container-simple">
+        <div class="modal-header" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+            <h3><i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación</h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarEliminarEgreso()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 1rem; color: #374151; margin-bottom: 20px; text-align: center;">
+                ¿Estás seguro de que deseas eliminar este egreso?
+            </p>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 0.875rem; color: #991b1b; text-align: center;">
+                    <strong id="egresoTipoEliminar"></strong><br>
+                    <span id="egresoDescripcionEliminar" style="color: #7f1d1d;"></span><br>
+                    <span style="font-weight: 600; font-size: 1rem; margin-top: 8px; display: block;">
+                        Monto: <span id="egresoMontoEliminar"></span>
+                    </span>
+                </p>
+            </div>
+            <p style="font-size: 0.875rem; color: #64748b; text-align: center; margin: 0;">
+                <span id="egresoMensajeAdicional"></span>
+            </p>
+            <input type="hidden" id="egresoTipoParaEliminar" value="">
+            <input type="hidden" id="egresoIdParaEliminar" value="">
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="cerrarModalConfirmarEliminarEgreso()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-delete-edit" id="btnConfirmarEliminarEgreso" onclick="ejecutarEliminarEgreso()">
+                <i class="fas fa-trash-alt"></i> Sí, eliminar egreso
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos para modales de finanzas */
+.modal-finanzas {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-finanzas.show {
+    display: flex;
+}
+
+.modal-content-finanzas {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header-finanzas {
+    padding: 20px 24px;
+    border-bottom: 2px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--primary-bg);
+    border-radius: 12px 12px 0 0;
+}
+
+.modal-header-finanzas h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-body-finanzas {
+    padding: 24px;
+}
+
+.form-group-finanzas {
+    margin-bottom: 20px;
+}
+
+.form-group-finanzas label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+    font-size: 14px;
+}
+
+.form-control-finanzas {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.form-control-finanzas:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.modal-footer-finanzas {
+    padding: 20px 24px;
+    border-top: 2px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-primary-finanzas {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-primary-finanzas:hover {
+    background: var(--primary-dark);
+}
+
+.btn-secondary-finanzas {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-secondary-finanzas:hover {
+    background: #e5e7eb;
+}
+
+.btn-eliminar-finanzas:hover {
+    background: #fee2e2;
+}
+
+/* Estilos para modal de confirmación de eliminación */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal-container-simple {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-container-simple .modal-header {
+    padding: 20px 24px;
+    border-bottom: 2px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 12px 12px 0 0;
+    color: white;
+}
+
+.modal-container-simple .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-container-simple .modal-body {
+    padding: 24px;
+}
+
+.modal-container-simple .modal-footer {
+    padding: 20px 24px;
+    border-top: 2px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-container-simple .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.modal-container-simple .btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+.modal-container-simple .btn-delete-edit {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.modal-container-simple .btn-delete-edit:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+</style>
+{% endblock %}

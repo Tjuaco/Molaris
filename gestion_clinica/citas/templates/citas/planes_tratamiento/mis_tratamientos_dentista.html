@@ -1,0 +1,516 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Mis Tratamientos - Clínica Dental{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .mis-tratamientos-container {
+        animation: fadeIn 0.4s ease;
+        max-width: 100%;
+        padding: 0;
+    }
+    
+    .header-mis-tratamientos {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        border-radius: 16px;
+        padding: 32px;
+        margin-bottom: 32px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+    }
+    
+    .header-mis-tratamientos h1 {
+        margin: 0 0 8px 0;
+        font-size: 2rem;
+        font-weight: 700;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .header-mis-tratamientos p {
+        margin: 0;
+        font-size: 1rem;
+        opacity: 0.9;
+        color: white;
+    }
+    
+    .stats-grid-dentista {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+    
+    .stat-card-dentista {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #14b8a6;
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card-dentista:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.15);
+    }
+    
+    .stat-number-dentista {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 4px 0;
+    }
+    
+    .stat-label-dentista {
+        font-size: 0.875rem;
+        color: #64748b;
+        margin: 0;
+    }
+    
+    .filtros-section {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    }
+    
+    .plan-card-dentista {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 5px solid #14b8a6;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .plan-card-dentista:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(20, 184, 166, 0.15);
+    }
+    
+    .plan-card-dentista.en-progreso {
+        border-left-color: #10b981;
+    }
+    
+    .plan-card-dentista.completado {
+        border-left-color: #3b82f6;
+    }
+    
+    .plan-card-dentista.pendiente {
+        border-left-color: #f59e0b;
+    }
+    
+    .plan-header-dentista {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    
+    .plan-title-section {
+        flex: 1;
+        min-width: 250px;
+    }
+    
+    .plan-title-dentista {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 8px 0;
+    }
+    
+    .plan-cliente-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #64748b;
+        font-size: 0.9375rem;
+        margin-bottom: 4px;
+    }
+    
+    .plan-cliente-info i {
+        color: #14b8a6;
+    }
+    
+    .badge-estado-dentista {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .badge-estado-dentista.en-progreso {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .badge-estado-dentista.completado {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .badge-estado-dentista.pendiente {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .plan-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .info-item-dentista {
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 8px;
+        border-left: 3px solid #14b8a6;
+    }
+    
+    .info-label-dentista {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-value-dentista {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    
+    .progreso-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .progreso-item {
+        margin-bottom: 16px;
+    }
+    
+    .progreso-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .progreso-label {
+        font-size: 0.875rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    
+    .progreso-porcentaje {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    
+    .progreso-bar {
+        width: 100%;
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progreso-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #14b8a6, #0d9488);
+        transition: width 0.5s ease;
+        border-radius: 4px;
+    }
+    
+    .progreso-fill.pagos {
+        background: linear-gradient(90deg, #10b981, #059669);
+    }
+    
+    .acciones-plan {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .btn-ver-detalle {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .btn-ver-detalle:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        color: white;
+    }
+    
+    .empty-state-dentista {
+        text-align: center;
+        padding: 80px 20px;
+        background: white;
+        border-radius: 16px;
+        border: 2px dashed #e5e7eb;
+    }
+    
+    .empty-state-dentista i {
+        font-size: 5rem;
+        color: #cbd5e1;
+        margin-bottom: 24px;
+    }
+    
+    .empty-state-dentista h3 {
+        color: #374151;
+        margin-bottom: 12px;
+        font-size: 1.5rem;
+    }
+    
+    .empty-state-dentista p {
+        color: #6b7280;
+        font-size: 1rem;
+        max-width: 500px;
+        margin: 0 auto 24px;
+    }
+    
+    @media (max-width: 768px) {
+        .plan-header-dentista {
+            flex-direction: column;
+        }
+        
+        .plan-info-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .acciones-plan {
+            flex-direction: column;
+        }
+        
+        .btn-ver-detalle {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="mis-tratamientos-container">
+    <!-- Header con título -->
+    <div class="header-mis-tratamientos">
+        <h1>
+            <i class="fas fa-user-md"></i>
+            Mis Tratamientos
+        </h1>
+        <p>Gestiona los tratamientos de tus pacientes asignados</p>
+    </div>
+    
+    <!-- Estadísticas -->
+    <div class="stats-grid-dentista">
+        <div class="stat-card-dentista">
+            <div class="stat-number-dentista">{{ estadisticas.total_planes }}</div>
+            <p class="stat-label-dentista">Total Tratamientos</p>
+        </div>
+        <div class="stat-card-dentista">
+            <div class="stat-number-dentista">{{ estadisticas.planes_activos }}</div>
+            <p class="stat-label-dentista">En Progreso</p>
+        </div>
+        <div class="stat-card-dentista">
+            <div class="stat-number-dentista">{{ estadisticas.planes_completados }}</div>
+            <p class="stat-label-dentista">Completados</p>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="filtros-section">
+        <form method="GET" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Buscar por nombre o paciente..." 
+                   style="flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9375rem;">
+            
+            <select name="estado" style="padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9375rem;">
+                <option value="">Todos los estados</option>
+                <option value="en_progreso" {% if estado_filtro == 'en_progreso' %}selected{% endif %}>En Progreso</option>
+                <option value="completado" {% if estado_filtro == 'completado' %}selected{% endif %}>Completado</option>
+                <option value="pendiente_aprobacion" {% if estado_filtro == 'pendiente_aprobacion' %}selected{% endif %}>Pendiente</option>
+            </select>
+            
+            <button type="submit" class="btn-ver-detalle" style="cursor: pointer;">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+            
+            {% if search or estado_filtro %}
+            <a href="{% url 'listar_planes_tratamiento' %}" style="padding: 10px 20px; background: #64748b; color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+    
+    <!-- Lista de tratamientos -->
+    {% if planes %}
+        {% for plan in planes %}
+        <div class="plan-card-dentista {{ plan.estado }}">
+            <div class="plan-header-dentista">
+                <div class="plan-title-section">
+                    <h3 class="plan-title-dentista">{{ plan.nombre }}</h3>
+                    <div class="plan-cliente-info">
+                        <i class="fas fa-user"></i>
+                        <span><strong>Paciente:</strong> {{ plan.cliente.nombre_completo }}</span>
+                        {% if plan.cliente.rut %}
+                        <span style="color: #94a3b8;">({{ plan.cliente.rut }})</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <span class="badge-estado-dentista {{ plan.estado }}">
+                    <i class="fas fa-{% if plan.estado == 'en_progreso' %}spinner{% elif plan.estado == 'completado' %}check-circle{% else %}clock{% endif %}"></i>
+                    {{ plan.get_estado_display }}
+                </span>
+            </div>
+            
+            <div class="plan-info-grid">
+                <div class="info-item-dentista">
+                    <div class="info-label-dentista">Presupuesto</div>
+                    <div class="info-value-dentista">{{ plan.precio_final|pesos_chilenos }}</div>
+                </div>
+                <div class="info-item-dentista">
+                    <div class="info-label-dentista">Pagado</div>
+                    <div class="info-value-dentista" style="color: #10b981;">{{ plan.total_pagado|pesos_chilenos }}</div>
+                </div>
+                <div class="info-item-dentista">
+                    <div class="info-label-dentista">Saldo</div>
+                    <div class="info-value-dentista" style="color: {% if plan.saldo_pendiente > 0 %}#f59e0b{% else %}#10b981{% endif %};">
+                        {{ plan.saldo_pendiente|pesos_chilenos }}
+                    </div>
+                </div>
+                {% if plan.fecha_inicio_estimada %}
+                <div class="info-item-dentista">
+                    <div class="info-label-dentista">Inicio</div>
+                    <div class="info-value-dentista">{{ plan.fecha_inicio_estimada|date:"d/m/Y" }}</div>
+                </div>
+                {% endif %}
+                {% if plan.proxima_cita_obj %}
+                <div class="info-item-dentista">
+                    <div class="info-label-dentista">Próxima Cita</div>
+                    <div class="info-value-dentista" style="color: #14b8a6;">
+                        {{ plan.proxima_cita_obj.fecha_hora|date:"d/m/Y H:i" }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="progreso-section">
+                <div class="progreso-item">
+                    <div class="progreso-header">
+                        <span class="progreso-label">
+                            <i class="fas fa-calendar-check"></i> Progreso de Citas
+                        </span>
+                        <span class="progreso-porcentaje">{{ plan.progreso_porcentaje }}%</span>
+                    </div>
+                    <div class="progreso-bar">
+                        <div class="progreso-fill" style="width: {{ plan.progreso_porcentaje }}%;"></div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+                        {{ plan.citas_completadas }} de {{ plan.total_citas }} citas completadas
+                    </div>
+                </div>
+                
+                <div class="progreso-item">
+                    <div class="progreso-header">
+                        <span class="progreso-label">
+                            <i class="fas fa-dollar-sign"></i> Progreso de Pagos
+                        </span>
+                        <span class="progreso-porcentaje">{{ plan.porcentaje_pagado|floatformat:0 }}%</span>
+                    </div>
+                    <div class="progreso-bar">
+                        <div class="progreso-fill pagos" style="width: {{ plan.porcentaje_pagado|floatformat:0 }}%;"></div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+                        {{ plan.total_pagado|pesos_chilenos }} de {{ plan.precio_final|pesos_chilenos }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="acciones-plan">
+                <a href="{% url 'detalle_plan_tratamiento' plan.id %}" class="btn-ver-detalle">
+                    <i class="fas fa-eye"></i> Ver Detalles Completos
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <!-- Paginación -->
+        {% if planes.has_other_pages %}
+        <div style="margin-top: 32px; display: flex; justify-content: center; gap: 12px; align-items: center; flex-wrap: wrap;">
+            {% if planes.has_previous %}
+                <a href="?page={{ planes.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}" 
+                   style="padding: 10px 20px; background: white; border: 1px solid #d1d5db; border-radius: 8px; text-decoration: none; color: #1e293b; font-weight: 600;">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </a>
+            {% endif %}
+            
+            <span style="padding: 10px 20px; background: #f8fafc; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9375rem; color: #64748b;">
+                Página {{ planes.number }} de {{ planes.paginator.num_pages }}
+            </span>
+            
+            {% if planes.has_next %}
+                <a href="?page={{ planes.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}" 
+                   style="padding: 10px 20px; background: white; border: 1px solid #d1d5db; border-radius: 8px; text-decoration: none; color: #1e293b; font-weight: 600;">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state-dentista">
+            <i class="fas fa-clipboard-list"></i>
+            <h3>No tienes tratamientos asignados</h3>
+            <p>
+                {% if search or estado_filtro %}
+                    No se encontraron tratamientos con los filtros aplicados.
+                {% else %}
+                    Aún no tienes tratamientos asignados para tus pacientes.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

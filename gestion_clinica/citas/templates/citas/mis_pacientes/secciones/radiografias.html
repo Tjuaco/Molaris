@@ -1,0 +1,613 @@
+<div class="radiografias-seccion">
+    <!-- Header Mejorado -->
+    <div class="radiografias-header-modern">
+        <div class="header-content">
+            <div class="header-title-section">
+                <div class="title-icon-modern">
+                    <i class="fas fa-x-ray"></i>
+                </div>
+                <div>
+                    <h1 class="page-title-modern">Radiografías</h1>
+                    <p class="page-subtitle-modern">{{ paciente_seleccionado.nombre_completo }}</p>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-badge-modern">
+                    <i class="fas fa-images"></i>
+                    <span>{{ radiografias.count|default:0 }} radiografía{{ radiografias.count|pluralize }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-actions-modern">
+            <a href="{% url 'agregar_radiografia' paciente_seleccionado.id %}" class="btn-add-modern">
+                <i class="fas fa-plus-circle"></i>
+                <span>Agregar Radiografía</span>
+            </a>
+        </div>
+    </div>
+
+    {% if radiografias %}
+    <!-- Grid Mejorado de Radiografías -->
+    <div class="radiografias-grid-modern">
+        {% for radiografia in radiografias %}
+        <div class="radiografia-card-modern">
+            <div class="card-image-wrapper">
+                {% if radiografia.imagen %}
+                <img src="{{ radiografia.imagen.url }}" alt="{{ radiografia.get_tipo_display }}"
+                    class="radiografia-image-modern">
+                <div class="image-overlay">
+                    <div class="overlay-content">
+                        <i class="fas fa-search-plus"></i>
+                        <span>Ver detalles</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="no-image-modern">
+                    <i class="fas fa-image"></i>
+                    <span>Sin imagen</span>
+                </div>
+                {% endif %}
+
+                <!-- Badges superpuestos -->
+                <div class="card-badges">
+                    {% if radiografia.imagen_anotada %}
+                    <span class="badge badge-anotaciones">
+                        <i class="fas fa-pencil-alt"></i>
+                        Anotada
+                    </span>
+                    {% endif %}
+                    <span class="badge badge-tipo">
+                        {{ radiografia.get_tipo_display }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-content-modern">
+                <div class="card-header-modern">
+                    <h3 class="card-title-modern">{{ radiografia.get_tipo_display }}</h3>
+                    <div class="card-date-modern">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>
+                            {% if radiografia.fecha_tomada %}
+                            Tomada: {{ radiografia.fecha_tomada|date:"d/m/Y" }}
+                            {% else %}
+                            Cargada: {{ radiografia.fecha_carga|date:"d/m/Y" }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                {% if radiografia.descripcion %}
+                <p class="card-description-modern">
+                    <i class="fas fa-file-alt"></i>
+                    {{ radiografia.descripcion|truncatewords:20 }}
+                </p>
+                {% endif %}
+
+                <div class="card-footer-modern">
+                    <div class="card-actions-modern">
+                        <button class="action-btn-modern btn-view"
+                            onclick="abrirVisualizadorRadiografia({{ radiografia.id }})">
+                            <i class="fas fa-eye"></i>
+                            <span>Ver</span>
+                        </button>
+                        <a href="{% url 'editar_radiografia' radiografia.id %}" class="action-btn-modern btn-edit"
+                            onclick="event.stopPropagation();">
+                            <i class="fas fa-edit"></i>
+                            <span>Editar</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Estado Vacío Mejorado -->
+    <div class="empty-state-modern">
+        <div class="empty-icon-wrapper">
+            <i class="fas fa-x-ray"></i>
+        </div>
+        <h3 class="empty-title">No hay radiografías registradas</h3>
+        <p class="empty-description">Este paciente aún no tiene radiografías en su historial. Puedes comenzar agregando
+            la primera.</p>
+        <a href="{% url 'agregar_radiografia' paciente_seleccionado.id %}" class="btn-empty-action">
+            <i class="fas fa-plus-circle"></i>
+            <span>Agregar Primera Radiografía</span>
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .radiografias-seccion {
+        padding: 0;
+        background: #f8fafc;
+        min-height: calc(100vh - 80px);
+        width: 100%;
+        margin: 0;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+
+    /* Header Moderno */
+    .radiografias-header-modern {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        padding: 12px 24px;
+        border-radius: 0;
+        box-shadow: 0 4px 20px rgba(20, 184, 166, 0.2);
+        margin-bottom: 0;
+        margin-top: 0 !important;
+        padding-top: 12px !important;
+        width: 100%;
+        box-sizing: border-box;
+        position: relative;
+        z-index: 1;
+    }
+
+    .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    .header-title-section {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .title-icon-modern {
+        width: 64px;
+        height: 64px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(10px);
+    }
+
+    .title-icon-modern i {
+        font-size: 2rem;
+        color: white;
+    }
+
+    .page-title-modern {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+        color: white;
+        line-height: 1.2;
+    }
+
+    .page-subtitle-modern {
+        margin: 8px 0 0 0;
+        font-size: 1rem;
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 400;
+    }
+
+    .header-stats {
+        display: flex;
+        gap: 12px;
+    }
+
+    .stat-badge-modern {
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        padding: 10px 20px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: white;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .header-actions-modern {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn-add-modern {
+        background: white;
+        color: #14b8a6;
+        padding: 12px 24px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-add-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        background: #f0fdfa;
+    }
+
+    .btn-add-modern i {
+        font-size: 1.2rem;
+    }
+
+    /* Grid Moderno - 3 columnas */
+    .radiografias-grid-modern {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        padding: 24px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    @media (max-width: 1400px) {
+        .radiografias-grid-modern {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .radiografias-grid-modern {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Card Moderna */
+    .radiografia-card-modern {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .radiografia-card-modern:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 32px rgba(20, 184, 166, 0.2);
+    }
+
+    .card-image-wrapper {
+        position: relative;
+        width: 100%;
+        height: 240px;
+        background: #f1f5f9;
+        overflow: hidden;
+    }
+
+    .radiografia-image-modern {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .radiografia-card-modern:hover .radiografia-image-modern {
+        transform: scale(1.05);
+    }
+
+    .image-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to bottom, transparent 0%, rgba(20, 184, 166, 0.9) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .radiografia-card-modern:hover .image-overlay {
+        opacity: 1;
+    }
+
+    .overlay-content {
+        color: white;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .overlay-content i {
+        font-size: 2rem;
+    }
+
+    .card-badges {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 10;
+    }
+
+    .badge {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .badge i {
+        font-size: 0.65rem;
+    }
+
+    .badge-anotaciones {
+        background: rgba(20, 184, 166, 0.95);
+        color: white;
+    }
+
+    .badge-tipo {
+        background: rgba(255, 255, 255, 0.95);
+        color: #1e293b;
+    }
+
+    .no-image-modern {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        gap: 12px;
+    }
+
+    .no-image-modern i {
+        font-size: 3.5rem;
+        opacity: 0.5;
+    }
+
+    .card-content-modern {
+        padding: 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-header-modern {
+        margin-bottom: 12px;
+    }
+
+    .card-title-modern {
+        margin: 0 0 8px 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1.3;
+    }
+
+    .card-date-modern {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    .card-date-modern i {
+        color: #14b8a6;
+        font-size: 0.75rem;
+    }
+
+    .card-description-modern {
+        margin: 0 0 14px 0;
+        font-size: 0.85rem;
+        color: #64748b;
+        line-height: 1.4;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        flex: 1;
+    }
+
+    .card-description-modern i {
+        color: #14b8a6;
+        margin-top: 2px;
+        font-size: 0.75rem;
+    }
+
+    .card-footer-modern {
+        margin-top: auto;
+        padding-top: 14px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .card-actions-modern {
+        display: flex;
+        gap: 8px;
+    }
+
+    .action-btn-modern {
+        flex: 1;
+        padding: 9px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        transition: all 0.2s ease;
+    }
+
+    .action-btn-modern i {
+        font-size: 0.85rem;
+    }
+
+    .action-btn-modern span {
+        font-size: 0.8rem;
+    }
+
+    .btn-view {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+    }
+
+    .btn-view:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-edit {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .btn-edit:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    /* Estado Vacío Moderno */
+    .empty-state-modern {
+        text-align: center;
+        padding: 80px 40px;
+        background: white;
+        border-radius: 16px;
+        margin: 24px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+        width: calc(100% - 48px);
+        box-sizing: border-box;
+    }
+
+    .empty-icon-wrapper {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 24px;
+        background: linear-gradient(135deg, #f0fdfa, #e0f2fe);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-icon-wrapper i {
+        font-size: 4rem;
+        color: #14b8a6;
+    }
+
+    .empty-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 12px 0;
+    }
+
+    .empty-description {
+        font-size: 1rem;
+        color: #64748b;
+        margin: 0 0 32px 0;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .btn-empty-action {
+        padding: 14px 28px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-empty-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .radiografias-grid-modern {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .radiografias-header-modern {
+            padding: 24px 20px;
+        }
+
+        .radiografias-grid-modern {
+            grid-template-columns: 1fr;
+            padding: 0 20px 20px;
+        }
+
+        .page-title-modern {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+
+<!-- Datos de las radiografías para el visualizador -->
+<script>
+    // Datos de las radiografías
+    window.radiografiasData = {};
+    {% if radiografias %}
+    {% for radiografia in radiografias %}
+    window.radiografiasData[{{ radiografia.id }}] = {
+        url: "{{ radiografia.imagen.url|escapejs }}",
+        label: "{{ radiografia.get_tipo_display|escapejs }}{% if radiografia.fecha_tomada %} - Tomada: {{ radiografia.fecha_tomada|date:"d/m/Y" }}{% else %} - Cargada: {{ radiografia.fecha_carga|date:"d/m/Y" }}{% endif %}{% if radiografia.cita %} - Cita: {{ radiografia.cita.fecha_hora|date:"d/m/Y H:i" }}{% endif %}{% if radiografia.descripcion %} - {{ radiografia.descripcion|truncatewords:5|escapejs }}{% endif %}",
+        hasAnnotations: {% if radiografia.imagen_anotada %}true{% else %}false{% endif %},
+        annotatedUrl: {% if radiografia.imagen_anotada %}"{{ radiografia.imagen_anotada.url|escapejs }}"{% else %}null{% endif %}
+    };
+    {% endfor %}
+    {% endif %}
+    console.log('radiografiasData cargado:', Object.keys(window.radiografiasData).length, 'radiografías');
+</script>
+
+<!-- Incluir el componente del visualizador completo -->
+{% include 'citas/radiografias/components/visualizador_full.html' %}
+
+<script>
+    function abrirVisualizadorRadiografia(radiografiaId) {
+        console.log('Click en Ver radiografía:', radiografiaId);
+        console.log('radiografiasData disponible:', typeof radiografiasData !== 'undefined');
+        console.log('abrirModalVisualizador disponible:', typeof window.abrirModalVisualizador);
+
+        // Esperar un momento para asegurar que el script esté cargado
+        if (typeof window.abrirModalVisualizador === 'function') {
+            window.abrirModalVisualizador(radiografiaId);
+        } else {
+            console.error('Error: abrirModalVisualizador no está definida');
+            // Intentar de nuevo después de un breve delay
+            setTimeout(function() {
+                if (typeof window.abrirModalVisualizador === 'function') {
+                    window.abrirModalVisualizador(radiografiaId);
+                } else {
+                    alert('El visualizador de radiografías no está listo. Por favor recargue la página.');
+                }
+            }, 100);
+        }
+    }
+</script>

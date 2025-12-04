@@ -1,0 +1,15 @@
+# Ignorar templates Django que contienen código template dentro de JavaScript
+citas/templates/**/*.html
+
+
+
+
+
+
+
+
+
+
+
+
+

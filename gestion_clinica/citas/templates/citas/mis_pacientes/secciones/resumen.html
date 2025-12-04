@@ -1,0 +1,515 @@
+<div class="resumen-paciente-section">
+    <div class="resumen-header">
+        <h2>
+            <i class="fas fa-user-circle"></i>
+            Información Detallada de {{ paciente_seleccionado.nombre_completo }}
+        </h2>
+    </div>
+    
+    <!-- Información Detallada del Cliente -->
+    {% if cliente %}
+    <div class="resumen-info-detallada">
+        <!-- Información Personal -->
+        <div class="info-section-card">
+            <div class="section-header">
+                <div class="section-icon personal">
+                    <i class="fas fa-user"></i>
+                </div>
+                <h3>Información Personal</h3>
+            </div>
+            <div class="section-content">
+                <div class="info-grid">
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-user"></i>
+                            <span>Nombre Completo</span>
+                        </div>
+                        <div class="field-value">{{ cliente.nombre_completo }}</div>
+                    </div>
+                    
+                    {% if cliente.rut %}
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-id-card"></i>
+                            <span>RUT</span>
+                        </div>
+                        <div class="field-value">{{ cliente.rut }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-envelope"></i>
+                            <span>Email</span>
+                        </div>
+                        <div class="field-value">
+                            <a href="mailto:{{ cliente.email }}">{{ cliente.email }}</a>
+                        </div>
+                    </div>
+                    
+                    {% if cliente.telefono %}
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-phone"></i>
+                            <span>Teléfono</span>
+                        </div>
+                        <div class="field-value">
+                            <a href="tel:{{ cliente.telefono }}">{{ cliente.telefono }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if cliente.fecha_nacimiento %}
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-birthday-cake"></i>
+                            <span>Fecha de Nacimiento</span>
+                        </div>
+                        <div class="field-value">
+                            {{ cliente.fecha_nacimiento|date:"d/m/Y" }}
+                            {% if cliente.edad %}
+                                <span class="age-badge">({{ cliente.edad }} años)</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-calendar-check"></i>
+                            <span>Fecha de Registro</span>
+                        </div>
+                        <div class="field-value">{{ cliente.fecha_registro|date:"d/m/Y H:i" }}</div>
+                    </div>
+                    
+                    {% if cliente.dentista_asignado %}
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-user-md"></i>
+                            <span>Dentista Asignado</span>
+                        </div>
+                        <div class="field-value">{{ cliente.dentista_asignado.nombre_completo }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información Médica -->
+        {% if cliente.alergias %}
+        <div class="info-section-card warning-card">
+            <div class="section-header">
+                <div class="section-icon warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Alergias y Consideraciones Médicas</h3>
+            </div>
+            <div class="section-content">
+                <div class="alergias-text">
+                    {{ cliente.alergias|linebreaks }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Notas -->
+        {% if cliente.notas %}
+        <div class="info-section-card">
+            <div class="section-header">
+                <div class="section-icon notes">
+                    <i class="fas fa-sticky-note"></i>
+                </div>
+                <h3>Notas y Observaciones</h3>
+            </div>
+            <div class="section-content">
+                <div class="notas-text">
+                    {{ cliente.notas|linebreaks }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Estadísticas de Documentos -->
+        <div class="info-section-card">
+            <div class="section-header">
+                <div class="section-icon stats">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h3>Documentos y Registros</h3>
+            </div>
+            <div class="section-content">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-icon-wrapper radiografia">
+                            <i class="fas fa-x-ray"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-number">{{ paciente_seleccionado.total_radiografias }}</div>
+                            <div class="stat-label">Radiografías</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <div class="stat-icon-wrapper odontograma">
+                            <i class="fas fa-tooth"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-number">{{ paciente_seleccionado.total_odontogramas }}</div>
+                            <div class="stat-label">Odontogramas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Si no hay objeto Cliente completo, mostrar información básica -->
+    <div class="resumen-info-detallada">
+        <div class="info-section-card">
+            <div class="section-header">
+                <div class="section-icon personal">
+                    <i class="fas fa-user"></i>
+                </div>
+                <h3>Información del Paciente</h3>
+            </div>
+            <div class="section-content">
+                <div class="info-grid">
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-user"></i>
+                            <span>Nombre Completo</span>
+                        </div>
+                        <div class="field-value">{{ paciente_seleccionado.nombre_completo }}</div>
+                    </div>
+                    
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-envelope"></i>
+                            <span>Email</span>
+                        </div>
+                        <div class="field-value">
+                            <a href="mailto:{{ paciente_seleccionado.email }}">{{ paciente_seleccionado.email }}</a>
+                        </div>
+                    </div>
+                    
+                    {% if paciente_seleccionado.telefono %}
+                    <div class="info-field">
+                        <div class="field-label">
+                            <i class="fas fa-phone"></i>
+                            <span>Teléfono</span>
+                        </div>
+                        <div class="field-value">
+                            <a href="tel:{{ paciente_seleccionado.telefono }}">{{ paciente_seleccionado.telefono }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Estadísticas de Documentos -->
+        <div class="info-section-card">
+            <div class="section-header">
+                <div class="section-icon stats">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h3>Documentos y Registros</h3>
+            </div>
+            <div class="section-content">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-icon-wrapper radiografia">
+                            <i class="fas fa-x-ray"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-number">{{ paciente_seleccionado.total_radiografias }}</div>
+                            <div class="stat-label">Radiografías</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <div class="stat-icon-wrapper odontograma">
+                            <i class="fas fa-tooth"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-number">{{ paciente_seleccionado.total_odontogramas }}</div>
+                            <div class="stat-label">Odontogramas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .resumen-paciente-section {
+        padding: 0;
+        width: 100%;
+        margin: 0;
+        background: #f8fafc;
+        min-height: calc(100vh - 200px);
+    }
+    
+    .resumen-header {
+        margin-bottom: 24px;
+        margin-top: 0;
+        padding: 20px 24px 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .resumen-header h2 {
+        font-size: 1.75rem;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        font-weight: 700;
+    }
+    
+    .resumen-header h2 i {
+        color: #14b8a6;
+        font-size: 1.5rem;
+    }
+    
+    .resumen-info-detallada {
+        padding: 0 24px 32px;
+        width: 100%;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    
+    .info-section-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .info-section-card:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+    
+    .warning-card {
+        border-left: 5px solid #f59e0b;
+    }
+    
+    .section-header {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        padding: 20px 24px;
+        border-bottom: 2px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    
+    .warning-card .section-header {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+    }
+    
+    .section-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        color: white;
+        flex-shrink: 0;
+    }
+    
+    .section-icon.personal {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+    }
+    
+    .section-icon.warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+    
+    .section-icon.notes {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    }
+    
+    .section-icon.stats {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+    
+    .section-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    
+    .section-content {
+        padding: 24px;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+    }
+    
+    .info-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .field-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    .field-label i {
+        color: #14b8a6;
+        font-size: 0.9rem;
+    }
+    
+    .field-value {
+        font-size: 1rem;
+        color: #1e293b;
+        font-weight: 500;
+        word-break: break-word;
+    }
+    
+    .field-value a {
+        color: #14b8a6;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    
+    .field-value a:hover {
+        color: #0d9488;
+        text-decoration: underline;
+    }
+    
+    .age-badge {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 4px 10px;
+        background: #e0f2f1;
+        color: #0d9488;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .alergias-text,
+    .notas-text {
+        color: #1e293b;
+        line-height: 1.8;
+        font-size: 0.95rem;
+        white-space: pre-wrap;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+    
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 2px solid #e5e7eb;
+        transition: all 0.2s ease;
+    }
+    
+    .stat-item:hover {
+        border-color: #14b8a6;
+        background: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-icon-wrapper {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        flex-shrink: 0;
+    }
+    
+    .stat-icon-wrapper.radiografia {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+    }
+    
+    .stat-icon-wrapper.odontograma {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+    
+    .stat-details {
+        flex: 1;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    @media (max-width: 768px) {
+        .resumen-info-detallada {
+            padding: 0 16px 24px;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .section-content {
+            padding: 20px;
+        }
+        
+        .section-header {
+            padding: 16px 20px;
+        }
+        
+        .resumen-header {
+            padding: 16px 20px 0;
+        }
+        
+        .resumen-header h2 {
+            font-size: 1.5rem;
+        }
+    }
+</style>

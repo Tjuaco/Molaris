@@ -1,0 +1,1265 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Gestionar Horario - {{ dentista.nombre_completo }}{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Contenedor de Notificaciones -->
+<div id="notificationContainer" class="notification-container"></div>
+
+<div class="personal-container">
+    <div class="page-header">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="avatar" style="width: 60px; height: 60px; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 24px;">
+                    <i class="fas fa-user-md"></i>
+                </div>
+                <div>
+                    <h1 class="page-title" style="margin: 0;"><i class="fas fa-clock"></i> Gestionar Horario</h1>
+                    <p style="margin: 5px 0 0 0; color: #64748b; font-size: 16px;">{{ dentista.nombre_completo }}</p>
+                </div>
+            </div>
+            <a href="{% url 'gestor_personal' %}" class="btn-volver-personal">
+                <i class="fas fa-arrow-left"></i> 
+                <span>Volver a Personal</span>
+            </a>
+        </div>
+        <p class="page-subtitle" style="margin-top: 15px;">
+            <i class="fas fa-info-circle"></i> Define los días y horarios en los que este dentista está disponible para atender citas. 
+            Las citas solo podrán crearse dentro de estos horarios configurados.
+        </p>
+    </div>
+
+    <!-- Sección: Agregar Nuevo Horario -->
+    <div class="section" style="background: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <h2 style="margin: 0 0 20px 0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-plus-circle" style="color: var(--primary-color);"></i> Agregar Horario
+        </h2>
+        
+        <form id="formAgregarHorario" style="background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); padding: 25px; border-radius: 12px; border: 2px solid #e2e8f0;">
+            {% csrf_token %}
+            <div style="display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #334155; font-size: 0.875rem;">
+                        <i class="fas fa-calendar-day" style="color: var(--primary-color); margin-right: 6px;"></i>Día
+                    </label>
+                    <select name="dia_semana" id="dia_semana" required style="padding: 12px 16px; font-size: 15px; border: 2px solid #e2e8f0; border-radius: 8px; width: 100%; background: white; cursor: pointer; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='#e2e8f0'">
+                        <option value="">Selecciona día</option>
+                        {% for dia_num, dia_nombre in dias_semana %}
+                        <option value="{{ dia_num }}">{{ dia_nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="flex: 0 0 140px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #334155; font-size: 0.875rem;">
+                        <i class="fas fa-clock" style="color: var(--primary-color); margin-right: 6px;"></i>Desde
+                    </label>
+                    <input type="time" name="hora_inicio" id="hora_inicio" required style="padding: 12px 16px; font-size: 15px; border: 2px solid #e2e8f0; border-radius: 8px; width: 100%; background: white; cursor: pointer; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+                <div style="flex: 0 0 140px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #334155; font-size: 0.875rem;">
+                        <i class="fas fa-clock" style="color: var(--primary-color); margin-right: 6px;"></i>Hasta
+                    </label>
+                    <input type="time" name="hora_fin" id="hora_fin" required style="padding: 12px 16px; font-size: 15px; border: 2px solid #e2e8f0; border-radius: 8px; width: 100%; background: white; cursor: pointer; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+                <div style="flex: 0 0 auto;">
+                    <button type="submit" id="btnAgregarHorario" style="padding: 12px 28px; font-size: 15px; white-space: nowrap; border-radius: 8px; font-weight: 600; background: var(--primary-color); color: white; border: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
+                        <i class="fas fa-plus"></i> Agregar
+                    </button>
+                </div>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 0; color: #64748b; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-info-circle" style="color: var(--primary-color);"></i> 
+                    <span>Ejemplo: Lunes 09:00-12:00 y 14:00-17:00 (puedes agregar múltiples horarios por día)</span>
+                </p>
+            </div>
+        </form>
+    </div>
+
+    <!-- Sección: Horarios Configurados - Diseño Calendario -->
+    <div class="section section-calendario-completo" style="background: white; padding: 30px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 100%; max-width: 100%; margin-left: 0; margin-right: 0;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <h2 style="margin: 0; color: #1e293b; font-size: 1.5rem;"><i class="fas fa-calendar-week"></i> Calendario Semanal de Horarios</h2>
+        </div>
+
+        <div id="horariosContainer" style="width: 100%;">
+            <!-- Lista vertical de días -->
+            <div class="lista-dias-semana">
+                {% for dia_num, dia_nombre in dias_semana %}
+                {% with horarios_dia=horarios_por_dia|get_item:dia_num %}
+                <div class="dia-lista-item {% if not horarios_dia %}sin-horarios{% endif %}" data-dia="{{ dia_num }}">
+                    <div class="dia-lista-header">
+                        <div class="dia-lista-titulo">
+                            <h3 class="dia-lista-nombre">
+                            <i class="fas fa-calendar-day"></i> 
+                            {{ dia_nombre }}
+                        </h3>
+                        {% if horarios_dia %}
+                            <span class="badge-cantidad-lista" id="badge-{{ dia_num }}">
+                            {{ horarios_dia|length }} bloque{{ horarios_dia|length|pluralize:"s" }}
+                        </span>
+                        {% else %}
+                            <span class="badge-sin-horarios-lista" id="badge-{{ dia_num }}">
+                            <i class="fas fa-exclamation-triangle"></i> Sin horarios
+                        </span>
+                        {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="horarios-lista-container" id="lista-{{ dia_num }}">
+                        {% if horarios_dia %}
+                            <div class="horarios-grid">
+                            {% for horario in horarios_dia %}
+                                <div class="horario-lista-item" data-horario-id="{{ horario.id }}" data-dia="{{ horario.dia_semana }}">
+                                    <div class="horario-lista-content">
+                                        <input type="checkbox" name="horarios_a_eliminar" value="{{ horario.id }}" id="horario_{{ horario.id }}" class="checkbox-horario-lista">
+                                        <div class="horario-lista-info">
+                                            <div class="horario-lista-hora">
+                                        <i class="fas fa-clock"></i>
+                                                <span class="horario-texto">{{ horario.hora_inicio|time:"H:i" }} - {{ horario.hora_fin|time:"H:i" }}</span>
+                                            </div>
+                                    {% if not horario.activo %}
+                                            <span class="badge-estado-lista badge-inactivo">Inactivo</span>
+                                    {% else %}
+                                            <span class="badge-estado-lista badge-activo">Activo</span>
+                                    {% endif %}
+                                        </div>
+                                        <button class="btn-editar-horario-lista" onclick="editarHorarioInline({{ horario.id }}, {{ horario.dia_semana }}, '{{ horario.hora_inicio|time:"H:i" }}', '{{ horario.hora_fin|time:"H:i" }}')" title="Editar horario">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                            </div>
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="sin-horarios-mensaje-lista">
+                                <i class="fas fa-calendar-times"></i>
+                                <p>No hay horarios configurados</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endwith %}
+                {% endfor %}
+            </div>
+            
+            <div class="seccion-eliminar-horarios" id="seccionEliminar" style="display: none;">
+                <div class="info-eliminar">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="contadorSeleccionados">0 horarios seleccionados</span>
+                </div>
+                <button type="button" class="btn-eliminar-horarios" id="btnEliminarHorarios">
+                    <i class="fas fa-trash-alt"></i> Eliminar Seleccionados
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Sistema de Notificaciones */
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+    
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+    
+    .notification.success {
+        border-left-color: #10b981;
+        background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+    }
+    
+    .notification.error {
+        border-left-color: #ef4444;
+        background: linear-gradient(to right, #fef2f2 0%, white 8%);
+    }
+    
+    .notification.warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(to right, #fffbeb 0%, white 8%);
+    }
+    
+    .notification.info {
+        border-left-color: #3b82f6;
+        background: linear-gradient(to right, #eff6ff 0%, white 8%);
+    }
+    
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+    
+    .notification.success .notification-icon {
+        background: #10b981;
+        color: white;
+    }
+    
+    .notification.error .notification-icon {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+        color: white;
+    }
+    
+    .notification.info .notification-icon {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .notification-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+    
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+    }
+    
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+
+    .section {
+        margin-bottom: 30px;
+    }
+    
+    /* Botón Volver a Personal */
+    .btn-volver-personal {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: white;
+        color: var(--primary-color);
+        border: 2px solid var(--primary-color);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        white-space: nowrap;
+    }
+    
+    .btn-volver-personal:hover {
+        background: var(--primary-color);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-volver-personal i {
+        font-size: 0.85rem;
+        transition: transform 0.3s ease;
+    }
+    
+    .btn-volver-personal:hover i {
+        transform: translateX(-3px);
+    }
+    
+    @media (max-width: 768px) {
+        .btn-volver-personal {
+            width: 100%;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        
+        .page-header > div:first-child {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+    }
+    
+    /* Contenedor principal - ancho completo */
+    .section-calendario-completo {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    .personal-container {
+        max-width: 100%;
+        padding: 0 20px;
+    }
+    
+    /* Lista Vertical de Días */
+    .lista-dias-semana {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+    
+    /* Item de día en lista */
+    .dia-lista-item {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 16px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    
+    .dia-lista-item:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        border-color: var(--primary-color);
+    }
+    
+    .dia-lista-item.sin-horarios {
+        background: #fef2f2;
+        border-color: #fee2e2;
+    }
+    
+    .dia-lista-item.sin-horarios:hover {
+        background: #fee2e2;
+    }
+    
+    /* Header del día en lista */
+    .dia-lista-header {
+        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+        padding: 20px 24px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .dia-lista-item.sin-horarios .dia-lista-header {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    }
+    
+    .dia-lista-titulo {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+    
+    .dia-lista-nombre {
+        margin: 0;
+        color: #1e293b;
+        font-size: 1.25rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .dia-lista-nombre i {
+        color: var(--primary-color);
+        font-size: 1.3rem;
+    }
+    
+    /* Badges para lista */
+    .badge-cantidad-lista {
+        background: #10b981;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    
+    .badge-sin-horarios-lista {
+        background: #fbbf24;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+    
+    /* Contenedor de horarios en lista */
+    .horarios-lista-container {
+        padding: 24px;
+    }
+    
+    /* Grid de horarios dentro de cada día */
+    .horarios-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+    }
+    
+    /* Scrollbar personalizado */
+    .horarios-lista::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .horarios-lista::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+    
+    .horarios-lista::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+    
+    .horarios-lista::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    
+    /* Item de horario en lista */
+    .horario-lista-item {
+        background: white;
+        border-radius: 14px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+    
+    .horario-lista-item:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        transform: translateY(-3px);
+    }
+    
+    .horario-lista-item.selected {
+        background: #eff6ff;
+        border-color: var(--primary-color);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.25);
+    }
+    
+    .horario-lista-content {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px;
+    }
+    
+    .checkbox-horario-lista {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    
+    .horario-lista-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+    }
+    
+    .horario-lista-hora {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .horario-lista-hora i {
+        color: var(--primary-color);
+        font-size: 1.1rem;
+    }
+    
+    .badge-estado-lista {
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        width: fit-content;
+    }
+    
+    .badge-activo {
+        background: #10b981;
+        color: white;
+    }
+    
+    .badge-inactivo {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .btn-editar-horario-lista {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        color: #0284c7;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        padding: 0;
+        font-size: 1rem;
+    }
+    
+    .btn-editar-horario-lista:hover {
+        background: #0284c7;
+        color: white;
+        transform: scale(1.1);
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+    }
+    
+    /* Mensaje sin horarios en lista */
+    .sin-horarios-mensaje-lista {
+        text-align: center;
+        padding: 60px 20px;
+        color: #64748b;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .sin-horarios-mensaje-lista i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+        color: #cbd5e1;
+    }
+    
+    .sin-horarios-mensaje-lista p {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    
+    
+    /* Responsive - Lista de días */
+    @media (max-width: 1024px) {
+        .horarios-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 14px;
+        }
+        
+        .dia-lista-header {
+            padding: 18px 20px;
+        }
+        
+        .horarios-lista-container {
+            padding: 20px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        #formAgregarHorario > div {
+            flex-direction: column !important;
+        }
+        
+        #formAgregarHorario > div > div {
+            width: 100% !important;
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        
+        .lista-dias-semana {
+            gap: 20px;
+        }
+        
+        .dia-lista-header {
+            padding: 16px 18px;
+        }
+        
+        .dia-lista-nombre {
+            font-size: 1.1rem;
+        }
+        
+        .horarios-lista-container {
+            padding: 18px;
+        }
+        
+        .horarios-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        
+        .horario-lista-content {
+            padding: 16px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .dia-lista-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .dia-lista-titulo {
+            flex-direction: column;
+            align-items: flex-start;
+            width: 100%;
+        }
+        
+        .horario-lista-content {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .btn-editar-horario-lista {
+            align-self: flex-end;
+        }
+    }
+    
+    /* Sección de eliminar horarios */
+    .seccion-eliminar-horarios {
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .info-eliminar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #64748b;
+        font-size: 0.875rem;
+    }
+    
+    .info-eliminar i {
+        color: var(--primary-color);
+        font-size: 0.9rem;
+    }
+    
+    .btn-eliminar-horarios {
+        padding: 8px 16px;
+        font-size: 0.875rem;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+    }
+    
+    .btn-eliminar-horarios:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+    }
+    
+    .btn-eliminar-horarios i {
+        font-size: 0.8rem;
+    }
+    
+    @media (max-width: 768px) {
+        .seccion-eliminar-horarios {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .btn-eliminar-horarios {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+    
+    /* Estilos para edición inline */
+    .horario-editando {
+        background: #fef3c7 !important;
+        border-color: #f59e0b !important;
+    }
+    
+    .horario-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .horario-edit-form input {
+        padding: 6px 10px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
+    
+    .horario-edit-actions {
+        display: flex;
+        gap: 6px;
+    }
+    
+    .horario-edit-actions button {
+        padding: 4px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    
+    .btn-guardar-edit {
+        background: #10b981;
+        color: white;
+    }
+    
+    .btn-cancelar-edit {
+        background: #6b7280;
+        color: white;
+    }
+</style>
+
+<script>
+// ========== SISTEMA DE NOTIFICACIONES ==========
+function showNotification(type, message, duration = 5000) {
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(notification);
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+
+// ========== VARIABLES GLOBALES ==========
+const DENTISTA_ID = {{ dentista.id }};
+const DIAS_SEMANA = {
+    {% for dia_num, dia_nombre in dias_semana %}
+    {{ dia_num }}: '{{ dia_nombre }}',
+    {% endfor %}
+};
+
+// ========== AGREGAR HORARIO ==========
+document.getElementById('formAgregarHorario').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const diaSemana = document.getElementById('dia_semana').value;
+    const horaInicio = document.getElementById('hora_inicio').value;
+    const horaFin = document.getElementById('hora_fin').value;
+    
+    // Validación frontend
+    if (!diaSemana || !horaInicio || !horaFin) {
+        showNotification('error', 'Todos los campos son obligatorios');
+        return;
+    }
+    
+    if (horaFin <= horaInicio) {
+        showNotification('error', 'La hora de fin debe ser mayor que la hora de inicio');
+        return;
+    }
+    
+    const btnAgregar = document.getElementById('btnAgregarHorario');
+    const originalText = btnAgregar.innerHTML;
+    btnAgregar.disabled = true;
+    btnAgregar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
+    
+    const formData = new FormData();
+    formData.append('dia_semana', diaSemana);
+    formData.append('hora_inicio', horaInicio);
+    formData.append('hora_fin', horaFin);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`/trabajadores/horarios/dentista/${DENTISTA_ID}/agregar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message);
+            agregarHorarioALista(data.horario);
+            // Resetear formulario
+            document.getElementById('formAgregarHorario').reset();
+        } else {
+            showNotification('error', data.error || 'Error al agregar horario');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al agregar horario. Por favor, intenta nuevamente.');
+    })
+    .finally(() => {
+        btnAgregar.disabled = false;
+        btnAgregar.innerHTML = originalText;
+    });
+});
+
+// Función para agregar horario a la lista visualmente
+function agregarHorarioALista(horario) {
+    const listaId = `lista-${horario.dia_semana}`;
+    const container = document.getElementById(listaId);
+    const diaItem = container.closest('.dia-lista-item');
+    const badge = document.getElementById(`badge-${horario.dia_semana}`);
+    
+    if (!container) return;
+    
+    // Remover mensaje de sin horarios si existe
+    const sinHorarios = container.querySelector('.sin-horarios-mensaje-lista');
+    if (sinHorarios) {
+        sinHorarios.remove();
+    }
+    
+    // Crear grid si no existe
+    let grid = container.querySelector('.horarios-grid');
+    if (!grid) {
+        grid = document.createElement('div');
+        grid.className = 'horarios-grid';
+        container.appendChild(grid);
+    }
+    
+    // Crear nuevo item de horario
+    const horarioItem = document.createElement('div');
+    horarioItem.className = 'horario-lista-item';
+    horarioItem.setAttribute('data-horario-id', horario.id);
+    horarioItem.setAttribute('data-dia', horario.dia_semana);
+    horarioItem.innerHTML = `
+        <div class="horario-lista-content">
+            <input type="checkbox" name="horarios_a_eliminar" value="${horario.id}" id="horario_${horario.id}" class="checkbox-horario-lista">
+            <div class="horario-lista-info">
+                <div class="horario-lista-hora" data-horario-id="${horario.id}">
+                    <i class="fas fa-clock"></i>
+                    <span class="horario-texto">${horario.hora_inicio} - ${horario.hora_fin}</span>
+                </div>
+                <span class="badge-estado-lista badge-activo">Activo</span>
+            </div>
+            <button class="btn-editar-horario-lista" onclick="editarHorarioInline(${horario.id}, ${horario.dia_semana}, '${horario.hora_inicio}', '${horario.hora_fin}')" title="Editar horario">
+                <i class="fas fa-edit"></i>
+            </button>
+        </div>
+    `;
+    
+    grid.appendChild(horarioItem);
+    
+    // Actualizar badge
+    const cantidad = grid.querySelectorAll('.horario-lista-item').length;
+    if (badge) {
+        badge.textContent = `${cantidad} bloque${cantidad > 1 ? 's' : ''}`;
+        badge.className = 'badge-cantidad-lista';
+    }
+    
+    // Remover clase sin-horarios del día
+    diaItem.classList.remove('sin-horarios');
+    
+    // Agregar evento al checkbox
+    const checkbox = horarioItem.querySelector('.checkbox-horario-lista');
+    checkbox.addEventListener('change', actualizarContadorEliminar);
+}
+
+// ========== ELIMINAR HORARIOS ==========
+function actualizarContadorEliminar() {
+    const checkboxes = document.querySelectorAll('.checkbox-horario-lista:checked');
+    const contador = document.getElementById('contadorSeleccionados');
+    const seccionEliminar = document.getElementById('seccionEliminar');
+    
+    const cantidad = checkboxes.length;
+    
+    if (contador) {
+        contador.textContent = `${cantidad} horario${cantidad !== 1 ? 's' : ''} seleccionado${cantidad !== 1 ? 's' : ''}`;
+    }
+    
+    if (seccionEliminar) {
+        seccionEliminar.style.display = cantidad > 0 ? 'flex' : 'none';
+    }
+    
+    // Marcar items seleccionados
+    document.querySelectorAll('.horario-lista-item').forEach(item => {
+        const checkbox = item.querySelector('.checkbox-horario-lista');
+        if (checkbox && checkbox.checked) {
+            item.classList.add('selected');
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+}
+
+// Agregar eventos a checkboxes existentes
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.checkbox-horario-lista').forEach(checkbox => {
+        checkbox.addEventListener('change', actualizarContadorEliminar);
+    });
+});
+
+// Botón eliminar horarios
+document.getElementById('btnEliminarHorarios').addEventListener('click', function() {
+    const checkboxes = document.querySelectorAll('.checkbox-horario-lista:checked');
+    const horariosIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    if (horariosIds.length === 0) {
+        showNotification('warning', 'No hay horarios seleccionados para eliminar');
+        return;
+    }
+    
+    if (!confirm(`¿Está seguro de que desea eliminar ${horariosIds.length} horario(s)? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    
+    const btnEliminar = this;
+    const originalText = btnEliminar.innerHTML;
+    btnEliminar.disabled = true;
+    btnEliminar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
+    
+    fetch(`/trabajadores/horarios/dentista/${DENTISTA_ID}/eliminar/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            horarios_ids: horariosIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message);
+            // Eliminar items visualmente
+            horariosIds.forEach(id => {
+                const item = document.querySelector(`[data-horario-id="${id}"]`);
+                if (item) {
+                    const dia = item.getAttribute('data-dia');
+                    item.remove();
+                    actualizarListaDia(dia);
+                }
+            });
+            actualizarContadorEliminar();
+        } else {
+            showNotification('error', data.error || 'Error al eliminar horarios');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar horarios. Por favor, intenta nuevamente.');
+    })
+    .finally(() => {
+        btnEliminar.disabled = false;
+        btnEliminar.innerHTML = originalText;
+    });
+});
+
+// Función para actualizar lista después de eliminar
+function actualizarListaDia(dia) {
+    const container = document.getElementById(`lista-${dia}`);
+    const diaItem = container.closest('.dia-lista-item');
+    const badge = document.getElementById(`badge-${dia}`);
+    
+    if (!container) return;
+    
+    const grid = container.querySelector('.horarios-grid');
+    const items = grid ? grid.querySelectorAll('.horario-lista-item') : [];
+    
+    if (items.length === 0) {
+        // Agregar mensaje de sin horarios
+        container.innerHTML = `
+            <div class="sin-horarios-mensaje-lista">
+                <i class="fas fa-calendar-times"></i>
+                <p>No hay horarios configurados</p>
+            </div>
+        `;
+        diaItem.classList.add('sin-horarios');
+        if (badge) {
+            badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Sin horarios';
+            badge.className = 'badge-sin-horarios-lista';
+        }
+    } else {
+        const cantidad = items.length;
+        if (badge) {
+            badge.textContent = `${cantidad} bloque${cantidad > 1 ? 's' : ''}`;
+            badge.className = 'badge-cantidad-lista';
+        }
+        diaItem.classList.remove('sin-horarios');
+    }
+}
+
+// ========== EDITAR HORARIO INLINE ==========
+function editarHorarioInline(horarioId, diaSemana, horaInicio, horaFin) {
+    const item = document.querySelector(`[data-horario-id="${horarioId}"]`);
+    if (!item) return;
+    
+    // Verificar si ya está en modo edición
+    if (item.classList.contains('horario-editando')) {
+        return;
+    }
+    
+    item.classList.add('horario-editando');
+    
+    const content = item.querySelector('.horario-calendario-content');
+    const btnEditar = content.querySelector('.btn-editar-horario-calendario');
+    
+    const formHTML = `
+        <div class="horario-edit-form">
+            <select id="edit-dia-${horarioId}" style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; width: 100%; margin-bottom: 8px;">
+                ${Object.entries(DIAS_SEMANA).map(([num, nombre]) => 
+                    `<option value="${num}" ${num == diaSemana ? 'selected' : ''}>${nombre}</option>`
+                ).join('')}
+            </select>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="time" id="edit-inicio-${horarioId}" value="${horaInicio}" style="flex: 1; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem;">
+                <input type="time" id="edit-fin-${horarioId}" value="${horaFin}" style="flex: 1; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem;">
+            </div>
+            <div class="horario-edit-actions">
+                <button class="btn-guardar-edit" onclick="guardarHorarioEditado(${horarioId})">
+                    <i class="fas fa-check"></i> Guardar
+                </button>
+                <button class="btn-cancelar-edit" onclick="cancelarEdicionHorario(${horarioId})">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = formHTML;
+}
+
+function guardarHorarioEditado(horarioId) {
+    const item = document.querySelector(`[data-horario-id="${horarioId}"]`);
+    if (!item) return;
+    
+    const diaSemana = document.getElementById(`edit-dia-${horarioId}`).value;
+    const horaInicio = document.getElementById(`edit-inicio-${horarioId}`).value;
+    const horaFin = document.getElementById(`edit-fin-${horarioId}`).value;
+    
+    // Validación
+    if (!diaSemana || !horaInicio || !horaFin) {
+        showNotification('error', 'Todos los campos son obligatorios');
+        return;
+    }
+    
+    if (horaFin <= horaInicio) {
+        showNotification('error', 'La hora de fin debe ser mayor que la hora de inicio');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('dia_semana', diaSemana);
+    formData.append('hora_inicio', horaInicio);
+    formData.append('hora_fin', horaFin);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`/trabajadores/horarios/${horarioId}/editar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message);
+            // Actualizar item visualmente
+            const diaAnterior = item.getAttribute('data-dia');
+            const diaNuevo = data.horario.dia_semana;
+            
+            if (diaAnterior != diaNuevo) {
+                // Mover a otra columna
+                const listaAnterior = document.getElementById(`lista-${diaAnterior}`);
+                const listaNueva = document.getElementById(`lista-${diaNuevo}`);
+                item.remove();
+                listaNueva.appendChild(item);
+                actualizarListaDia(diaAnterior);
+            }
+            
+            item.setAttribute('data-dia', diaNuevo);
+            item.classList.remove('horario-editando');
+            
+            const content = item.querySelector('.horario-lista-content');
+            content.innerHTML = `
+                <input type="checkbox" name="horarios_a_eliminar" value="${horarioId}" id="horario_${horarioId}" class="checkbox-horario-lista">
+                <div class="horario-lista-info">
+                    <div class="horario-lista-hora" data-horario-id="${horarioId}">
+                        <i class="fas fa-clock"></i>
+                        <span class="horario-texto">${data.horario.hora_inicio} - ${data.horario.hora_fin}</span>
+                    </div>
+                    <span class="badge-estado-lista badge-activo">Activo</span>
+                </div>
+                <button class="btn-editar-horario-lista" onclick="editarHorarioInline(${horarioId}, ${diaNuevo}, '${data.horario.hora_inicio}', '${data.horario.hora_fin}')" title="Editar horario">
+                    <i class="fas fa-edit"></i>
+                </button>
+            `;
+            
+            // Agregar evento al checkbox
+            const checkbox = content.querySelector('.checkbox-horario-lista');
+            checkbox.addEventListener('change', actualizarContadorEliminar);
+            
+            // Si cambió de día, mover el item al grid correcto
+            if (diaAnterior != diaNuevo) {
+                const nuevoContainer = document.getElementById(`lista-${diaNuevo}`);
+                const nuevoGrid = nuevoContainer.querySelector('.horarios-grid') || (() => {
+                    const g = document.createElement('div');
+                    g.className = 'horarios-grid';
+                    nuevoContainer.innerHTML = '';
+                    nuevoContainer.appendChild(g);
+                    return g;
+                })();
+                
+                item.remove();
+                nuevoGrid.appendChild(item);
+                actualizarListaDia(diaAnterior);
+            }
+            
+            actualizarListaDia(diaNuevo);
+        } else {
+            showNotification('error', data.error || 'Error al actualizar horario');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al actualizar horario. Por favor, intenta nuevamente.');
+    });
+}
+
+function cancelarEdicionHorario(horarioId) {
+    const item = document.querySelector(`[data-horario-id="${horarioId}"]`);
+    if (!item) return;
+    
+    // Recargar la página para restaurar el estado original
+    window.location.reload();
+}
+</script>
+{% endblock %}

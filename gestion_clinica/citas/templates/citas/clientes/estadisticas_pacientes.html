@@ -1,0 +1,183 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Estadísticas de Pacientes - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-chart-line"></i> Estadísticas de Mis Pacientes{% endblock %}
+{% block page_subtitle %}Análisis detallado del rendimiento y actividad de tus pacientes{% endblock %}
+
+{% block content %}
+<!-- Estadísticas Generales -->
+<div class="section">
+    <h2><i class="fas fa-chart-bar"></i> Resumen General</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
+        <div style="background: #eff6ff; padding: 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: #3b82f6;">{{ estadisticas.total_pacientes }}</div>
+            <div style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Total Pacientes</div>
+        </div>
+        <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: #10b981;">{{ estadisticas.citas_totales }}</div>
+            <div style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Total Citas</div>
+        </div>
+        <div style="background: #fef3c7; padding: 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: #f59e0b;">{{ estadisticas.citas_pendientes }}</div>
+            <div style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Citas Pendientes</div>
+        </div>
+        <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: #10b981;">{{ estadisticas.citas_completadas }}</div>
+            <div style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Citas Completadas</div>
+        </div>
+        <div style="background: #fef2f2; padding: 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: #ef4444;">{{ estadisticas.citas_hoy }}</div>
+            <div style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Citas Hoy</div>
+        </div>
+    </div>
+</div>
+
+<!-- Citas por Mes -->
+{% if citas_por_mes %}
+<div class="section">
+    <h2><i class="fas fa-calendar-alt"></i> Citas por Mes (Últimos 6 Meses)</h2>
+    <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+            {% for mes_data in citas_por_mes %}
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6; margin-bottom: 4px;">
+                    {{ mes_data.citas }}
+                </div>
+                <div style="color: #64748b; font-size: 0.875rem;">
+                    {{ mes_data.mes }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Pacientes Más Activos -->
+{% if pacientes_activos %}
+<div class="section">
+    <h2><i class="fas fa-star"></i> Pacientes Más Activos</h2>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+            <thead>
+                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                    <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151;">Paciente</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151;">Email</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600; color: #374151;">Total Citas</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600; color: #374151;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for paciente in pacientes_activos %}
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 12px;">
+                        <div style="font-weight: 600; color: #1f2937;">{{ paciente.nombre_completo }}</div>
+                        <div style="font-size: 0.75rem; color: #6b7280;">{{ paciente.telefono }}</div>
+                    </td>
+                    <td style="padding: 12px; color: #374151;">
+                        {{ paciente.email }}
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="background: #eff6ff; color: #3b82f6; padding: 4px 8px; border-radius: 4px; font-size: 0.875rem; font-weight: 600;">
+                            {{ paciente.total_citas }}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="color: #6b7280; font-size: 0.875rem;">Ver en Mis Pacientes</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tipos de Consulta Más Comunes -->
+{% if tipos_consulta %}
+<div class="section">
+    <h2><i class="fas fa-list"></i> Tipos de Consulta Más Comunes</h2>
+    <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+            {% for tipo in tipos_consulta %}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div>
+                    <div style="font-weight: 600; color: #1f2937; font-size: 0.875rem;">
+                        {{ tipo.tipo_consulta|default:"Consulta general" }}
+                    </div>
+                </div>
+                <div style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                    {{ tipo.total }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Acciones Rápidas -->
+<div class="section">
+    <h2><i class="fas fa-tools"></i> Acciones Rápidas</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <a href="{% url 'gestionar_pacientes' %}" class="btn" style="padding: 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <i class="fas fa-user-friends" style="font-size: 1.5rem;"></i>
+            <span>Gestionar Pacientes</span>
+        </a>
+        <a href="{% url 'mis_citas_dentista' %}" class="btn btn-success" style="padding: 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <i class="fas fa-calendar-check" style="font-size: 1.5rem;"></i>
+            <span>Ver Mis Citas</span>
+        </a>
+        <a href="{% url 'mi_perfil' %}" class="btn btn-info" style="padding: 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <i class="fas fa-user" style="font-size: 1.5rem;"></i>
+            <span>Mi Perfil</span>
+        </a>
+    </div>
+</div>
+
+<!-- Información Adicional -->
+<div class="section">
+    <h2><i class="fas fa-info-circle"></i> Información del Dentista</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <h4 style="color: #1f2937; margin-bottom: 8px;">
+                <i class="fas fa-user-md"></i> Información Personal
+            </h4>
+            <div style="color: #374151; font-size: 0.875rem;">
+                <div style="margin-bottom: 4px;"><strong>Nombre:</strong> {{ perfil.nombre_completo }}</div>
+                <div style="margin-bottom: 4px;"><strong>Especialidad:</strong> {{ perfil.especialidad|default:"No especificada" }}</div>
+                <div style="margin-bottom: 4px;"><strong>Número de Colegio:</strong> {{ perfil.numero_colegio|default:"No especificado" }}</div>
+                <div><strong>Email:</strong> {{ perfil.email }}</div>
+            </div>
+        </div>
+        
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <h4 style="color: #1f2937; margin-bottom: 8px;">
+                <i class="fas fa-chart-pie"></i> Rendimiento
+            </h4>
+            <div style="color: #374151; font-size: 0.875rem;">
+                {% if estadisticas.citas_totales > 0 %}
+                <div style="margin-bottom: 4px;">
+                    <strong>Tasa de Completitud:</strong> 
+                    {% widthratio estadisticas.citas_completadas estadisticas.citas_totales 100 %}%
+                </div>
+                {% endif %}
+                <div style="margin-bottom: 4px;">
+                    <strong>Promedio de Citas por Paciente:</strong> 
+                    {% if estadisticas.total_pacientes > 0 %}
+                        {% widthratio estadisticas.citas_totales estadisticas.total_pacientes 1 %}
+                    {% else %}
+                        0
+                    {% endif %}
+                </div>
+                <div>
+                    <strong>Pacientes Activos:</strong> {{ estadisticas.total_pacientes }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

@@ -1,0 +1,1511 @@
+{% extends 'citas/base.html' %}
+{% load static %}
+
+{% block title %}Mis Citas - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<!-- Contenedor de Notificaciones -->
+<div id="notificationContainer" class="notification-container"></div>
+
+<style>
+    /* Sistema de Notificaciones */
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+    
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+    
+    .notification.success {
+        border-left-color: #10b981;
+        background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+    }
+    
+    .notification.error {
+        border-left-color: #ef4444;
+        background: linear-gradient(to right, #fef2f2 0%, white 8%);
+    }
+    
+    .notification.warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(to right, #fffbeb 0%, white 8%);
+    }
+    
+    .notification.info {
+        border-left-color: #3b82f6;
+        background: linear-gradient(to right, #eff6ff 0%, white 8%);
+    }
+    
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+    
+    .notification.success .notification-icon {
+        background: #10b981;
+        color: white;
+    }
+    
+    .notification.error .notification-icon {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+        color: white;
+    }
+    
+    .notification.info .notification-icon {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .notification-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+    
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+    }
+    
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+</style>
+
+<!-- Header con Stats a la Derecha -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-calendar-alt"></i> Mis Citas</h1>
+        <p class="page-subtitle">Gestiona todas tus citas asignadas</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon today">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ citas_hoy }}</div>
+                    <div class="stat-label">Citas de Hoy</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon pending">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ citas_reservadas }}</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon completed">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ citas_completadas_count }}</div>
+                    <div class="stat-label">Completadas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+
+    <!-- Filtros -->
+    <div class="filtros-busqueda">
+        <form method="GET" style="display: contents;">
+            <input type="hidden" name="tab" value="{{ tab }}">
+            <div class="filtro-group">
+                <i class="fas fa-calendar-alt"></i>
+                <input type="date" id="fecha_desde" name="fecha_desde" class="filtro-input" value="{{ fecha_desde }}" placeholder="Fecha desde">
+            </div>
+            <div class="filtro-group">
+                <i class="fas fa-calendar-alt"></i>
+                <input type="date" id="fecha_hasta" name="fecha_hasta" class="filtro-input" value="{{ fecha_hasta }}" placeholder="Fecha hasta">
+            </div>
+            <button type="submit" class="btn-limpiar-filtros" style="background: #3b82f6; color: white; border-color: #3b82f6;">
+                <i class="fas fa-search"></i> Filtrar
+            </button>
+            <a href="{% url 'mis_citas_dentista' %}?tab={{ tab }}" class="btn-limpiar-filtros" title="Limpiar filtros">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+        </form>
+    </div>
+
+    <!-- Sistema de Pestañas -->
+    <div class="citas-container">
+                <!-- Pestañas -->
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-button {% if tab == 'activas' %}active{% endif %}" 
+                                onclick="window.location.href='{% url 'mis_citas_dentista' %}?tab=activas{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}'">
+                            <i class="fas fa-calendar-check"></i>
+                            Mis Citas
+                            <span class="tab-badge">{{ citas_reservadas }}</span>
+                        </button>
+                        <button class="tab-button {% if tab == 'completadas' %}active{% endif %}" 
+                                onclick="window.location.href='{% url 'mis_citas_dentista' %}?tab=completadas{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}'">
+                            <i class="fas fa-check-circle"></i>
+                            Mis Citas Completadas
+                            <span class="tab-badge">{{ citas_completadas_count }}</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Contenido: Mis Citas (Activas) -->
+                    <div class="tab-content {% if tab == 'activas' %}active{% endif %}" id="tab-activas">
+                        {% if citas_activas %}
+                            <div class="citas-grid">
+                                {% for cita in citas_activas %}
+                                <div class="cita-card {{ cita.estado }}">
+                                    <div class="cita-header">
+                                        <div class="cita-fecha">
+                                            <div class="fecha-dia">{{ cita.fecha_hora|date:"d" }}</div>
+                                            <div class="fecha-mes">{{ cita.fecha_hora|date:"M" }}</div>
+                                        </div>
+                                        <div class="cita-hora">
+                                            <i class="fas fa-clock"></i>
+                                            {{ cita.fecha_hora|time:"H:i" }}
+                                        </div>
+                                        <div class="cita-estado">
+                                            <span class="estado-badge {{ cita.estado }}">
+                                                <i class="fas fa-calendar-check"></i>
+                                                {{ cita.get_estado_display }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="cita-body">
+                                        <div class="cita-paciente">
+                                            <i class="fas fa-user"></i>
+                                            <span>{{ cita.nombre_paciente }}</span>
+                                        </div>
+                                        
+                                        {% if cita.tipo_servicio %}
+                                        <div class="cita-tipo">
+                                            <i class="fas fa-stethoscope"></i>
+                                            <span>{{ cita.tipo_servicio.nombre }}</span>
+                                        </div>
+                                        {% elif cita.tipo_consulta %}
+                                        <div class="cita-tipo">
+                                            <i class="fas fa-file-medical"></i>
+                                            <span>{{ cita.tipo_consulta }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if cita.notas %}
+                                        <div class="cita-notas">
+                                            <i class="fas fa-sticky-note"></i>
+                                            <span>{{ cita.notas|truncatechars:50 }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="cita-contacto">
+                                            {% if cita.email_paciente %}
+                                                <div class="contact-item">
+                                                    <i class="fas fa-envelope"></i>
+                                                    <span>{{ cita.email_paciente }}</span>
+                                                </div>
+                                            {% endif %}
+                                            {% if cita.telefono_paciente %}
+                                                <div class="contact-item">
+                                                    <i class="fas fa-phone"></i>
+                                                    <span>{{ cita.telefono_paciente }}</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if cita.tiene_ficha %}
+                                        <div class="ficha-indicator" style="margin-top: 12px; padding: 8px 12px; background: #d1fae5; border-left: 3px solid #10b981; border-radius: 4px;">
+                                            <i class="fas fa-check-circle" style="color: #065f46;"></i>
+                                            <span style="color: #065f46; font-size: 0.875rem; font-weight: 600;">Ficha creada</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="cita-actions">
+                                        {% if cita.estado == 'en_espera' %}
+                                            <button onclick="marcarListoParaAtender({{ cita.id }})" class="action-btn btn-listo-para-atender">
+                                                <i class="fas fa-check-circle"></i>
+                                                Listo para Atender
+                                            </button>
+                                        {% elif cita.estado == 'listo_para_atender' %}
+                                            <button onclick="iniciarAtencion({{ cita.id }})" class="action-btn btn-iniciar-atencion">
+                                                <i class="fas fa-play"></i>
+                                                Iniciar Atención
+                                            </button>
+                                            <div class="info-message" style="background: #dbeafe; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; color: #1e40af; margin-top: 8px; border-left: 3px solid #3b82f6;">
+                                                <i class="fas fa-info-circle"></i> La recepcionista ha sido notificada. Cuando el paciente entre, presiona "Iniciar Atención" para desbloquear la opción de crear la ficha.
+                                            </div>
+                                        {% elif cita.estado == 'en_progreso' %}
+                                            {% if not cita.tiene_ficha %}
+                                                <a href="{% url 'crear_odontograma' %}?cita_id={{ cita.id }}" class="action-btn create-ficha">
+                                                    <i class="fas fa-file-medical"></i>
+                                                    Crear Ficha
+                                                </a>
+                                            {% else %}
+                                                <button onclick="finalizarAtencion({{ cita.id }})" class="action-btn btn-finalizar-atencion">
+                                                    <i class="fas fa-stop"></i>
+                                                    Finalizar Atención
+                                                </button>
+                                            {% endif %}
+                                        {% elif cita.estado == 'finalizada' %}
+                                            <div class="info-message" style="background: #fef3c7; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; color: #92400e; margin-top: 8px; border-left: 3px solid #f59e0b;">
+                                                <i class="fas fa-check-double"></i> Atención finalizada - Cliente va a recepción
+                                            </div>
+                                        {% else %}
+                                            {% if not cita.tiene_ficha %}
+                                                <a href="{% url 'crear_odontograma' %}?cita_id={{ cita.id }}" class="action-btn create-ficha">
+                                                    <i class="fas fa-file-medical"></i>
+                                                    Crear Ficha
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i class="fas fa-calendar-times"></i>
+                                </div>
+                                <h3>No tienes citas activas</h3>
+                                <p>Las citas reservadas o confirmadas aparecerán aquí</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Contenido: Mis Citas Completadas -->
+                    <div class="tab-content {% if tab == 'completadas' %}active{% endif %}" id="tab-completadas">
+                        {% if citas_completadas %}
+                            <div class="citas-completadas-container">
+                                <div class="citas-completadas-table">
+                                    <div class="table-header">
+                                        <div class="col-fecha">Fecha y Hora</div>
+                                        <div class="col-paciente">Paciente</div>
+                                        <div class="col-servicio">Servicio</div>
+                                        <div class="col-ficha">Ficha</div>
+                                        <div class="col-acciones">Acciones</div>
+                                    </div>
+                                    <div class="table-body">
+                                        {% for cita in citas_completadas %}
+                                        <div class="table-row">
+                                            <div class="col-fecha">
+                                                <div class="fecha-completa">
+                                                    <i class="fas fa-calendar"></i>
+                                                    <span>{{ cita.fecha_hora|date:"d/m/Y" }}</span>
+                                                </div>
+                                                <div class="hora-completa">
+                                                    <i class="fas fa-clock"></i>
+                                                    <span>{{ cita.fecha_hora|time:"H:i" }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-paciente">
+                                                <div class="paciente-nombre">
+                                                    <i class="fas fa-user"></i>
+                                                    <strong>{{ cita.nombre_paciente }}</strong>
+                                                </div>
+                                                {% if cita.email_paciente %}
+                                                <div class="paciente-contacto">
+                                                    <i class="fas fa-envelope"></i>
+                                                    <span>{{ cita.email_paciente }}</span>
+                                                </div>
+                                                {% endif %}
+                                                {% if cita.telefono_paciente %}
+                                                <div class="paciente-contacto">
+                                                    <i class="fas fa-phone"></i>
+                                                    <span>{{ cita.telefono_paciente }}</span>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-servicio">
+                                                {% if cita.tipo_servicio %}
+                                                    <span class="servicio-badge">
+                                                        <i class="fas fa-stethoscope"></i>
+                                                        {{ cita.tipo_servicio.nombre }}
+                                                    </span>
+                                                {% elif cita.tipo_consulta %}
+                                                    <span class="servicio-badge">
+                                                        <i class="fas fa-file-medical"></i>
+                                                        {{ cita.tipo_consulta }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="servicio-badge" style="color: #94a3b8;">
+                                                        Sin especificar
+                                                    </span>
+                                                {% endif %}
+                                                {% if cita.notas %}
+                                                <div class="notas-preview" title="{{ cita.notas }}">
+                                                    <i class="fas fa-sticky-note"></i>
+                                                    <span>{{ cita.notas|truncatechars:30 }}</span>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-ficha">
+                                                {% if cita.tiene_ficha %}
+                                                    <span class="ficha-status ficha-creada">
+                                                        <i class="fas fa-check-circle"></i>
+                                                        Creada
+                                                    </span>
+                                                {% else %}
+                                                    <span class="ficha-status ficha-pendiente">
+                                                        <i class="fas fa-exclamation-triangle"></i>
+                                                        Pendiente
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-acciones">
+                                                {% if cita.tiene_ficha %}
+                                                    <a href="{% url 'editar_odontograma' cita.odontograma.id %}" class="btn-accion-lista btn-editar-ficha" title="Editar ficha">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="{% url 'exportar_odontograma_pdf' cita.odontograma.id %}" class="btn-accion-lista" title="Descargar PDF" target="_blank">
+                                                        <i class="fas fa-file-pdf"></i>
+                                                    </a>
+                                                {% else %}
+                                                    <a href="{% url 'crear_odontograma' %}?cita_id={{ cita.id }}" class="btn-accion-lista btn-crear-ficha" title="Crear ficha">
+                                                        <i class="fas fa-file-medical"></i>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <h3>No tienes citas completadas</h3>
+                                <p>Las citas completadas aparecerán aquí</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+</div>
+
+<style>
+/* Los estilos de estadísticas están ahora en base.html con diseño unificado */
+
+/* Filtros - Estilo minimalista */
+.filtros-busqueda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    align-items: center;
+}
+
+.filtro-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+
+.filtro-group i {
+    color: #64748b;
+    font-size: 0.875rem;
+    position: absolute;
+    left: 12px;
+    z-index: 1;
+}
+
+.filtro-input,
+.filtro-select {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: #f8fafc;
+    color: #1e293b;
+    transition: all 0.2s ease;
+}
+
+.filtro-input:focus,
+.filtro-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-limpiar-filtros {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.btn-limpiar-filtros:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+/* Grid de citas */
+.citas-container {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.citas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 24px;
+}
+
+.cita-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.cita-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.cita-card.reservada {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+}
+
+.cita-card.completada {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
+
+.cita-card.cancelada {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, #fef2f2, #fecaca);
+}
+
+.cita-card.disponible {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+}
+
+.cita-header {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    gap: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cita-fecha {
+    text-align: center;
+    min-width: 60px;
+}
+
+.fecha-dia {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1;
+}
+
+.fecha-mes {
+    font-size: 0.875rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.cita-hora {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #374151;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.cita-hora i {
+    color: var(--primary-color);
+}
+
+.cita-estado {
+    margin-left: auto;
+}
+
+.estado-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.estado-badge.reservada {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.estado-badge.completada {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.estado-badge.cancelada {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+.estado-badge.disponible {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.cita-body {
+    padding: 20px;
+}
+
+.cita-paciente,
+.cita-tipo,
+.cita-notas {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: #374151;
+}
+
+.cita-paciente i,
+.cita-tipo i,
+.cita-notas i {
+    color: var(--primary-color);
+    width: 16px;
+}
+
+.cita-paciente span,
+.cita-tipo span,
+.cita-notas span {
+    font-weight: 500;
+}
+
+.cita-contacto {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.contact-item i {
+    color: #9ca3af;
+    width: 14px;
+}
+
+.cita-actions {
+    padding: 20px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.action-btn.complete {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn.complete:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.action-btn.cancel {
+    background: #ef4444;
+    color: white;
+}
+
+.action-btn.cancel:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+.action-btn.details {
+    background: var(--primary-color);
+    color: white;
+}
+
+.action-btn.details:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.action-btn.create-ficha {
+    background: #8b5cf6;
+    color: white;
+}
+
+.action-btn.create-ficha:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+}
+
+.action-btn.btn-listo-para-atender {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn.btn-listo-para-atender:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.action-btn.btn-iniciar-atencion {
+    background: #3b82f6;
+    color: white;
+}
+
+.action-btn.btn-iniciar-atencion:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.action-btn.btn-finalizar-atencion {
+    background: #f59e0b;
+    color: white;
+}
+
+.action-btn.btn-finalizar-atencion:hover {
+    background: #d97706;
+    transform: translateY(-1px);
+}
+
+.estado-badge.en_espera {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.estado-badge.listo_para_atender {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.estado-badge.en_progreso {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.estado-badge.finalizada {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.action-btn.view-ficha {
+    background: #0ea5e9;
+    color: white;
+}
+
+.action-btn.view-ficha:hover {
+    background: #0284c7;
+    transform: translateY(-1px);
+}
+
+/* Sistema de Pestañas */
+.tabs-container {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.tabs-header {
+    display: flex;
+    border-bottom: 2px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 16px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6b7280;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+}
+
+.tab-button:hover {
+    background: #f1f5f9;
+    color: #374151;
+}
+
+.tab-button.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: white;
+}
+
+.tab-button i {
+    font-size: 1.1rem;
+}
+
+.tab-badge {
+    background: #e5e7eb;
+    color: #6b7280;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 4px;
+}
+
+.tab-button.active .tab-badge {
+    background: var(--primary-color);
+    color: white;
+}
+
+.tab-content {
+    display: none;
+    padding: 24px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.status-completed,
+.status-cancelled {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-cancelled {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 80px 20px;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: #d1d5db;
+    margin-bottom: 24px;
+}
+
+.empty-state h3 {
+    color: #374151;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 32px;
+}
+
+/* Estilos para Lista de Citas Completadas */
+.citas-completadas-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.citas-completadas-table {
+    width: 100%;
+}
+
+.table-header {
+    display: grid;
+    grid-template-columns: 140px 1fr 180px 120px 100px;
+    gap: 16px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-bottom: 2px solid #e5e7eb;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 180px 120px 100px;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+    align-items: center;
+}
+
+.table-row:hover {
+    background: #f8fafc;
+}
+
+.table-row:last-child {
+    border-bottom: none;
+}
+
+.col-fecha {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fecha-completa,
+.hora-completa {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    color: #1e293b;
+}
+
+.fecha-completa {
+    font-weight: 600;
+}
+
+.hora-completa {
+    color: #64748b;
+    font-size: 0.8125rem;
+}
+
+.col-paciente {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.paciente-nombre {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9375rem;
+    color: #1e293b;
+}
+
+.paciente-nombre strong {
+    font-weight: 600;
+}
+
+.paciente-contacto {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+
+.col-servicio {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.servicio-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #e0f2fe;
+    color: #0c4a6e;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    width: fit-content;
+}
+
+.notas-preview {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+.col-ficha {
+    display: flex;
+    align-items: center;
+}
+
+.ficha-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.ficha-creada {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.ficha-pendiente {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.col-acciones {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-accion-lista {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-size: 0.875rem;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-accion-lista i {
+    color: white;
+}
+
+.btn-editar-ficha {
+    background: #f59e0b;
+}
+
+.btn-editar-ficha:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-accion-lista:nth-child(2) {
+    background: #ef4444;
+}
+
+.btn-accion-lista:nth-child(2):hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-crear-ficha {
+    background: #10b981;
+}
+
+.btn-crear-ficha:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .table-header,
+    .table-row {
+        grid-template-columns: 120px 1fr 160px 100px 90px;
+        gap: 12px;
+        padding: 12px 16px;
+    }
+}
+
+@media (max-width: 968px) {
+    .table-header,
+    .table-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .table-header {
+        display: none;
+    }
+    
+    .table-row {
+        padding: 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    
+    .col-fecha,
+    .col-paciente,
+    .col-servicio,
+    .col-ficha,
+    .col-acciones {
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .col-acciones {
+        border-bottom: none;
+        justify-content: flex-start;
+    }
+    
+    .col-fecha::before {
+        content: "Fecha y Hora: ";
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+    
+    .col-paciente::before {
+        content: "Paciente: ";
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+    
+    .col-servicio::before {
+        content: "Servicio: ";
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+    
+    .col-ficha::before {
+        content: "Ficha: ";
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-card {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .filtros-busqueda {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filtro-group {
+        min-width: 100%;
+    }
+    
+    .citas-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+// FUNCIÓN DESHABILITADA: Los dentistas ya no pueden completar citas
+// Solo el personal administrativo puede marcar citas como completadas
+function completarCita(citaId) {
+    showNotification('warning', 'Solo el personal de recepción puede marcar citas como completadas. Contacta al administrador si necesitas completar una cita.');
+}
+
+// Marcar listo para atender (dentista)
+function marcarListoParaAtender(citaId) {
+    // Construir URL manualmente para evitar problemas con template tags
+    const url = `/trabajadores/marcar_listo_para_atender/${citaId}/`;
+    
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        showNotification('error', 'Error: No se pudo obtener el token CSRF. Por favor, recarga la página.');
+        return;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                console.error('Respuesta no JSON recibida:', text.substring(0, 500));
+                throw new Error('El servidor devolvió una respuesta no válida. Por favor, recarga la página e intenta nuevamente.');
+            });
+        }
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || `Error del servidor: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Cita marcada como "Listo para Atender".');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Error al marcar la cita como lista.');
+        }
+    })
+    .catch(error => {
+        console.error('Error completo:', error);
+        showNotification('error', error.message || 'Error al marcar la cita como lista.');
+    });
+}
+
+// Iniciar atención (dentista)
+function iniciarAtencion(citaId) {
+    const url = `/trabajadores/iniciar_atencion/${citaId}/`;
+    
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        alert('❌ Error: No se pudo obtener el token CSRF. Por favor, recarga la página.');
+        return;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                console.error('Respuesta no JSON recibida:', text.substring(0, 500));
+                throw new Error('El servidor devolvió una respuesta no válida. Por favor, recarga la página e intenta nuevamente.');
+            });
+        }
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || `Error del servidor: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Atención iniciada.');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Error al iniciar la atención.');
+        }
+    })
+    .catch(error => {
+        console.error('Error completo:', error);
+        showNotification('error', error.message || 'Error al iniciar la atención.');
+    });
+}
+
+// Finalizar atención (dentista)
+function finalizarAtencion(citaId) {
+    if (!confirm('¿Finalizar la atención? Asegúrate de haber creado la ficha odontológica.')) {
+        return;
+    }
+    
+    const url = `/trabajadores/finalizar_atencion/${citaId}/`;
+    
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        showNotification('error', 'Error: No se pudo obtener el token CSRF. Por favor, recarga la página.');
+        return;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                console.error('Respuesta no JSON recibida:', text.substring(0, 500));
+                throw new Error('El servidor devolvió una respuesta no válida. Por favor, recarga la página e intenta nuevamente.');
+            });
+        }
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || `Error del servidor: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Atención finalizada.');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Error al finalizar la atención.');
+        }
+    })
+    .catch(error => {
+        console.error('Error completo:', error);
+        showNotification('error', error.message || 'Error al finalizar la atención.');
+    });
+}
+
+// Función auxiliar para obtener cookie CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    // Si no se encuentra en cookies, intentar obtener del input hidden
+    if (!cookieValue) {
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfInput) {
+            cookieValue = csrfInput.value;
+        }
+    }
+    return cookieValue;
+}
+
+// Función para mostrar notificaciones
+function showNotification(type, message, duration = 5000) {
+    // Tipos válidos: success, error, warning, info
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    // Obtener o crear contenedor
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    // Crear notificación
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    // Iconos según tipo
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    // Títulos según tipo
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Agregar al contenedor
+    container.appendChild(notification);
+    
+    // Auto-remover después de la duración
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+</script>
+{% endblock %}

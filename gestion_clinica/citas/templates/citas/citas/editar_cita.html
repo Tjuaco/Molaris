@@ -1,0 +1,196 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Editar Cita - Clínica Dental{% endblock %}
+
+{% block page_title %}✏️ Editar Cita{% endblock %}
+
+{% block content %}
+<div class="section form-section">
+    <h2>{% if cita.estado == 'disponible' %}Editar Cita Disponible{% elif cita.estado == 'reservada' or cita.estado == 'confirmada' %}Editar Cita Reservada{% endif %}</h2>
+    
+    {% if cita.estado == 'reservada' or cita.estado == 'confirmada' %}
+    <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <p style="margin: 0; color: #92400e; font-weight: 600;">
+            <i class="fas fa-info-circle"></i> 
+            <strong>Nota:</strong> Esta cita está reservada. No se puede modificar el cliente. Solo puede ajustar fecha/hora, dentista, servicio y precio.
+        </p>
+    </div>
+    
+    <!-- Información del Cliente (Solo lectura) -->
+    <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 16px; font-weight: 600;">
+            <i class="fas fa-user"></i> Cliente (No modificable)
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+            <div>
+                <label style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Nombre</label>
+                <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600;">{{ cita.paciente_nombre|default:"Sin nombre" }}</p>
+            </div>
+            {% if cita.paciente_email %}
+            <div>
+                <label style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Email</label>
+                <p style="margin: 4px 0 0 0; color: #1e293b;">{{ cita.paciente_email }}</p>
+            </div>
+            {% endif %}
+            {% if cita.paciente_telefono %}
+            <div>
+                <label style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Teléfono</label>
+                <p style="margin: 4px 0 0 0; color: #1e293b;">{{ cita.paciente_telefono }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label><strong>📅 Fecha y Hora:</strong></label>
+                <input type="datetime-local" name="fecha_hora" value="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|time:'H:i' }}" required>
+            </div>
+            <div class="form-group">
+                <label><strong><i class="fas fa-tasks"></i> Tipo de Servicio:</strong></label>
+                <select name="tipo_servicio" id="tipo_servicio_edit" onchange="actualizarPrecioEditarCita()" class="form-control">
+                    <option value="">-- Seleccionar Servicio --</option>
+                    {% if servicios %}
+                        {% regroup servicios by categoria as servicios_por_categoria %}
+                        {% for categoria_group in servicios_por_categoria %}
+                            <optgroup label="{{ categoria_group.grouper|title }}">
+                                {% for servicio in categoria_group.list %}
+                                <option value="{{ servicio.id }}" data-precio="{{ servicio.precio_base }}" {% if cita.tipo_servicio and cita.tipo_servicio.id == servicio.id %}selected{% endif %}>
+                                    {{ servicio.nombre }} - {{ servicio.precio_base|pesos_chilenos }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            
+            <div class="form-group" id="precio_container_edit_cita" style="display: {% if cita.precio_cobrado %}block{% else %}none{% endif %};">
+                <label><strong><i class="fas fa-dollar-sign"></i> Precio Cobrado:</strong></label>
+                <input type="text" inputmode="numeric" pattern="[0-9.,]*" name="precio_cobrado" id="precio_cobrado_edit_cita" value="{% if cita.precio_cobrado %}{{ cita.precio_cobrado|floatformat:0|stringformat:"d" }}{% endif %}" placeholder="60.000" class="form-control formato-numero">
+                <small style="color: #666;">Puede ajustar el precio si aplica descuento o recargo</small>
+            </div>
+            
+            <div class="form-group">
+                <label><strong><i class="fas fa-tooth"></i> Tipo de Consulta (Texto Libre - Opcional):</strong></label>
+                <input type="text" name="tipo_consulta" value="{{ cita.tipo_consulta|default:'' }}" placeholder="Ej: Otro tipo de consulta personalizado" class="form-control">
+                <small style="color: #666;">Solo si el servicio seleccionado no cubre lo necesario</small>
+            </div>
+        </div>
+        {% if dentistas %}
+        {% if cita.estado == 'reservada' or cita.estado == 'confirmada' %}
+        <div class="form-group full-width">
+            <label><strong>👨‍⚕️ Dentista Asignado:</strong></label>
+            <select name="dentista" class="form-control">
+                <option value="">-- Sin asignar --</option>
+                {% for dentista in dentistas %}
+                    <option value="{{ dentista.id }}" {% if cita.dentista and cita.dentista.id == dentista.id %}selected{% endif %}>
+                        {{ dentista.nombre_completo }}{% if dentista.especialidad %} - {{ dentista.especialidad }}{% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+            <small style="color: #666;">Puede cambiar el dentista asignado a esta cita.</small>
+        </div>
+        {% endif %}
+        {% endif %}
+        <div class="form-group full-width">
+            <label><strong>📝 Notas:</strong></label>
+            <textarea name="notas" rows="3">{{ cita.notas|default:'' }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-success">💾 Guardar Cambios</button>
+        <a href="{% url 'panel_trabajador' %}" class="btn">← Volver</a>
+    </form>
+</div>
+
+<script>
+// Función para formatear número con separadores de miles
+function formatearNumero(numero) {
+    if (!numero) return '';
+    let numeroLimpio = numero.toString().replace(/[^\d]/g, '');
+    if (!numeroLimpio) return '';
+    return numeroLimpio.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Función para limpiar formato (remover puntos) antes de enviar
+function limpiarFormatoNumero(numero) {
+    if (!numero) return '';
+    return numero.toString().replace(/\./g, '');
+}
+
+// Aplicar formato a todos los campos con clase formato-numero
+document.addEventListener('DOMContentLoaded', function() {
+    const camposNumeros = document.querySelectorAll('.formato-numero');
+    
+    camposNumeros.forEach(function(campo) {
+        // Formatear valor inicial
+        if (campo.value) {
+            campo.value = formatearNumero(campo.value);
+        }
+        
+        // Formatear mientras se escribe
+        campo.addEventListener('input', function(e) {
+            const cursorPos = e.target.selectionStart;
+            const valorOriginal = e.target.value;
+            const valorFormateado = formatearNumero(valorOriginal);
+            
+            e.target.value = valorFormateado;
+            
+            const diferencia = valorFormateado.length - valorOriginal.length;
+            const nuevaPos = cursorPos + diferencia;
+            e.target.setSelectionRange(nuevaPos, nuevaPos);
+        });
+        
+        // Formatear al perder el foco
+        campo.addEventListener('blur', function(e) {
+            if (e.target.value) {
+                e.target.value = formatearNumero(e.target.value);
+            }
+        });
+    });
+    
+    // Limpiar formato antes de enviar formularios
+    const forms = document.querySelectorAll('form');
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            const camposNumerosEnForm = form.querySelectorAll('.formato-numero');
+            camposNumerosEnForm.forEach(function(campo) {
+                if (campo.value) {
+                    campo.value = limpiarFormatoNumero(campo.value);
+                }
+            });
+        });
+    });
+});
+
+function actualizarPrecioEditarCita() {
+    const selectServicio = document.getElementById('tipo_servicio_edit');
+    const precioInput = document.getElementById('precio_cobrado_edit_cita');
+    const precioContainer = document.getElementById('precio_container_edit_cita');
+    
+    if (selectServicio && selectServicio.value) {
+        const selectedOption = selectServicio.options[selectServicio.selectedIndex];
+        const precio = selectedOption.getAttribute('data-precio');
+        
+        if (precio) {
+            if (precioInput) {
+                precioInput.value = formatearNumero(precio);
+            }
+            if (precioContainer) {
+                precioContainer.style.display = 'block';
+            }
+        }
+    } else {
+        if (precioContainer) {
+            precioContainer.style.display = 'none';
+        }
+        if (precioInput) {
+            precioInput.value = '';
+        }
+    }
+}
+</script>
+{% endblock %}
+

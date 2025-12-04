@@ -1,0 +1,2106 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Estadísticas - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ESTILOS CRÍTICOS - Deben aplicarse primero y con máxima especificidad */
+    :root {
+        --turquesa-primary: #14b8a6;
+        --turquesa-dark: #0d9488;
+        --turquesa-light: #2dd4bf;
+        --turquesa-bg: #f0fdfa;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --info: #3b82f6;
+    }
+    
+    .estadisticas-wrapper {
+        display: flex;
+        gap: 0;
+        max-width: 100%;
+        margin: 0;
+        margin-top: 0;
+        padding: 0;
+        padding-top: 0;
+        background: #f8fafc;
+        width: 100%;
+    }
+    
+    /* Sobrescribir estilos del main-content del base.html */
+    .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Ocultar el page-header si está vacío */
+    .main-content .content-wrapper .page-header:empty,
+    .main-content .content-wrapper .page-header:has(:empty) {
+        display: none !important;
+    }
+    
+    .main-content .content-wrapper .page-header h1.page-title:empty,
+    .main-content .content-wrapper .page-header .page-subtitle:empty {
+        display: none !important;
+    }
+    
+    /* Asegurar que TODOS los títulos tengan color visible */
+    .estadisticas-wrapper h1,
+    .estadisticas-wrapper h2,
+    .estadisticas-wrapper h3,
+    .estadisticas-wrapper h4,
+    .estadisticas-wrapper h5,
+    .estadisticas-wrapper h6,
+    .stats-main-content h1,
+    .stats-main-content h2,
+    .stats-main-content h3,
+    .stats-main-content h4,
+    .stats-section h1,
+    .stats-section h2,
+    .stats-section h3,
+    .stats-section h4 {
+        color: #1e293b !important;
+    }
+    
+    /* Títulos de sección y gráficos */
+    .estadisticas-wrapper h2.section-title,
+    .estadisticas-wrapper h3.chart-title,
+    .estadisticas-wrapper .section-title,
+    .estadisticas-wrapper .chart-title,
+    .stats-main-content .section-title,
+    .stats-main-content .chart-title,
+    .stats-section .section-title,
+    .stats-section .chart-title {
+        color: #1e293b !important;
+    }
+    
+    /* Iconos de títulos en turquesa */
+    .estadisticas-wrapper .section-title i,
+    .estadisticas-wrapper .chart-title i,
+    .estadisticas-wrapper h2 i,
+    .estadisticas-wrapper h3 i,
+    .stats-main-content .section-title i,
+    .stats-main-content .chart-title i {
+        color: #14b8a6 !important;
+    }
+    
+    /* Menú Lateral Izquierdo */
+    .stats-sidebar-left {
+        width: 260px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        padding: 20px 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        min-height: calc(100vh - 99px);
+        position: fixed;
+        top: 99px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 100;
+        overflow-y: auto;
+        max-height: calc(100vh - 99px);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .sidebar-panel {
+        background: white;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+        margin-bottom: 20px;
+    }
+    
+    .sidebar-panel:first-child {
+        padding-top: 0;
+    }
+    
+    .sidebar-panel h3 {
+        margin: 0 0 16px 0;
+        padding: 0 20px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b !important;
+        text-transform: none;
+        letter-spacing: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 2px solid #e5e7eb;
+        background: #f0fdfa;
+        border-radius: 0;
+    }
+    
+    .sidebar-panel h3 i {
+        color: var(--primary-color) !important;
+        font-size: 1.2rem;
+    }
+    
+    .sidebar-panel h3 * {
+        color: inherit !important;
+    }
+    
+    /* Estilos para el menú dentro del sidebar */
+    .sidebar-panel:first-child {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .nav-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        margin-bottom: 5px;
+        margin-left: 12px;
+        margin-right: 12px;
+        border-radius: 6px;
+        color: #64748b;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        background: transparent;
+    }
+    
+    .nav-menu-item:hover {
+        background: #f0fdfa;
+        color: var(--primary-color);
+        transform: translateX(4px);
+    }
+    
+    .nav-menu-item.active {
+        background: linear-gradient(135deg, var(--primary-color), var(--turquesa-dark)) !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+    
+    .nav-menu-item.active *,
+    .nav-menu-item.active i,
+    .nav-menu-item.active span,
+    .nav-menu-item.active::before,
+    .nav-menu-item.active::after {
+        color: #ffffff !important;
+    }
+    
+    .nav-menu-item.active i {
+        color: #ffffff !important;
+    }
+    
+    .nav-menu-item.active span {
+        color: #ffffff !important;
+    }
+    
+    .nav-menu-item i {
+        width: 20px;
+        text-align: center;
+        color: #14b8a6;
+        transition: color 0.2s ease;
+        font-size: 1rem;
+    }
+    
+    .nav-menu-item:hover i {
+        color: var(--primary-color);
+    }
+    
+    .nav-menu-item.active i {
+        color: #ffffff !important;
+    }
+    
+    /* Contenido Principal */
+    .stats-main-content {
+        flex: 1;
+        min-width: 0;
+        margin-left: 260px !important;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 12px 24px;
+        padding-top: 12px;
+        width: calc(100% - 260px) !important;
+        max-width: calc(100vw - 260px) !important;
+        box-sizing: border-box;
+        position: relative;
+    }
+    
+    /* Panel de Filtros */
+    .filters-panel {
+        background: linear-gradient(135deg, #14b8a6, #0d9488) !important;
+        border-radius: 16px;
+        padding: 20px 24px;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+    }
+    
+    /* Título del panel de filtros - siempre blanco */
+    .filters-panel h3 {
+        margin: 0 0 16px 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #ffffff !important;
+    }
+    
+    .filters-panel h3 i,
+    .filters-panel h3 span,
+    .filters-panel h3 * {
+        color: #ffffff !important;
+    }
+    
+    .filter-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    /* Botones de filtro - texto blanco por defecto */
+    .filter-btn {
+        padding: 8px 18px;
+        background: rgba(255, 255, 255, 0.2) !important;
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        border-radius: 8px;
+        color: #ffffff !important;
+        font-weight: 500;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .filter-btn:hover {
+        background: rgba(255, 255, 255, 0.3) !important;
+        transform: translateY(-2px);
+        color: #ffffff !important;
+    }
+    
+    /* Botón activo - fondo blanco, texto turquesa oscuro */
+    .filter-btn.active {
+        background: #ffffff !important;
+        color: #0d9488 !important;
+        border-color: #ffffff !important;
+    }
+    
+    .filter-btn.active *,
+    .filter-btn.active::before,
+    .filter-btn.active::after {
+        color: #0d9488 !important;
+    }
+    
+    /* KPIs Principales */
+    .kpis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+    }
+    
+    .kpi-card {
+        background: white !important;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #14b8a6;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Asegurar que todos los textos dentro de las tarjetas KPI sean visibles */
+    .kpi-card,
+    .kpi-card p,
+    .kpi-card span,
+    .kpi-card div {
+        color: inherit;
+    }
+    
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
+    }
+    
+    .kpi-card.warning {
+        border-left-color: var(--warning);
+    }
+    
+    .kpi-card.danger {
+        border-left-color: var(--danger);
+    }
+    
+    .kpi-card.success {
+        border-left-color: var(--success);
+    }
+    
+    .kpi-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+    
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.25rem;
+    }
+    
+    .kpi-card.warning .kpi-icon {
+        background: linear-gradient(135deg, var(--warning), #d97706);
+    }
+    
+    .kpi-card.danger .kpi-icon {
+        background: linear-gradient(135deg, var(--danger), #dc2626);
+    }
+    
+    .kpi-card.success .kpi-icon {
+        background: linear-gradient(135deg, var(--success), #059669);
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b !important;
+        margin: 0;
+        line-height: 1;
+    }
+    
+    .kpi-value * {
+        color: #1e293b !important;
+    }
+    
+    .kpi-label {
+        color: #64748b !important;
+        font-size: 0.8125rem;
+        margin: 8px 0 4px 0;
+        font-weight: 500;
+    }
+    
+    .kpi-label * {
+        color: #64748b !important;
+    }
+    
+    .kpi-change {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        margin-top: 8px;
+        font-weight: 500;
+    }
+    
+    .kpi-change.positive {
+        color: #10b981 !important;
+    }
+    
+    .kpi-change.negative {
+        color: #ef4444 !important;
+    }
+    
+    .kpi-change.neutral {
+        color: #64748b !important;
+    }
+    
+    .kpi-change * {
+        color: inherit !important;
+    }
+    
+    /* Asegurar que todos los textos dentro de las tarjetas KPI sean visibles */
+    .kpi-card,
+    .kpi-card * {
+        color: inherit;
+    }
+    
+    .kpi-card h2,
+    .kpi-card h3,
+    .kpi-card h4,
+    .kpi-card p,
+    .kpi-card span,
+    .kpi-card div {
+        color: inherit;
+    }
+    
+    /* Alertas */
+    .alert-banner {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border-left: 4px solid var(--warning);
+        border-radius: 12px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #78350f;
+    }
+    
+    .alert-banner * {
+        color: inherit;
+    }
+    
+    .alert-banner strong {
+        color: #78350f;
+        font-weight: 700;
+    }
+    
+    .alert-banner.danger {
+        background: linear-gradient(135deg, #fee2e2, #fecaca);
+        border-left-color: var(--danger);
+        color: #7f1d1d;
+    }
+    
+    .alert-banner.danger * {
+        color: inherit;
+    }
+    
+    .alert-banner.danger strong {
+        color: #7f1d1d;
+        font-weight: 700;
+    }
+    
+    .alert-banner a {
+        color: inherit;
+        text-decoration: underline;
+        font-weight: 600;
+    }
+    
+    .alert-icon {
+        font-size: 1.5rem;
+        color: var(--warning);
+    }
+    
+    .alert-banner.danger .alert-icon {
+        color: var(--danger);
+    }
+    
+    /* Secciones */
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 32px 0 20px 0;
+    }
+    
+    .section-title {
+        font-size: 1.375rem;
+        font-weight: 700;
+        color: #1e293b !important;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+    }
+    
+    .section-title i {
+        color: #14b8a6 !important;
+    }
+    
+    /* Asegurar que todos los elementos dentro de section-title tengan color excepto iconos */
+    .section-title > *:not(i) {
+        color: #1e293b !important;
+    }
+    
+    /* Gráficos */
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+        gap: 24px;
+    }
+    
+    .chart-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+    
+    .chart-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    }
+    
+    .chart-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    
+    .chart-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1e293b !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .chart-title i {
+        color: #14b8a6 !important;
+    }
+    
+    .chart-title *,
+    .chart-title span {
+        color: #1e293b !important;
+    }
+    
+    /* Asegurar que todos los elementos dentro de chart-title tengan color excepto iconos */
+    .chart-title > *:not(i) {
+        color: #1e293b !important;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    
+    /* Rankings y Listas */
+    .ranking-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .ranking-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px;
+        border-bottom: 1px solid #e5e7eb;
+        transition: background 0.2s ease;
+    }
+    
+    .ranking-item:last-child {
+        border-bottom: none;
+    }
+    
+    .ranking-item:hover {
+        background: var(--turquesa-bg);
+    }
+    
+    .rank-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+    
+    .rank-number.gold {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    }
+    
+    .rank-number.silver {
+        background: linear-gradient(135deg, #94a3b8, #64748b);
+    }
+    
+    .rank-number.bronze {
+        background: linear-gradient(135deg, #d97706, #b45309);
+    }
+    
+    .ranking-info {
+        flex: 1;
+    }
+    
+    .ranking-info h4 {
+        margin: 0 0 4px 0;
+        color: #1e293b !important;
+        font-size: 0.9375rem;
+        font-weight: 600;
+    }
+    
+    .ranking-info p {
+        margin: 0;
+        color: #64748b !important;
+        font-size: 0.8125rem;
+    }
+    
+    .ranking-value {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--turquesa-primary);
+    }
+    
+    /* Grid de métricas */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+    
+    /* Resumen Financiero */
+    .financial-summary {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .financial-summary .chart-title {
+        margin-bottom: 20px;
+        color: #1e293b !important;
+    }
+    
+    .financial-summary .chart-title i {
+        color: #14b8a6 !important;
+    }
+    
+    .financial-summary .chart-title span {
+        color: #1e293b !important;
+    }
+    
+    .financial-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .financial-item:last-child {
+        border-bottom: none;
+        padding-top: 18px;
+        margin-top: 8px;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .financial-label {
+        color: #64748b !important;
+        font-size: 0.9375rem;
+        font-weight: 500;
+    }
+    
+    .financial-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1e293b !important;
+    }
+    
+    .financial-value.positive {
+        color: #10b981 !important;
+    }
+    
+    .financial-value.negative {
+        color: #ef4444 !important;
+    }
+    
+    .financial-value.total {
+        font-size: 1.375rem;
+    }
+    
+    .quick-stat {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .quick-stat:last-child {
+        border-bottom: none;
+    }
+    
+    .quick-stat-label {
+        color: #64748b !important;
+        font-size: 0.8125rem;
+    }
+    
+    .quick-stat-value {
+        font-weight: 700;
+        color: #1e293b !important;
+        font-size: 0.9375rem;
+    }
+    
+    /* Secciones ocultas por defecto */
+    .stats-section {
+        display: none;
+    }
+    
+    .stats-section.active {
+        display: block;
+    }
+    
+    /* Mini Cards de Métricas */
+    .mini-metric-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        border-left: 3px solid var(--turquesa-primary);
+    }
+    
+    .mini-metric-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b !important;
+        margin: 0;
+    }
+    
+    .mini-metric-label {
+        font-size: 0.75rem;
+        color: #64748b !important;
+        margin-top: 4px;
+    }
+    
+    @media (max-width: 1200px) {
+        .estadisticas-wrapper {
+            flex-direction: column;
+            padding: 12px 8px;
+        }
+        
+        .stats-sidebar-left {
+            width: 100%;
+        }
+        
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .estadisticas-wrapper {
+            padding: 12px 6px;
+            gap: 16px;
+        }
+        
+        .kpis-grid,
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .filter-buttons {
+            flex-direction: column;
+        }
+        
+        .filter-btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<style>
+    /* Ocultar page-header si está vacío */
+    .main-content .content-wrapper .page-header:empty {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Asegurar colores visibles en todos los títulos dentro del wrapper */
+    .estadisticas-wrapper h1,
+    .estadisticas-wrapper h2,
+    .estadisticas-wrapper h3,
+    .estadisticas-wrapper h4,
+    .estadisticas-wrapper h5,
+    .estadisticas-wrapper h6 {
+        color: #1e293b !important;
+    }
+    
+    .estadisticas-wrapper .section-title,
+    .estadisticas-wrapper .chart-title {
+        color: #1e293b !important;
+    }
+    
+    .estadisticas-wrapper .section-title i,
+    .estadisticas-wrapper .chart-title i {
+        color: #14b8a6 !important;
+    }
+</style>
+<script>
+    // Ocultar page-header si está vacío o solo tiene elementos vacíos
+    (function() {
+        function ocultarHeaderVacio() {
+            var pageHeader = document.querySelector('.main-content .content-wrapper .page-header');
+            if (pageHeader) {
+                var title = pageHeader.querySelector('.page-title');
+                var subtitle = pageHeader.querySelector('.page-subtitle');
+                if ((!title || title.textContent.trim() === '') && 
+                    (!subtitle || subtitle.textContent.trim() === '')) {
+                    pageHeader.style.display = 'none';
+                    pageHeader.style.margin = '0';
+                    pageHeader.style.padding = '0';
+                }
+            }
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', ocultarHeaderVacio);
+        } else {
+            ocultarHeaderVacio();
+        }
+        setTimeout(ocultarHeaderVacio, 100);
+    })();
+</script>
+<div class="estadisticas-wrapper">
+    <!-- Menú Lateral Izquierdo -->
+    <div class="stats-sidebar-left">
+        <div class="sidebar-panel">
+            <h3><i class="fas fa-chart-line"></i> Estadísticas</h3>
+            <div style="display: flex; flex-direction: column; gap: 5px; padding: 0;">
+                <a href="#" class="nav-menu-item active" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-menu-item" data-section="graficos">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Gráficos</span>
+                </a>
+                <a href="#" class="nav-menu-item" data-section="finanzas">
+                    <i class="fas fa-dollar-sign"></i>
+                    <span>Análisis Financiero</span>
+                </a>
+                <a href="#" class="nav-menu-item" data-section="inventario">
+                    <i class="fas fa-boxes"></i>
+                    <span>Inventario</span>
+                </a>
+                <a href="#" class="nav-menu-item" data-section="personal">
+                    <i class="fas fa-user-md"></i>
+                    <span>Personal</span>
+                </a>
+                <a href="#" class="nav-menu-item" data-section="comparativas">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Comparativas</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contenido Principal -->
+    <div class="stats-main-content">
+        
+        <!-- Alertas Críticas -->
+        {% if insumos_bajo_stock > 0 %}
+        <div class="alert-banner {% if insumos_bajo_stock > 5 %}danger{% endif %}">
+            <i class="fas fa-exclamation-triangle alert-icon"></i>
+            <div>
+                <strong>{% if insumos_bajo_stock > 5 %}Alerta Crítica:{% else %}Atención:{% endif %}</strong>
+                {{ insumos_bajo_stock }} insumo{{ insumos_bajo_stock|pluralize }} con stock bajo. 
+                <a href="{% url 'gestor_inventario_unificado' %}?seccion=insumos" style="color: inherit; text-decoration: underline;">Revisar inventario</a>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if tasa_cancelacion > 15 %}
+        <div class="alert-banner danger">
+            <i class="fas fa-exclamation-circle alert-icon"></i>
+            <div>
+                <strong>Alerta:</strong> Tasa de cancelación alta ({{ tasa_cancelacion }}%). 
+                Se recomienda revisar los procesos de confirmación de citas.
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- SECCIÓN: DASHBOARD -->
+        <div class="stats-section active" id="section-dashboard">
+            <!-- KPIs Principales -->
+            <div class="kpis-grid">
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ citas_hoy }}</h2>
+                    <p class="kpi-label">Citas Hoy</p>
+                    <div class="kpi-change {% if cambio_citas >= 0 %}positive{% else %}negative{% endif %}">
+                        <i class="fas fa-arrow-{% if cambio_citas >= 0 %}up{% else %}down{% endif %}"></i>
+                        {{ cambio_citas|floatformat:1 }}% vs mes anterior
+                    </div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ citas_mes }}</h2>
+                    <p class="kpi-label">Citas Este Mes</p>
+                    <div class="kpi-change positive">
+                        <i class="fas fa-check-circle"></i>
+                        {{ citas_completadas_mes }} completadas
+                    </div>
+                </div>
+                
+                <div class="kpi-card success">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ ingresos_mes|pesos_chilenos }}</h2>
+                    <p class="kpi-label">Ingresos del Mes</p>
+                    <div class="kpi-change {% if cambio_ingresos >= 0 %}positive{% else %}negative{% endif %}">
+                        <i class="fas fa-arrow-{% if cambio_ingresos >= 0 %}up{% else %}down{% endif %}"></i>
+                        {{ cambio_ingresos|floatformat:1 }}% vs mes anterior
+                    </div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ total_clientes }}</h2>
+                    <p class="kpi-label">Total Clientes</p>
+                    <div class="kpi-change {% if cambio_clientes >= 0 %}positive{% else %}neutral{% endif %}">
+                        <i class="fas fa-user-plus"></i>
+                        {{ clientes_nuevos_mes }} nuevos este mes
+                    </div>
+                </div>
+                
+                <div class="kpi-card {% if tasa_ocupacion >= 80 %}success{% elif tasa_ocupacion >= 60 %}warning{% else %}danger{% endif %}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ tasa_ocupacion|floatformat:1 }}%</h2>
+                    <p class="kpi-label">Tasa de Ocupación</p>
+                    <div class="kpi-change neutral">
+                        <i class="fas fa-info-circle"></i>
+                        {{ citas_completadas_mes }}/{{ citas_mes }} citas
+                    </div>
+                </div>
+                
+                <div class="kpi-card {% if tasa_cancelacion <= 10 %}success{% elif tasa_cancelacion <= 15 %}warning{% else %}danger{% endif %}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ tasa_cancelacion|floatformat:1 }}%</h2>
+                    <p class="kpi-label">Tasa de Cancelación</p>
+                    <div class="kpi-change {% if tasa_cancelacion <= 10 %}positive{% else %}negative{% endif %}">
+                        <i class="fas fa-{% if tasa_cancelacion <= 10 %}check{% else %}exclamation-triangle{% endif %}"></i>
+                        {{ citas_canceladas_mes }} canceladas este mes
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Métricas Adicionales -->
+            <div class="metrics-grid" style="margin-top: 24px;">
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ total_personal }}</h3>
+                    <p class="mini-metric-label">Personal Activo</p>
+                </div>
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ total_insumos }}</h3>
+                    <p class="mini-metric-label">Insumos Registrados</p>
+                </div>
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ total_planes }}</h3>
+                    <p class="mini-metric-label">Planes de Tratamiento</p>
+                </div>
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ total_proveedores }}</h3>
+                    <p class="mini-metric-label">Proveedores Activos</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SECCIÓN: GRÁFICOS -->
+        <div class="stats-section" id="section-graficos">
+            <h2 class="section-title">
+                <i class="fas fa-chart-bar"></i>
+                Análisis de Citas
+            </h2>
+            
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribución por Estado</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="citasEstadoChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Citas por Día de la Semana</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="citasDiaChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-line"></i> Tendencia Mensual (6 meses)</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="citasMesChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-tooth"></i> Tipos de Consulta Más Frecuentes</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="tiposConsultaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SECCIÓN: ANÁLISIS FINANCIERO -->
+        <div class="stats-section" id="section-finanzas">
+            <h2 class="section-title">
+                <i class="fas fa-dollar-sign"></i>
+                Análisis Financiero
+            </h2>
+            
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-line"></i> Ingresos vs Egresos (6 meses)</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="finanzasChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="financial-summary">
+                    <h3 class="chart-title"><i class="fas fa-info-circle"></i> <span>Resumen Financiero</span></h3>
+                    <div class="financial-item">
+                        <span class="financial-label">Total Ingresos:</span>
+                        <span class="financial-value positive">{{ total_ingresos|pesos_chilenos }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="financial-label">Total Egresos:</span>
+                        <span class="financial-value negative">{{ total_egresos|pesos_chilenos }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="financial-label">Ingresos del Mes:</span>
+                        <span class="financial-value positive">{{ ingresos_mes|pesos_chilenos }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="financial-label">Egresos del Mes:</span>
+                        <span class="financial-value negative">{{ egresos_mes|pesos_chilenos }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="financial-label">Balance del Mes:</span>
+                        <span class="financial-value {% if balance_mes >= 0 %}positive{% else %}negative{% endif %} total">
+                            {{ balance_mes|pesos_chilenos }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SECCIÓN: INVENTARIO -->
+        <div class="stats-section" id="section-inventario">
+            <h2 class="section-title">
+                <i class="fas fa-boxes"></i>
+                Análisis de Inventario
+            </h2>
+            
+            <div class="metrics-grid">
+                <div class="kpi-card {% if insumos_bajo_stock > 0 %}warning{% endif %}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ insumos_bajo_stock }}</h2>
+                    <p class="kpi-label">Insumos Bajo Stock</p>
+                    <div class="kpi-change {% if insumos_bajo_stock > 0 %}negative{% else %}positive{% endif %}">
+                        <i class="fas fa-{% if insumos_bajo_stock > 0 %}exclamation{% else %}check{% endif %}"></i>
+                        {% if insumos_bajo_stock > 0 %}Requieren atención{% else %}Todo en orden{% endif %}
+                    </div>
+                </div>
+                
+                <div class="kpi-card success">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ valor_total_inventario|pesos_chilenos }}</h2>
+                    <p class="kpi-label">Valor Total Inventario</p>
+                    <div class="kpi-change neutral">
+                        <i class="fas fa-box"></i>
+                        {{ total_insumos }} insumos registrados
+                    </div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-sync-alt"></i>
+                        </div>
+                    </div>
+                    <h2 class="kpi-value">{{ movimientos_mes }}</h2>
+                    <p class="kpi-label">Movimientos Este Mes</p>
+                    <div class="kpi-change neutral">
+                        <i class="fas fa-chart-line"></i>
+                        Rotación de inventario
+                    </div>
+                </div>
+            </div>
+            
+            <div class="charts-grid" style="margin-top: 24px;">
+                <div class="ranking-card">
+                    <h3 class="chart-title" style="margin-bottom: 20px;"><i class="fas fa-fire"></i> Insumos Más Usados</h3>
+                    {% for insumo in insumos_mas_usados %}
+                    <div class="ranking-item">
+                        <div class="rank-number">{{ forloop.counter }}</div>
+                        <div class="ranking-info">
+                            <h4>{{ insumo.insumo__nombre }}</h4>
+                            <p>Movimientos de salida este mes</p>
+                        </div>
+                        <div class="ranking-value">{{ insumo.total_salidas|default:0 }} unidades</div>
+                    </div>
+                    {% empty %}
+                    <p style="text-align: center; color: #64748b; padding: 40px;">No hay datos de movimientos</p>
+                    {% endfor %}
+                </div>
+                
+                <div class="ranking-card">
+                    <h3 class="chart-title" style="margin-bottom: 20px;"><i class="fas fa-shopping-cart"></i> Insumos Más Solicitados</h3>
+                    {% for insumo in insumos_mas_solicitados %}
+                    <div class="ranking-item">
+                        <div class="rank-number">{{ forloop.counter }}</div>
+                        <div class="ranking-info">
+                            <h4>{{ insumo.insumo__nombre }}</h4>
+                            <p>Solicitudes a proveedores</p>
+                        </div>
+                        <div class="ranking-value">{{ insumo.total }} solicitudes</div>
+                    </div>
+                    {% empty %}
+                    <p style="text-align: center; color: #64748b; padding: 40px;">No hay solicitudes registradas</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- SECCIÓN: PERSONAL -->
+        <div class="stats-section" id="section-personal">
+            <h2 class="section-title">
+                <i class="fas fa-user-md"></i>
+                Rendimiento del Personal
+            </h2>
+            
+            <div class="charts-grid">
+                <div class="ranking-card">
+                    <h3 class="chart-title" style="margin-bottom: 20px;"><i class="fas fa-trophy"></i> Dentistas Más Activos</h3>
+                    {% for dentista in dentistas_activos %}
+                    <div class="ranking-item">
+                        <div class="rank-number {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% endif %}">
+                            {{ forloop.counter }}
+                        </div>
+                        <div class="ranking-info">
+                            <h4>{{ dentista.nombre_completo }}</h4>
+                            <p>{{ dentista.especialidad|default:"Odontología General" }}</p>
+                        </div>
+                        <div class="ranking-value">{{ dentista.num_citas }} citas</div>
+                    </div>
+                    {% empty %}
+                    <p style="text-align: center; color: #64748b; padding: 40px;">No hay dentistas activos</p>
+                    {% endfor %}
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Ingresos por Dentista</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="ingresosDentistaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SECCIÓN: COMPARATIVAS -->
+        <div class="stats-section" id="section-comparativas">
+            <h2 class="section-title">
+                <i class="fas fa-chart-line"></i>
+                Comparativas y Tendencias
+            </h2>
+            
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-line"></i> Tendencia Mensual (6 meses)</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="citasMesChart2"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-dollar-sign"></i> Ingresos vs Egresos</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="finanzasChart2"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-grid" style="margin-top: 24px;">
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ citas_mes }}</h3>
+                    <p class="mini-metric-label">Citas Este Mes</p>
+                    <div class="kpi-change {% if cambio_citas >= 0 %}positive{% else %}negative{% endif %}" style="margin-top: 8px;">
+                        <i class="fas fa-arrow-{% if cambio_citas >= 0 %}up{% else %}down{% endif %}"></i>
+                        {{ cambio_citas|floatformat:1 }}% vs mes anterior
+                    </div>
+                </div>
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ ingresos_mes|pesos_chilenos }}</h3>
+                    <p class="mini-metric-label">Ingresos Este Mes</p>
+                    <div class="kpi-change {% if cambio_ingresos >= 0 %}positive{% else %}negative{% endif %}" style="margin-top: 8px;">
+                        <i class="fas fa-arrow-{% if cambio_ingresos >= 0 %}up{% else %}down{% endif %}"></i>
+                        {{ cambio_ingresos|floatformat:1 }}% vs mes anterior
+                    </div>
+                </div>
+                <div class="mini-metric-card">
+                    <h3 class="mini-metric-value">{{ clientes_nuevos_mes }}</h3>
+                    <p class="mini-metric-label">Clientes Nuevos</p>
+                    <div class="kpi-change {% if cambio_clientes >= 0 %}positive{% else %}neutral{% endif %}" style="margin-top: 8px;">
+                        <i class="fas fa-arrow-{% if cambio_clientes >= 0 %}up{% else %}down{% endif %}"></i>
+                        {{ cambio_clientes|floatformat:1 }}% vs mes anterior
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// eslint-disable-next-line
+// jshint ignore:start
+// jslint ignore:start
+// Función para esperar a que el DOM esté listo
+function domReady(fn) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fn);
+    } else {
+        fn();
+    }
+}
+
+// Cargar Chart.js dinámicamente y luego inicializar gráficos
+domReady(function() {
+    // Verificar si Chart.js ya está cargado
+    if (typeof Chart !== 'undefined') {
+        setTimeout(initCharts, 100);
+        return;
+    }
+    
+    // Cargar Chart.js desde CDN
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    script.onload = function() {
+        console.log('Chart.js cargado correctamente');
+        setTimeout(initCharts, 100);
+    };
+    script.onerror = function() {
+        console.error('Error al cargar Chart.js, intentando versión alternativa...');
+        // Intentar con una versión alternativa
+        const script2 = document.createElement('script');
+        script2.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
+        script2.onload = function() {
+            setTimeout(initCharts, 100);
+        };
+        document.head.appendChild(script2);
+    };
+    document.head.appendChild(script);
+});
+
+// Función para inicializar todos los gráficos
+function initCharts() {
+    // Verificar que Chart.js esté cargado
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js no está disponible');
+        return;
+    }
+
+    console.log('Inicializando gráficos...');
+
+    // Colores del sistema
+    const turquesaPrimary = '#14b8a6';
+    const turquesaDark = '#0d9488';
+    const turquesaLight = '#2dd4bf';
+
+    // Gráfico de Citas por Estado
+    const citasEstadoEl = document.getElementById('citasEstadoChart');
+    if (citasEstadoEl) {
+        console.log('Creando gráfico de citas por estado...');
+        const citasEstadoCtx = citasEstadoEl.getContext('2d');
+        // Django template code - linter puede ignorar
+        const estadoData = [
+            {{ citas_disponibles|default:0 }}, 
+            {{ citas_reservadas|default:0 }}, 
+            {{ citas_completadas|default:0 }}, 
+            {{ citas_canceladas|default:0 }}
+        ];
+        console.log('Datos estado citas:', estadoData);
+        new Chart(citasEstadoCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Disponibles', 'Reservadas', 'Completadas', 'Canceladas'],
+                datasets: [{
+                    data: estadoData,
+                    backgroundColor: ['#3b82f6', '#10b981', turquesaPrimary, '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        console.log('Gráfico de citas por estado creado');
+    } else {
+        console.warn('No se encontró el elemento citasEstadoChart');
+    }
+
+    // Gráfico de Citas por Día de la Semana
+    const citasDiaEl = document.getElementById('citasDiaChart');
+    if (citasDiaEl) {
+        const citasDiaCtx = citasDiaEl.getContext('2d');
+        // Django template code - linter puede ignorar
+        const citasDiaLabels = [{% for item in citas_por_dia %}'{{ item.dia|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+        const citasDiaData = [{% for item in citas_por_dia %}{{ item.total|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        console.log('Datos citas por día:', citasDiaLabels, citasDiaData);
+        new Chart(citasDiaCtx, {
+            type: 'bar',
+            data: {
+                labels: citasDiaLabels.length > 0 ? citasDiaLabels : ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+                datasets: [{
+                    label: 'Citas',
+                    data: citasDiaData.length > 0 ? citasDiaData : [0, 0, 0, 0, 0, 0, 0],
+                    backgroundColor: turquesaPrimary,
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Citas: ' + context.parsed.y;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+        console.log('Gráfico de citas por día creado');
+    } else {
+        console.warn('No se encontró el elemento citasDiaChart');
+    }
+
+    // Gráfico de Citas por Mes
+    const citasMesEl = document.getElementById('citasMesChart');
+    if (citasMesEl) {
+        const citasMesCtx = citasMesEl.getContext('2d');
+        // Django template code - linter puede ignorar
+        const citasMesLabels = [{% for item in citas_por_mes %}'{{ item.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+        const citasMesData = [{% for item in citas_por_mes %}{{ item.total|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        console.log('Datos citas por mes:', citasMesLabels, citasMesData);
+        new Chart(citasMesCtx, {
+            type: 'line',
+            data: {
+                labels: citasMesLabels.length > 0 ? citasMesLabels : ['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'],
+                datasets: [{
+                    label: 'Citas',
+                    data: citasMesData.length > 0 ? citasMesData : [0, 0, 0, 0, 0, 0],
+                    borderColor: turquesaPrimary,
+                    backgroundColor: turquesaLight + '40',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: turquesaPrimary,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Citas: ' + context.parsed.y;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+        console.log('Gráfico de citas por mes creado');
+    } else {
+        console.warn('No se encontró el elemento citasMesChart');
+    }
+
+    // Gráfico de Tipos de Consulta
+    const tiposConsultaEl = document.getElementById('tiposConsultaChart');
+    if (tiposConsultaEl) {
+        const tiposConsultaCtx = tiposConsultaEl.getContext('2d');
+        // Django template code - linter puede ignorar
+        const tiposConsultaLabels = [{% for item in tipos_consulta %}'{{ item.tipo_consulta|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+        const tiposConsultaData = [{% for item in tipos_consulta %}{{ item.total|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        console.log('Datos tipos consulta:', tiposConsultaLabels, tiposConsultaData);
+        if (tiposConsultaLabels.length > 0 && tiposConsultaData.length > 0) {
+            new Chart(tiposConsultaCtx, {
+                type: 'bar',
+                data: {
+                    labels: tiposConsultaLabels,
+                    datasets: [{
+                        label: 'Cantidad',
+                        data: tiposConsultaData,
+                        backgroundColor: turquesaPrimary,
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Citas: ' + context.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        } else {
+            // Mostrar mensaje si no hay datos
+            tiposConsultaCtx.font = '16px Arial';
+            tiposConsultaCtx.fillStyle = '#64748b';
+            tiposConsultaCtx.textAlign = 'center';
+            tiposConsultaCtx.fillText('No hay datos disponibles', tiposConsultaEl.width / 2, tiposConsultaEl.height / 2);
+        }
+    }
+
+    // Gráfico de Finanzas
+    const finanzasEl = document.getElementById('finanzasChart');
+    if (finanzasEl) {
+        const finanzasCtx = finanzasEl.getContext('2d');
+        // Django template code - linter puede ignorar
+        const finanzasLabels = [{% for item in citas_por_mes %}'{{ item.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+        const ingresosData = [{% for ingreso in ingresos_por_mes %}{{ ingreso|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        const egresosData = [{% for egreso in egresos_por_mes %}{{ egreso|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        console.log('Datos finanzas:', finanzasLabels, ingresosData, egresosData);
+        new Chart(finanzasCtx, {
+            type: 'line',
+            data: {
+                labels: finanzasLabels.length > 0 ? finanzasLabels : ['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'],
+                datasets: [{
+                    label: 'Ingresos',
+                    data: ingresosData.length > 0 ? ingresosData : [0, 0, 0, 0, 0, 0],
+                    borderColor: '#10b981',
+                    backgroundColor: '#10b98140',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }, {
+                    label: 'Egresos',
+                    data: egresosData.length > 0 ? egresosData : [0, 0, 0, 0, 0, 0],
+                    borderColor: '#ef4444',
+                    backgroundColor: '#ef444440',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': $' + context.parsed.y.toLocaleString('es-CL');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString('es-CL');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Ingresos por Dentista
+    const ingresosDentistaEl = document.getElementById('ingresosDentistaChart');
+    if (ingresosDentistaEl) {
+        const ingresosDentistaCtx = ingresosDentistaEl.getContext('2d');
+        // Django template code - linter puede ignorar
+        const dentistasLabels = [{% for dentista in ingresos_por_dentista %}'{{ dentista.nombre|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+        const ingresosDentistaData = [{% for dentista in ingresos_por_dentista %}{{ dentista.ingreso_estimado|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        console.log('Datos ingresos por dentista:', dentistasLabels, ingresosDentistaData);
+        if (dentistasLabels.length > 0 && ingresosDentistaData.length > 0) {
+            new Chart(ingresosDentistaCtx, {
+                type: 'bar',
+                data: {
+                    labels: dentistasLabels,
+                    datasets: [{
+                        label: 'Ingresos Estimados',
+                        data: ingresosDentistaData,
+                        backgroundColor: turquesaPrimary,
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Ingresos: $' + context.parsed.y.toLocaleString('es-CL');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString('es-CL');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            // Mostrar mensaje si no hay datos
+            ingresosDentistaCtx.font = '16px Arial';
+            ingresosDentistaCtx.fillStyle = '#64748b';
+            ingresosDentistaCtx.textAlign = 'center';
+            ingresosDentistaCtx.fillText('No hay datos disponibles', ingresosDentistaEl.width / 2, ingresosDentistaEl.height / 2);
+        }
+        console.log('Gráfico de ingresos por dentista procesado');
+    } else {
+        console.warn('No se encontró el elemento ingresosDentistaChart');
+    }
+
+    console.log('Todos los gráficos inicializados');
+    
+    // Función para inicializar gráficos de secciones específicas
+    function inicializarGraficosSeccion(sectionId) {
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js no está disponible');
+            return;
+        }
+        
+        try {
+            // Gráficos de la sección Comparativas
+            if (sectionId === 'comparativas') {
+                // Gráfico de Citas por Mes 2
+                var citasMesEl2 = document.getElementById('citasMesChart2');
+                if (citasMesEl2 && !citasMesEl2.chartInstance) {
+                    var citasMesCtx2 = citasMesEl2.getContext('2d');
+                    var citasMesLabels2 = [{% for item in citas_por_mes %}'{{ item.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+                    var citasMesData2 = [{% for item in citas_por_mes %}{{ item.total|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                    citasMesEl2.chartInstance = new Chart(citasMesCtx2, {
+                        type: 'line',
+                        data: {
+                            labels: citasMesLabels2.length > 0 ? citasMesLabels2 : ['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'],
+                            datasets: [{
+                                label: 'Citas',
+                                data: citasMesData2.length > 0 ? citasMesData2 : [0, 0, 0, 0, 0, 0],
+                                borderColor: '#14b8a6',
+                                backgroundColor: '#2dd4bf40',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5,
+                                pointHoverRadius: 7,
+                                pointBackgroundColor: '#14b8a6',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return 'Citas: ' + context.parsed.y;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { stepSize: 1 }
+                                }
+                            }
+                        }
+                    });
+                    console.log('Gráfico citasMesChart2 inicializado');
+                }
+                
+                // Gráfico de Finanzas 2
+                var finanzasEl2 = document.getElementById('finanzasChart2');
+                if (finanzasEl2 && !finanzasEl2.chartInstance) {
+                    var finanzasCtx2 = finanzasEl2.getContext('2d');
+                    var finanzasLabels2 = [{% for item in citas_por_mes %}'{{ item.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+                    var ingresosData2 = [{% for ingreso in ingresos_por_mes %}{{ ingreso|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                    var egresosData2 = [{% for egreso in egresos_por_mes %}{{ egreso|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                    finanzasEl2.chartInstance = new Chart(finanzasCtx2, {
+                        type: 'line',
+                        data: {
+                            labels: finanzasLabels2.length > 0 ? finanzasLabels2 : ['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'],
+                            datasets: [{
+                                label: 'Ingresos',
+                                data: ingresosData2.length > 0 ? ingresosData2 : [0, 0, 0, 0, 0, 0],
+                                borderColor: '#10b981',
+                                backgroundColor: '#10b98140',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5,
+                                pointHoverRadius: 7
+                            }, {
+                                label: 'Egresos',
+                                data: egresosData2.length > 0 ? egresosData2 : [0, 0, 0, 0, 0, 0],
+                                borderColor: '#ef4444',
+                                backgroundColor: '#ef444440',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5,
+                                pointHoverRadius: 7
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 15,
+                                        font: { size: 12 }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': $' + context.parsed.y.toLocaleString('es-CL');
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '$' + value.toLocaleString('es-CL');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('Gráfico finanzasChart2 inicializado');
+                }
+            }
+        } catch(error) {
+            console.error('Error inicializando gráficos de sección:', error);
+        }
+    }
+    
+    // Navegación entre secciones - MEJORADA CON VALIDACIONES
+    var navMenuItems = document.querySelectorAll('.nav-menu-item[data-section]');
+    if (navMenuItems.length === 0) {
+        console.warn('No se encontraron items de navegación');
+    }
+    
+    navMenuItems.forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var sectionId = this.getAttribute('data-section');
+            if (!sectionId) {
+                console.error('Item de navegación sin data-section');
+                return;
+            }
+            
+            // Remover active de todos los items y aplicar estilos de inactivo
+            document.querySelectorAll('.nav-menu-item').forEach(function(nav) {
+                nav.classList.remove('active');
+                nav.style.setProperty('background', 'transparent', 'important');
+                nav.style.setProperty('color', '#475569', 'important');
+                var icons = nav.querySelectorAll('i');
+                icons.forEach(function(icon) {
+                    icon.style.setProperty('color', '#14b8a6', 'important');
+                });
+                var spans = nav.querySelectorAll('span');
+                spans.forEach(function(span) {
+                    span.style.setProperty('color', '#475569', 'important');
+                });
+            });
+            
+            // Agregar active al item clickeado y aplicar estilos de activo
+            this.classList.add('active');
+            this.style.setProperty('background', 'linear-gradient(135deg, #14b8a6, #0d9488)', 'important');
+            this.style.setProperty('background-color', '#14b8a6', 'important');
+            this.style.setProperty('color', '#ffffff', 'important');
+            this.style.setProperty('box-shadow', '0 4px 12px rgba(20, 184, 166, 0.3)', 'important');
+            var activeIcons = this.querySelectorAll('i');
+            activeIcons.forEach(function(icon) {
+                icon.style.setProperty('color', '#ffffff', 'important');
+            });
+            var activeSpans = this.querySelectorAll('span');
+            activeSpans.forEach(function(span) {
+                span.style.setProperty('color', '#ffffff', 'important');
+            });
+            
+            // Ocultar todas las secciones
+            document.querySelectorAll('.stats-section').forEach(function(sec) {
+                sec.classList.remove('active');
+            });
+            
+            // Mostrar la sección seleccionada
+            var targetSection = document.getElementById('section-' + sectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+                
+                // Inicializar gráficos de la sección si es necesario
+                setTimeout(function() {
+                    inicializarGraficosSeccion(sectionId);
+                }, 100);
+                
+                // NO hacer scroll automático - mantener posición actual
+                // El usuario puede hacer scroll manualmente si lo necesita
+            } else {
+                console.warn('Sección no encontrada: section-' + sectionId);
+            }
+        });
+    });
+    
+    
+    // Forzar colores de botones, tarjetas y títulos después de cargar la página
+    function forzarColoresTitulos() {
+        console.log('Forzando colores de elementos...');
+        
+        // ===== MENÚ LATERAL - ITEMS ACTIVOS =====
+        try {
+            var navMenuItems = document.querySelectorAll('.nav-menu-item');
+            navMenuItems.forEach(function(item) {
+                if (item.classList.contains('active')) {
+                    // Item activo: fondo turquesa, texto blanco
+                    item.style.setProperty('background', 'linear-gradient(135deg, #14b8a6, #0d9488)', 'important');
+                    item.style.setProperty('background-color', '#14b8a6', 'important');
+                    item.style.setProperty('color', '#ffffff', 'important');
+                    item.style.setProperty('box-shadow', '0 4px 12px rgba(20, 184, 166, 0.3)', 'important');
+                    
+                    // Aplicar color blanco a todos los hijos
+                    var icons = item.querySelectorAll('i');
+                    icons.forEach(function(icon) {
+                        icon.style.setProperty('color', '#ffffff', 'important');
+                    });
+                    var spans = item.querySelectorAll('span');
+                    spans.forEach(function(span) {
+                        span.style.setProperty('color', '#ffffff', 'important');
+                    });
+                } else {
+                    // Item inactivo: sin fondo, texto gris oscuro
+                    item.style.setProperty('background', 'transparent', 'important');
+                    item.style.setProperty('color', '#475569', 'important');
+                    var icons = item.querySelectorAll('i');
+                    icons.forEach(function(icon) {
+                        icon.style.setProperty('color', '#14b8a6', 'important');
+                    });
+                }
+            });
+        } catch(e) {
+            console.error('Error aplicando colores a menú lateral:', e);
+        }
+        
+        
+        // ===== TARJETAS KPI =====
+        try {
+            var kpiCards = document.querySelectorAll('.kpi-card');
+            kpiCards.forEach(function(card) {
+                var kpiValues = card.querySelectorAll('.kpi-value, h2.kpi-value');
+                kpiValues.forEach(function(value) {
+                    value.style.setProperty('color', '#1e293b', 'important');
+                });
+                var kpiLabels = card.querySelectorAll('.kpi-label, p.kpi-label');
+                kpiLabels.forEach(function(label) {
+                    label.style.setProperty('color', '#64748b', 'important');
+                });
+                var kpiChanges = card.querySelectorAll('.kpi-change');
+                kpiChanges.forEach(function(change) {
+                    if (change.classList.contains('positive')) {
+                        change.style.setProperty('color', '#10b981', 'important');
+                    } else if (change.classList.contains('negative')) {
+                        change.style.setProperty('color', '#ef4444', 'important');
+                    } else {
+                        change.style.setProperty('color', '#64748b', 'important');
+                    }
+                });
+            });
+        } catch(e) {
+            console.error('Error aplicando colores a tarjetas:', e);
+        }
+        
+        // Títulos principales - FORZAR SIEMPRE sin importar el color actual
+        const selectorsTitulos = [
+            'h1.page-title',
+            '.page-title',
+            '.page-header .page-title',
+            '.content-wrapper .page-header .page-title',
+            '.main-content .content-wrapper .page-header .page-title',
+            '.app-container .main-content .content-wrapper .page-header .page-title'
+        ];
+        
+        selectorsTitulos.forEach(function(selector) {
+            try {
+                const pageTitles = document.querySelectorAll(selector);
+                pageTitles.forEach(function(title) {
+                    if (title && !title.closest('.filters-panel')) {
+                        // SIEMPRE forzar color oscuro sin verificar
+                        title.style.setProperty('color', '#1e293b', 'important');
+                        title.style.color = '#1e293b';
+                        
+                        // Aplicar a todos los nodos hijos
+                        var childNodes = title.childNodes;
+                        for (var i = 0; i < childNodes.length; i++) {
+                            var child = childNodes[i];
+                            if (child.nodeType === 1) { // ELEMENT_NODE
+                                if (child.tagName === 'I') {
+                                    child.style.setProperty('color', '#14b8a6', 'important');
+                                    child.style.color = '#14b8a6';
+                                } else {
+                                    child.style.setProperty('color', '#1e293b', 'important');
+                                    child.style.color = '#1e293b';
+                                }
+                            }
+                        }
+                        
+                        // También aplicar a elementos hijos usando children
+                        var children = title.children;
+                        for (var j = 0; j < children.length; j++) {
+                            var childEl = children[j];
+                            if (childEl.tagName === 'I') {
+                                childEl.style.setProperty('color', '#14b8a6', 'important');
+                                childEl.style.color = '#14b8a6';
+                            } else {
+                                childEl.style.setProperty('color', '#1e293b', 'important');
+                                childEl.style.color = '#1e293b';
+                            }
+                        }
+                    }
+                });
+            } catch(e) {
+                console.error('Error aplicando colores a títulos:', e);
+            }
+        });
+        
+        // Subtítulos - FORZAR SIEMPRE
+        const selectorsSubtitulos = [
+            '.page-subtitle',
+            '.page-header .page-subtitle',
+            '.content-wrapper .page-header .page-subtitle',
+            '.main-content .content-wrapper .page-header .page-subtitle'
+        ];
+        
+        selectorsSubtitulos.forEach(function(selector) {
+            try {
+                const pageSubtitles = document.querySelectorAll(selector);
+                pageSubtitles.forEach(function(subtitle) {
+                    if (subtitle) {
+                        subtitle.style.setProperty('color', '#64748b', 'important');
+                        subtitle.style.color = '#64748b';
+                        
+                        // Aplicar a hijos
+                        var childNodes = subtitle.childNodes;
+                        for (var i = 0; i < childNodes.length; i++) {
+                            var child = childNodes[i];
+                            if (child.nodeType === 1) {
+                                child.style.setProperty('color', '#64748b', 'important');
+                                child.style.color = '#64748b';
+                            }
+                        }
+                    }
+                });
+            } catch(e) {
+                console.error('Error aplicando colores a subtítulos:', e);
+            }
+        });
+        
+        // Títulos de sección
+        try {
+            const sectionTitles = document.querySelectorAll('.section-title, h2.section-title, .chart-title, h3.chart-title');
+            sectionTitles.forEach(function(title) {
+                if (title && !title.closest('.filters-panel')) {
+                    title.style.setProperty('color', '#1e293b', 'important');
+                    title.style.color = '#1e293b';
+                    var icons = title.querySelectorAll('i');
+                    icons.forEach(function(icon) {
+                        icon.style.setProperty('color', '#14b8a6', 'important');
+                        icon.style.color = '#14b8a6';
+                    });
+                }
+            });
+        } catch(e) {
+            console.error('Error aplicando colores a títulos de sección:', e);
+        }
+        
+        console.log('Colores de títulos forzados correctamente');
+    }
+    
+    // Ejecutar INMEDIATAMENTE múltiples veces
+    forzarColoresTitulos();
+    setTimeout(forzarColoresTitulos, 10);
+    setTimeout(forzarColoresTitulos, 25);
+    setTimeout(forzarColoresTitulos, 50);
+    setTimeout(forzarColoresTitulos, 100);
+    setTimeout(forzarColoresTitulos, 200);
+    setTimeout(forzarColoresTitulos, 500);
+    setTimeout(forzarColoresTitulos, 1000);
+    
+    // Ejecutar cuando el DOM esté completamente cargado
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            forzarColoresTitulos();
+            setTimeout(forzarColoresTitulos, 50);
+            setTimeout(forzarColoresTitulos, 100);
+            setTimeout(forzarColoresTitulos, 500);
+        });
+    }
+    
+    // Ejecutar cuando la ventana esté completamente cargada
+    window.addEventListener('load', function() {
+        forzarColoresTitulos();
+        setTimeout(forzarColoresTitulos, 100);
+        setTimeout(forzarColoresTitulos, 500);
+    });
+    
+    // Observar cambios en el DOM
+    if (window.MutationObserver) {
+        var observer = new MutationObserver(function(mutations) {
+            var shouldUpdate = false;
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length > 0) {
+                    shouldUpdate = true;
+                }
+            });
+            if (shouldUpdate) {
+                setTimeout(forzarColoresTitulos, 50);
+            }
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+// jslint ignore:end
+// jshint ignore:end
+// eslint-enable-next-line
+</script>
+{% endblock %}

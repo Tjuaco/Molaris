@@ -1,0 +1,501 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block page_title %}<i class="fas fa-tooth"></i> Odontograma - {{ odontograma.paciente_nombre }}{% endblock %}
+{% block page_subtitle %}Ficha odontológica detallada{% endblock %}
+
+{% block content %}
+<div class="section">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="flex: 1; margin: 0;"><i class="fas fa-tooth"></i> Odontograma de {{ odontograma.paciente_nombre }}</h2>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <a href="{% url 'exportar_odontograma_pdf' odontograma.id %}" class="btn" style="background: #dc2626; color: white;">
+                <i class="fas fa-file-pdf"></i> Descargar PDF
+            </a>
+            {% if es_dentista %}
+            <a href="{% url 'editar_odontograma' odontograma.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            {% endif %}
+            <a href="{{ url_retorno|default:'/trabajadores/odontogramas/' }}" class="btn-close" title="Cerrar" style="background: #6b7280; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 1.2em; transition: all 0.2s;">
+                <i class="fas fa-times"></i>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Información de la Cita Asociada (si existe) -->
+    {% if odontograma.cita %}
+    <div style="background: linear-gradient(135deg, #e0f2fe, #f0f9ff); border: 2px solid #0ea5e9; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <i class="fas fa-calendar-check" style="color: #0ea5e9; font-size: 1.5rem;"></i>
+            <h3 style="margin: 0; color: #0c4a6e; font-size: 1.125rem; font-weight: 600;">
+                Cita Asociada
+            </h3>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; color: #075985;">
+            <div>
+                <strong><i class="fas fa-calendar"></i> Fecha y Hora:</strong><br>
+                <span style="font-size: 1.05rem; font-weight: 600;">{{ odontograma.cita.fecha_hora|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div>
+                <strong><i class="fas fa-info-circle"></i> Estado:</strong><br>
+                <span style="background: #fff; padding: 4px 12px; border-radius: 6px; font-size: 0.875rem; font-weight: 600; display: inline-block; margin-top: 4px;">
+                    {{ odontograma.cita.get_estado_display }}
+                </span>
+            </div>
+            {% if odontograma.cita.tipo_servicio %}
+            <div>
+                <strong><i class="fas fa-stethoscope"></i> Servicio:</strong><br>
+                <span style="font-size: 0.95rem;">{{ odontograma.cita.tipo_servicio.nombre }}</span>
+            </div>
+            {% elif odontograma.cita.tipo_consulta %}
+            <div>
+                <strong><i class="fas fa-file-medical"></i> Tipo:</strong><br>
+                <span style="font-size: 0.95rem;">{{ odontograma.cita.tipo_consulta }}</span>
+            </div>
+            {% endif %}
+            {% if odontograma.cita %}
+            <div style="grid-column: 1 / -1;">
+                <div style="display: inline-flex; align-items: center; gap: 8px; color: #0ea5e9; font-weight: 600; padding: 8px 16px; background: white; border-radius: 6px; border: 1px solid #0ea5e9;">
+                    <i class="fas fa-calendar-check"></i> Cita asociada: {{ odontograma.cita.fecha_hora|date:"d/m/Y H:i" }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Información del Paciente -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+            <i class="fas fa-user"></i> Información del Paciente
+        </h3>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+            <div>
+                <strong>Nombre:</strong> {{ odontograma.paciente_nombre }}
+            </div>
+            <div>
+                <strong>Email:</strong> {{ odontograma.paciente_email }}
+            </div>
+            {% if odontograma.paciente_telefono %}
+            <div>
+                <strong>Teléfono:</strong> {{ odontograma.paciente_telefono }}
+            </div>
+            {% endif %}
+            {% if odontograma.paciente_fecha_nacimiento %}
+            <div>
+                <strong>Fecha de Nacimiento:</strong> {{ odontograma.paciente_fecha_nacimiento|date:"d/m/Y" }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Información Clínica -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+            <i class="fas fa-stethoscope"></i> Información Clínica
+        </h3>
+        
+        <div style="margin-bottom: 16px;">
+            <strong>Motivo de Consulta:</strong>
+            <p style="margin: 4px 0 0 0; color: #374151;">{{ odontograma.motivo_consulta }}</p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+            <div>
+                <strong>Higiene Oral:</strong> 
+                <span style="background: #f0f9ff; color: #0ea5e9; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                    {{ odontograma.get_higiene_oral_display }}
+                </span>
+            </div>
+            <div>
+                <strong>Estado General:</strong> 
+                <span style="background: #f0fdf4; color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                    {{ odontograma.get_estado_general_display }}
+                </span>
+            </div>
+        </div>
+        
+        {% if odontograma.antecedentes_medicos %}
+        <div style="margin-bottom: 16px;">
+            <strong>Antecedentes Médicos:</strong>
+            <p style="margin: 4px 0 0 0; color: #374151;">{{ odontograma.antecedentes_medicos }}</p>
+        </div>
+        {% endif %}
+        
+        {% if odontograma.alergias %}
+        <div style="margin-bottom: 16px;">
+            <strong>Alergias:</strong>
+            <p style="margin: 4px 0 0 0; color: #374151;">{{ odontograma.alergias }}</p>
+        </div>
+        {% endif %}
+        
+        {% if odontograma.medicamentos_actuales %}
+        <div style="margin-bottom: 16px;">
+            <strong>Medicamentos Actuales:</strong>
+            <p style="margin: 4px 0 0 0; color: #374151;">{{ odontograma.medicamentos_actuales }}</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Odontograma Visual -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+            <i class="fas fa-tooth"></i> Odontograma Visual
+        </h3>
+        
+        <!-- Odontograma Visual -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px;">
+            <!-- Superior Derecho -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Superior Derecho</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    {% for numero in "18,17,16,15,14,13,12,11"|split:"," %}
+                        <div class="diente-container-detalle" data-diente="{{ numero }}">
+                            <div class="diente-detalle" data-numero="{{ numero }}">{{ numero }}</div>
+                            <div class="caras-detalle">
+                                <div class="cara-detalle oclusal" data-cara="oclusal">O</div>
+                                <div class="cara-detalle vestibular" data-cara="vestibular">V</div>
+                                <div class="cara-detalle lingual" data-cara="lingual">L</div>
+                                <div class="cara-detalle mesial" data-cara="mesial">M</div>
+                                <div class="cara-detalle distal" data-cara="distal">D</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Superior Izquierdo -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Superior Izquierdo</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    {% for numero in "21,22,23,24,25,26,27,28"|split:"," %}
+                        <div class="diente-container-detalle" data-diente="{{ numero }}">
+                            <div class="diente-detalle" data-numero="{{ numero }}">{{ numero }}</div>
+                            <div class="caras-detalle">
+                                <div class="cara-detalle oclusal" data-cara="oclusal">O</div>
+                                <div class="cara-detalle vestibular" data-cara="vestibular">V</div>
+                                <div class="cara-detalle lingual" data-cara="lingual">L</div>
+                                <div class="cara-detalle mesial" data-cara="mesial">M</div>
+                                <div class="cara-detalle distal" data-cara="distal">D</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Inferior Izquierdo -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Inferior Izquierdo</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    {% for numero in "38,37,36,35,34,33,32,31"|split:"," %}
+                        <div class="diente-container-detalle" data-diente="{{ numero }}">
+                            <div class="diente-detalle" data-numero="{{ numero }}">{{ numero }}</div>
+                            <div class="caras-detalle">
+                                <div class="cara-detalle oclusal" data-cara="oclusal">O</div>
+                                <div class="cara-detalle vestibular" data-cara="vestibular">V</div>
+                                <div class="cara-detalle lingual" data-cara="lingual">L</div>
+                                <div class="cara-detalle mesial" data-cara="mesial">M</div>
+                                <div class="cara-detalle distal" data-cara="distal">D</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Inferior Derecho -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Inferior Derecho</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    {% for numero in "41,42,43,44,45,46,47,48"|split:"," %}
+                        <div class="diente-container-detalle" data-diente="{{ numero }}">
+                            <div class="diente-detalle" data-numero="{{ numero }}">{{ numero }}</div>
+                            <div class="caras-detalle">
+                                <div class="cara-detalle oclusal" data-cara="oclusal">O</div>
+                                <div class="cara-detalle vestibular" data-cara="vestibular">V</div>
+                                <div class="cara-detalle lingual" data-cara="lingual">L</div>
+                                <div class="cara-detalle mesial" data-cara="mesial">M</div>
+                                <div class="cara-detalle distal" data-cara="distal">D</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Leyenda -->
+        <div style="margin-top: 20px; padding: 16px; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <h5 style="margin: 0 0 12px 0; color: #374151; font-size: 0.875rem; font-weight: 600;">Leyenda:</h5>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem;">
+                    <span style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #f0fdf4; border: 1px solid #10b981;"></span>
+                    Sano
+                </span>
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem;">
+                    <span style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #fef2f2; border: 1px solid #dc2626;"></span>
+                    Caries
+                </span>
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem;">
+                    <span style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #fef3c7; border: 1px solid #f59e0b;"></span>
+                    Obturado
+                </span>
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem;">
+                    <span style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #f3f4f6; border: 1px solid #6b7280;"></span>
+                    Ausente
+                </span>
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem;">
+                    <span style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #f0f9ff; border: 1px solid #0ea5e9;"></span>
+                    Otros
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Plan de Tratamiento -->
+    {% if odontograma.plan_tratamiento or odontograma.proxima_cita %}
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+            <i class="fas fa-clipboard-list"></i> Plan de Tratamiento
+        </h3>
+        
+        {% if odontograma.plan_tratamiento %}
+        <div style="margin-bottom: 16px;">
+            <strong>Plan:</strong>
+            <p style="margin: 4px 0 0 0; color: #374151;">{{ odontograma.plan_tratamiento }}</p>
+        </div>
+        {% endif %}
+        
+        {% if odontograma.proxima_cita %}
+        <div>
+            <strong>Próxima Cita:</strong>
+            <span style="background: #fef3c7; color: #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 0.875rem; font-weight: 500;">
+                {{ odontograma.proxima_cita|date:"d/m/Y H:i" }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Observaciones -->
+    {% if odontograma.observaciones %}
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1.125rem; font-weight: 600;">
+            <i class="fas fa-comment"></i> Observaciones
+        </h3>
+        <p style="margin: 0; color: #374151;">{{ odontograma.observaciones }}</p>
+    </div>
+    {% endif %}
+    
+    <!-- Información del Sistema -->
+    <div style="background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; font-size: 0.875rem; color: #64748b;">
+            <div>
+                <strong>Creado:</strong> {{ odontograma.fecha_creacion|date:"d/m/Y H:i" }}
+            </div>
+            <div>
+                <strong>Última actualización:</strong> {{ odontograma.fecha_actualizacion|date:"d/m/Y H:i" }}
+            </div>
+            <div>
+                <strong>Dentista:</strong> {{ odontograma.dentista.nombre_completo }}
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<style>
+/* Botón de cerrar */
+.btn-close {
+    background: #6b7280;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 1.2em;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-close:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+    color: white;
+}
+
+/* Estilos para el odontograma de detalle con formas anatómicas */
+.diente-container-detalle { position: relative; display: inline-block; margin: 4px; }
+
+/* Estilos base del diente */
+.diente-detalle { 
+    border: 2px solid #d1d5db; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    background: #f9fafb; 
+    color: #6b7280; 
+    font-weight: 600; 
+    font-size: 0.75rem; 
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Formas anatómicas según tipo de diente */
+/* Incisivos (11, 12, 21, 22, 31, 32, 41, 42) - Rectangulares verticales */
+.diente-detalle.diente-incisivo {
+    width: 28px;
+    height: 42px;
+    border-radius: 6px 6px 10px 10px;
+}
+
+/* Caninos (13, 23, 33, 43) - Forma puntiaguda */
+.diente-detalle.diente-canino {
+    width: 30px;
+    height: 40px;
+    border-radius: 50% 50% 8px 8px;
+    clip-path: polygon(20% 0%, 80% 0%, 100% 30%, 90% 70%, 50% 100%, 10% 70%, 0% 30%);
+}
+
+/* Premolares (14, 15, 24, 25, 34, 35, 44, 45) - Cuadrados redondeados */
+.diente-detalle.diente-premolar {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+}
+
+/* Molares (16, 17, 18, 26, 27, 28, 36, 37, 38, 46, 47, 48) - Más anchos y cuadrados */
+.diente-detalle.diente-molar {
+    width: 42px;
+    height: 38px;
+    border-radius: 4px;
+}
+
+.caras-detalle { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.cara-detalle { 
+    position: absolute; 
+    width: 8px; 
+    height: 8px; 
+    border-radius: 50%; 
+    background: transparent; 
+    border: 1px solid transparent; 
+    font-size: 0.4rem; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-weight: bold; 
+    color: #6b7280;
+    transition: all 0.2s ease;
+}
+
+.cara-detalle.oclusal { top: 2px; left: 50%; transform: translateX(-50%); }
+.cara-detalle.vestibular { top: 50%; right: 2px; transform: translateY(-50%); }
+.cara-detalle.lingual { top: 50%; left: 2px; transform: translateY(-50%); }
+.cara-detalle.mesial { bottom: 2px; left: 25%; transform: translateX(-50%); }
+.cara-detalle.distal { bottom: 2px; right: 25%; transform: translateX(50%); }
+
+/* Colores para diferentes condiciones */
+.condicion-sano { background: #f0fdf4; border-color: #10b981; color: #065f46; }
+.condicion-caries { background: #fef2f2; border-color: #dc2626; color: #991b1b; }
+.condicion-obturado { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.condicion-corona { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.condicion-ausente { background: #f3f4f6; border-color: #6b7280; color: #374151; text-decoration: line-through; }
+.condicion-endodoncia { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.condicion-protesis { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.condicion-implante { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.condicion-sellante { background: #f0fdf4; border-color: #10b981; color: #065f46; }
+.condicion-fractura { background: #fef2f2; border-color: #dc2626; color: #991b1b; }
+
+@media (max-width: 768px) {
+    .diente-detalle { width: 35px; height: 35px; font-size: 0.7rem; }
+    .cara-detalle { width: 6px; height: 6px; font-size: 0.3rem; }
+}
+</style>
+
+<script>
+// Función para determinar el tipo de diente según número FDI
+function getTipoDiente(numero) {
+    const num = parseInt(numero);
+    const ultimoDigito = num % 10;
+    
+    // Incisivos: 1, 2
+    if (ultimoDigito === 1 || ultimoDigito === 2) {
+        return 'incisivo';
+    }
+    // Caninos: 3
+    else if (ultimoDigito === 3) {
+        return 'canino';
+    }
+    // Premolares: 4, 5
+    else if (ultimoDigito === 4 || ultimoDigito === 5) {
+        return 'premolar';
+    }
+    // Molares: 6, 7, 8
+    else if (ultimoDigito === 6 || ultimoDigito === 7 || ultimoDigito === 8) {
+        return 'molar';
+    }
+    // Por defecto
+    return 'premolar';
+}
+
+// Aplicar clases de tipo de diente a todos los dientes
+function aplicarFormasAnatomicasDetalle() {
+    document.querySelectorAll('.diente-container-detalle').forEach(container => {
+        const numero = container.dataset.diente;
+        const diente = container.querySelector('.diente-detalle');
+        if (diente) {
+            const tipo = getTipoDiente(numero);
+            diente.classList.add(`diente-${tipo}`);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar formas anatómicas
+    aplicarFormasAnatomicasDetalle();
+    
+    // Cargar datos del odontograma interactivo
+    {% for diente in odontograma.dientes.all %}
+        {% if diente.observaciones %}
+            {% if "Datos del odontograma interactivo:" in diente.observaciones %}
+                var numero = '{{ diente.numero_diente }}';
+                var observaciones = '{{ diente.observaciones|escapejs }}';
+                var jsonStr = observaciones.replace('Datos del odontograma interactivo: ', '');
+                
+                try {
+                    var parsed = JSON.parse(jsonStr);
+                    var dienteContainer = document.querySelector('[data-diente="' + numero + '"]');
+                    
+                    if (dienteContainer) {
+                        var dienteEl = dienteContainer.querySelector('.diente-detalle');
+                        
+                        for (var cara in parsed) {
+                            var condicion = parsed[cara];
+                            var caraEl = dienteContainer.querySelector('[data-cara="' + cara + '"]');
+                            
+                            if (caraEl) {
+                                caraEl.className = 'cara-detalle ' + cara + ' condicion-' + condicion;
+                                caraEl.textContent = cara.charAt(0).toUpperCase();
+                            }
+                        }
+                        
+                        var anyCondicion = Object.values(parsed)[0];
+                        const tipo = getTipoDiente(numero);
+                        if (dienteEl && anyCondicion) {
+                            dienteEl.className = 'diente-detalle diente-' + tipo + ' condicion-' + anyCondicion;
+                        } else if (dienteEl) {
+                            dienteEl.className = 'diente-detalle diente-' + tipo;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Error parsing odontograma data:', e);
+                }
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+});
+</script>
+{% endblock %}

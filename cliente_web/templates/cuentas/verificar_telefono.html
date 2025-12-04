@@ -1,9 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verificar Teléfono - Clínica Dental</title>
+    <title>Verificar Teléfono - Clínica San Felipe</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -14,39 +15,13 @@
 
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
             min-height: 100vh;
             color: #333;
-            position: relative;
-        }
-
-        .back-to-home {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 100;
-        }
-
-        .back-btn {
-            background: rgba(255, 255, 255, 0.9);
-            color: #3b82f6;
-            border: 2px solid #667eea;
-            padding: 12px 20px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 8px;
-            backdrop-filter: blur(10px);
-        }
-
-        .back-btn:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            justify-content: center;
+            padding: 20px;
         }
 
         .verify-container { 
@@ -57,7 +32,6 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             width: 100%;
             max-width: 500px;
-            margin: 80px auto 20px;
             position: relative;
             overflow: hidden;
         }
@@ -69,7 +43,7 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #28a745, #20c997);
+            background: linear-gradient(90deg, #14b8a6, #0d9488);
         }
 
         .verify-header { 
@@ -77,11 +51,17 @@
             margin-bottom: 30px; 
         }
 
+        .verify-header i {
+            font-size: 4rem;
+            color: #14b8a6;
+            margin-bottom: 15px;
+        }
+
         .verify-header h1 { 
             color: #333; 
-            margin: 0 0 15px 0; 
-            font-size: 2.2rem;
-            background: linear-gradient(45deg, #28a745, #20c997);
+            margin: 0 0 10px 0; 
+            font-size: 2rem;
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -90,35 +70,27 @@
         .verify-header p { 
             color: #666; 
             margin: 0;
-            font-size: 1.1rem;
-            line-height: 1.5;
+            font-size: 1rem;
         }
 
         .phone-display {
-            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
-            border: 1px solid #c3e6cb;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 25px;
+            background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+            border: 2px solid #14b8a6;
+            padding: 15px;
+            border-radius: 10px;
             text-align: center;
+            margin-bottom: 25px;
         }
 
         .phone-display i {
-            color: #28a745;
-            font-size: 2rem;
-            margin-bottom: 10px;
+            color: #14b8a6;
+            font-size: 1.5rem;
+            margin-right: 10px;
         }
 
-        .phone-display .phone-number {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
-            margin: 10px 0;
-        }
-
-        .phone-display .instruction {
-            color: #666;
-            font-size: 0.9rem;
+        .phone-display strong {
+            color: #0f766e;
+            font-size: 1.1rem;
         }
 
         .form-group { 
@@ -133,35 +105,31 @@
             font-size: 0.95rem;
         }
 
-        .code-input-container {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
         .code-input {
-            width: 50px;
-            height: 50px;
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: bold;
+            width: 100%;
+            padding: 15px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
-            background: rgba(255, 255, 255, 0.9);
+            font-size: 24px;
+            text-align: center;
+            letter-spacing: 10px;
+            font-weight: bold;
+            box-sizing: border-box;
             transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            font-family: 'Courier New', monospace;
         }
 
         .code-input:focus {
             outline: none;
-            border-color: #28a745;
-            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
-            transform: scale(1.05);
+            border-color: #14b8a6;
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+            transform: translateY(-2px);
         }
 
         .btn-verify { 
             width: 100%; 
-            background: linear-gradient(45deg, #28a745, #20c997); 
+            background: linear-gradient(45deg, #14b8a6, #0d9488); 
             color: white; 
             border: none; 
             padding: 16px; 
@@ -169,7 +137,7 @@
             font-size: 16px; 
             cursor: pointer; 
             transition: all 0.3s ease;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -177,56 +145,25 @@
 
         .btn-verify:hover { 
             transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
-        }
-
-        .btn-verify:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .resend-section {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
+            box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);
         }
 
         .btn-resend {
-            background: transparent;
-            color: #3b82f6;
-            border: 2px solid #667eea;
-            padding: 10px 20px;
-            border-radius: 25px;
+            width: 100%;
+            background: white;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
             cursor: pointer;
             transition: all 0.3s ease;
             font-weight: 600;
-            text-decoration: none;
-            display: inline-block;
         }
 
         .btn-resend:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: #14b8a6;
             color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn-resend:disabled {
-            background: #ccc;
-            color: #666;
-            border-color: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .countdown {
-            color: #666;
-            font-size: 0.9rem;
-            margin-top: 10px;
         }
 
         .messages { 
@@ -250,9 +187,9 @@
         }
 
         .message.success { 
-            background: linear-gradient(45deg, #4CAF50, #45a049);
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
             color: white;
-            border-left: 4px solid #2E7D32;
+            border-left: 4px solid #0f766e;
         }
 
         .message.error { 
@@ -261,30 +198,39 @@
             border-left: 4px solid #c62828;
         }
 
-        .security-note {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            text-align: center;
-            margin-top: 15px;
+        .errorlist { 
+            color: #dc3545; 
+            font-size: 14px; 
+            margin: 5px 0; 
+            list-style: none; 
+            padding: 0; 
         }
 
-        .security-note i {
-            margin-right: 5px;
+        .help-text {
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #14b8a6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
         }
 
         @media (max-width: 768px) {
             .verify-container {
-                margin: 60px 20px 20px;
                 padding: 30px;
-            }
-
-            .back-to-home {
-                top: 15px;
-                left: 15px;
             }
 
             .verify-header h1 {
@@ -292,19 +238,13 @@
             }
 
             .code-input {
-                width: 45px;
-                height: 45px;
-                font-size: 1.3rem;
-            }
-
-            .btn-verify {
-                padding: 14px;
+                font-size: 20px;
+                letter-spacing: 8px;
             }
         }
 
         @media (max-width: 480px) {
             .verify-container {
-                margin: 50px 15px 15px;
                 padding: 25px;
             }
 
@@ -312,41 +252,78 @@
                 font-size: 1.6rem;
             }
 
-            .back-btn {
-                padding: 10px 16px;
-                font-size: 14px;
+            .verify-header i {
+                font-size: 3rem;
             }
+        }
 
-            .code-input {
-                width: 40px;
-                height: 40px;
-                font-size: 1.2rem;
+        /* Notificaciones personalizadas */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            min-width: 300px;
+            max-width: 400px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
+            border-left: 4px solid #0f766e;
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            border-left: 4px solid #c62828;
+        }
+
+        .notification i {
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .notification {
+                right: 10px;
+                left: 10px;
+                min-width: auto;
+                max-width: none;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Botón Volver al Inicio -->
-    <div class="back-to-home">
-        <a href="{% url 'inicio' %}" class="back-btn">
-            <i class="fas fa-arrow-left"></i>
-            Volver al Inicio
-        </a>
-    </div>
-
     <div class="verify-container">
         <div class="verify-header">
-            <h1><i class="fas fa-mobile-alt"></i> Verificar Teléfono</h1>
-            <p>Ingresa el código de verificación que enviamos a tu teléfono</p>
+            <i class="fas fa-sms"></i>
+            <h1>Verificar Teléfono</h1>
+            <p>Ingresa el código que enviamos a tu celular</p>
         </div>
 
-        <!-- Información del teléfono -->
         <div class="phone-display">
-            <i class="fas fa-sms"></i>
-            <div class="phone-number">{{ telefono }}</div>
-            <div class="instruction">
-                Revisa tu WhatsApp o SMS para obtener el código de 6 dígitos
-            </div>
+            <i class="fas fa-mobile-alt"></i>
+            <strong>{{ telefono }}</strong>
         </div>
 
         {% if messages %}
@@ -364,123 +341,73 @@
             </div>
         {% endif %}
 
-        <form method="post" id="verificationForm">
+        <form method="post">
             {% csrf_token %}
             
             <div class="form-group">
                 <label for="codigo">
-                    <i class="fas fa-key"></i> Código de Verificación:
+                    <i class="fas fa-key"></i> Código de Verificación
                 </label>
-                <div class="code-input-container">
-                    <input type="text" class="code-input" maxlength="1" pattern="[0-9]" required>
-                    <input type="text" class="code-input" maxlength="1" pattern="[0-9]" required>
-                    <input type="text" class="code-input" maxlength="1" pattern="[0-9]" required>
-                    <input type="text" class="code-input" maxlength="1" pattern="[0-9]" required>
-                    <input type="text" class="code-input" maxlength="1" pattern="[0-9]" required>
-                    <input type="text" class="code-input" maxlength="1" pattern="[0-9]" required>
+                <input type="text" 
+                       name="codigo" 
+                       id="codigo" 
+                       class="code-input"
+                       maxlength="6"
+                       pattern="[0-9]{6}"
+                       placeholder="000000"
+                       oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);"
+                       required
+                       autofocus>
+                <div class="help-text">
+                    Ingresa el código de 6 dígitos que recibiste por SMS
                 </div>
-                <input type="hidden" name="codigo" id="codigo" required>
             </div>
 
-            <button type="submit" class="btn-verify" id="verifyBtn">
+            <button type="submit" class="btn-verify">
                 <i class="fas fa-check"></i>
                 Verificar Código
             </button>
         </form>
 
-        <div class="resend-section">
-            <button class="btn-resend" id="resendBtn" onclick="reenviarCodigo()">
-                <i class="fas fa-redo"></i>
-                Reenviar Código
-            </button>
-            <div class="countdown" id="countdown"></div>
-        </div>
+        <button type="button" class="btn-resend" onclick="reenviarCodigo()">
+            <i class="fas fa-redo"></i>
+            Reenviar Código
+        </button>
 
-        <div class="security-note">
-            <i class="fas fa-shield-alt"></i>
-            El código expira en 15 minutos por seguridad
+        <div class="back-link">
+            <a href="{% url 'registro_cliente' %}">
+                <i class="fas fa-arrow-left"></i> Volver al Registro
+            </a>
         </div>
     </div>
 
     <script>
-        // Manejo de inputs de código
-        const codeInputs = document.querySelectorAll('.code-input');
-        const hiddenInput = document.getElementById('codigo');
-        const verifyBtn = document.getElementById('verifyBtn');
-        const resendBtn = document.getElementById('resendBtn');
-        const countdownEl = document.getElementById('countdown');
-
-        // Auto-focus y navegación entre inputs
-        codeInputs.forEach((input, index) => {
-            input.addEventListener('input', function(e) {
-                const value = e.target.value;
-                
-                // Solo permitir números
-                if (!/^\d$/.test(value)) {
-                    e.target.value = '';
-                    return;
-                }
-                
-                // Mover al siguiente input
-                if (value && index < codeInputs.length - 1) {
-                    codeInputs[index + 1].focus();
-                }
-                
-                // Actualizar input oculto
-                updateHiddenInput();
-            });
+        // Función para mostrar notificaciones estilizadas
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
             
-            input.addEventListener('keydown', function(e) {
-                // Retroceder al input anterior con backspace
-                if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                    codeInputs[index - 1].focus();
-                }
-            });
+            const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+            notification.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <span>${message}</span>
+            `;
             
-            input.addEventListener('paste', function(e) {
-                e.preventDefault();
-                const pastedData = e.clipboardData.getData('text').replace(/\D/g, '');
-                if (pastedData.length === 6) {
-                    pastedData.split('').forEach((char, i) => {
-                        if (codeInputs[i]) {
-                            codeInputs[i].value = char;
-                        }
-                    });
-                    updateHiddenInput();
-                    codeInputs[5].focus();
-                }
-            });
-        });
-
-        function updateHiddenInput() {
-            const code = Array.from(codeInputs).map(input => input.value).join('');
-            hiddenInput.value = code;
-            verifyBtn.disabled = code.length !== 6;
-        }
-
-        // Contador de reenvío
-        let countdown = 60;
-        let countdownInterval;
-
-        function startCountdown() {
-            resendBtn.disabled = true;
-            countdown = 60;
-            countdownEl.textContent = `Reenviar en ${countdown} segundos`;
+            document.body.appendChild(notification);
             
-            countdownInterval = setInterval(() => {
-                countdown--;
-                countdownEl.textContent = `Reenviar en ${countdown} segundos`;
-                
-                if (countdown <= 0) {
-                    clearInterval(countdownInterval);
-                    resendBtn.disabled = false;
-                    countdownEl.textContent = '';
-                }
-            }, 1000);
+            // Auto-remover después de 4 segundos
+            setTimeout(() => {
+                notification.style.animation = 'slideInRight 0.3s ease reverse';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 4000);
         }
 
         function reenviarCodigo() {
-            if (resendBtn.disabled) return;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
             
             fetch('{% url "reenviar_codigo" %}', {
                 method: 'POST',
@@ -488,48 +415,33 @@
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({})
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Mostrar mensaje de éxito
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message success';
-                    messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + data.message;
-                    document.querySelector('.messages').appendChild(messageDiv);
-                    
-                    // Iniciar countdown
-                    startCountdown();
-                    
-                    // Limpiar inputs
-                    codeInputs.forEach(input => input.value = '');
-                    updateHiddenInput();
-                    codeInputs[0].focus();
+                    showNotification(data.message, 'success');
                 } else {
-                    alert('Error: ' + data.message);
+                    showNotification(data.message, 'error');
                 }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-redo"></i> Reenviar Código';
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error al reenviar código');
+                showNotification('Error al reenviar código. Por favor, intenta nuevamente.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-redo"></i> Reenviar Código';
             });
         }
 
-        // Iniciar countdown al cargar la página
-        startCountdown();
-
-        // Auto-hide messages after 5 seconds
-        setTimeout(function() {
-            const messages = document.querySelectorAll('.message');
-            messages.forEach(function(message) {
-                message.style.opacity = '0';
-                message.style.transform = 'translateY(-20px)';
-                setTimeout(function() {
-                    message.remove();
-                }, 300);
-            });
-        }, 5000);
+        // Auto-focus en el campo de código
+        document.addEventListener('DOMContentLoaded', function() {
+            const codigoInput = document.getElementById('codigo');
+            if (codigoInput) {
+                codigoInput.focus();
+            }
+        });
     </script>
 </body>
 </html>
-

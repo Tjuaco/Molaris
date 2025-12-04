@@ -1,0 +1,1798 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Gestor de Servicios - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<div class="personal-container">
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <!-- Header con Stats a la Derecha -->
+    <div class="header-with-stats">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-tasks"></i> Gestión de Servicios Dentales</h1>
+            <p class="page-subtitle">Administra los tipos de servicios y sus precios base para las citas</p>
+        </div>
+        <div class="dashboard-compact">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon total">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.total_servicios }}</div>
+                        <div class="stat-label">Total Servicios</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon dentistas">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.servicios_activos }}</div>
+                        <div class="stat-label">Servicios Activos</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon administrativos">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.servicios_inactivos }}</div>
+                        <div class="stat-label">Servicios Inactivos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Acciones y Filtros -->
+    <div class="actions-bar">
+        <form method="GET" class="filter-form">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" name="search" placeholder="Buscar por nombre o descripción..." value="{{ search }}">
+            </div>
+
+            <select name="categoria" class="filter-select">
+                <option value="">Todas las categorías</option>
+                {% for cat_code, cat_name in categorias %}
+                <option value="{{ cat_code }}" {% if categoria == cat_code %}selected{% endif %}>{{ cat_name }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="estado" class="filter-select">
+                <option value="">Todos los estados</option>
+                <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+                <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivos</option>
+            </select>
+            
+            <button type="submit" class="btn-filter">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+            
+            {% if search or categoria or estado %}
+            <a href="{% url 'gestor_servicios' %}" class="btn-clear">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+            {% endif %}
+            
+            <button type="button" class="btn-add-cliente" onclick="abrirModalCrearServicio()">
+                <i class="fas fa-plus"></i>
+                Nuevo Servicio
+            </button>
+        </form>
+    </div>
+
+    <!-- Tabla de Servicios -->
+    <div class="section">
+        {% if servicios %}
+        <div class="personal-table-container">
+            <table class="personal-table">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-tasks"></i> Nombre del Servicio</th>
+                        <th><i class="fas fa-tags"></i> Categoría</th>
+                        <th><i class="fas fa-dollar-sign"></i> Precio Base</th>
+                        <th><i class="fas fa-clock"></i> Duración</th>
+                        <th><i class="fas fa-user-md"></i> Requiere Dentista</th>
+                        <th><i class="fas fa-toggle-on"></i> Estado</th>
+                        <th class="text-center"><i class="fas fa-cog"></i> Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for servicio in servicios %}
+                    <tr class="personal-row servicio-row {% if not servicio.activo %}inactive-row{% endif %}">
+                        <td>
+                            <div class="personal-info">
+                                <div class="avatar servicio-avatar">
+                                    <i class="fas fa-tasks"></i>
+                                </div>
+                                <div class="info">
+                                    <strong class="servicio-nombre">{{ servicio.nombre }}</strong>
+                                    {% if servicio.descripcion %}
+                                    <span class="especialidad servicio-descripcion">
+                                        <i class="fas fa-info-circle"></i> {{ servicio.descripcion|truncatewords:15 }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-categoria badge-{{ servicio.categoria }}">
+                                <i class="fas fa-tag"></i> {{ servicio.get_categoria_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="precio-container">
+                                <strong class="precio-amount">{{ servicio.precio_base|pesos_chilenos }}</strong>
+                                <small class="precio-label">Precio base</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if servicio.duracion_estimada %}
+                                <div class="duracion-container">
+                                    <i class="fas fa-clock"></i>
+                                    <span class="duracion-text">{{ servicio.duracion_estimada }} min</span>
+                                </div>
+                            {% else %}
+                                <span class="text-muted-duracion">
+                                    <i class="fas fa-minus"></i> No especificado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if servicio.requiere_dentista %}
+                                <span class="status-badge status-yes">
+                                    <i class="fas fa-check-circle"></i> Sí
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-no">
+                                    <i class="fas fa-times-circle"></i> No
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if servicio.activo %}
+                                <span class="status-badge status-active">
+                                    <i class="fas fa-circle"></i> Activo
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-inactive">
+                                    <i class="fas fa-circle"></i> Inactivo
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'editar_servicio' servicio.id %}" class="btn-action btn-edit" title="Editar servicio">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn-action btn-delete" title="Eliminar servicio" onclick="abrirModalEliminarServicio({{ servicio.id }}, '{{ servicio.nombre|escapejs }}', '{{ servicio.get_categoria_display|escapejs }}', '{{ servicio.precio_base|floatformat:0 }}', {% if servicio.activo %}true{% else %}false{% endif %})">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state-services">
+            <div class="empty-icon">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <h3>No hay servicios registrados</h3>
+            <p>Comienza creando tu primer servicio dental con su precio base para poder asignarlo a las citas</p>
+            <a href="{% url 'crear_servicio' %}" class="btn-add-cliente">
+                <i class="fas fa-plus"></i> Crear Primer Servicio
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+/* ============================================================================
+   ESTILOS MEJORADOS PARA GESTOR DE SERVICIOS
+   ============================================================================ */
+
+/* Contenedor principal */
+.personal-container {
+    padding: 0;
+}
+
+/* Header con estadísticas */
+.header-with-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 30px;
+    gap: 20px;
+}
+
+.page-header {
+    flex: 1;
+}
+
+.page-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.page-subtitle {
+    color: #64748b;
+    font-size: 16px;
+    margin: 0;
+}
+
+/* Dashboard compacto */
+.dashboard-compact {
+    flex-shrink: 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 160px;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: white;
+    flex-shrink: 0;
+}
+
+.stat-icon.total { 
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); 
+}
+
+.stat-icon.dentistas { 
+    background: linear-gradient(135deg, #10b981, #059669); 
+}
+
+.stat-icon.administrativos { 
+    background: linear-gradient(135deg, #f59e0b, #d97706); 
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Barra de acciones */
+.actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-form {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    max-width: 400px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 12px 14px 12px 40px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.filter-select {
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    color: #1e293b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 180px;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-filter {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-filter:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-clear {
+    padding: 12px 20px;
+    background: #f3f4f6;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-clear:hover {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+    color: #374151;
+}
+
+.btn-add-cliente {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    white-space: nowrap;
+    margin-left: auto;
+}
+
+.btn-add-cliente:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Tabla de servicios */
+.personal-table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    animation: fadeIn 0.4s ease;
+}
+
+.personal-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.personal-table thead {
+    background: linear-gradient(135deg, #1f2937, #111827);
+    color: white;
+    border-bottom: 2px solid #374151;
+}
+
+.personal-table th {
+    padding: 18px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: white;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.personal-table th.text-center {
+    text-align: center;
+}
+
+.personal-table th i {
+    margin-right: 8px;
+    opacity: 0.9;
+    color: white;
+    font-size: 14px;
+}
+
+.personal-table tbody tr {
+    border-bottom: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.personal-table tbody tr:hover {
+    background: #f8fafc;
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.personal-table tbody tr.inactive-row {
+    opacity: 0.6;
+}
+
+.personal-table td {
+    padding: 18px 16px;
+    color: #1e293b;
+    font-size: 14px;
+}
+
+/* Info del servicio */
+.personal-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.servicio-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.info strong.servicio-nombre {
+    display: block;
+    color: #1e293b;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.especialidad.servicio-descripcion {
+    display: block;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.especialidad.servicio-descripcion i {
+    margin-right: 4px;
+    color: #94a3b8;
+}
+
+/* Badge de categoría */
+.badge-categoria {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-categoria i {
+    font-size: 10px;
+}
+
+/* Colores por categoría */
+.badge-preventivo {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.badge-restaurador {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-endodoncico {
+    background: #fce7f3;
+    color: #9f1239;
+}
+
+.badge-protesico {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.badge-quirurgico {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.badge-estetico {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-ortodontico {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-otros {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* Contenedor de precio */
+.precio-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.precio-amount {
+    color: #10b981;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.precio-label {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* Contenedor de duración */
+.duracion-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748b;
+}
+
+.duracion-container i {
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.duracion-text {
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.text-muted-duracion {
+    color: #9ca3af;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-badge i {
+    font-size: 8px;
+}
+
+.status-badge.status-active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.status-inactive {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.status-badge.status-yes {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-badge.status-no {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* Botones de acción */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.btn-action {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-action.btn-edit {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.btn-action.btn-edit:hover {
+    background: #fde68a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-action.btn-delete {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.btn-action.btn-delete:hover {
+    background: #fecaca;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Estado vacío */
+.empty-state-services {
+    text-align: center;
+    padding: 100px 40px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.empty-icon {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 32px;
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-icon i {
+    font-size: 60px;
+    color: #9ca3af;
+}
+
+.empty-state-services h3 {
+    color: #374151;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.empty-state-services p {
+    color: #64748b;
+    font-size: 16px;
+    margin-bottom: 32px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .header-with-stats {
+        flex-direction: column;
+    }
+    
+    .dashboard-compact {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .actions-bar {
+        flex-direction: column;
+    }
+    
+    .filter-form {
+        flex-direction: column;
+    }
+    
+    .search-box {
+        max-width: 100%;
+        width: 100%;
+    }
+    
+    .filter-select {
+        width: 100%;
+    }
+    
+    .btn-add-cliente {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+    }
+    
+    .personal-table-container {
+        overflow-x: auto;
+    }
+    
+    .personal-table {
+        min-width: 800px;
+    }
+}
+
+/* ============================================================================
+   SISTEMA DE NOTIFICACIONES
+   ============================================================================ */
+.notification-container {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.notification {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    animation: slideInRight 0.3s ease-out;
+    pointer-events: auto;
+    border-left: 4px solid;
+    min-width: 320px;
+    max-width: 400px;
+}
+
+.notification.success {
+    border-left-color: #10b981;
+    background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+}
+
+.notification.error {
+    border-left-color: #ef4444;
+    background: linear-gradient(to right, #fef2f2 0%, white 8%);
+}
+
+.notification.warning {
+    border-left-color: #f59e0b;
+    background: linear-gradient(to right, #fffbeb 0%, white 8%);
+}
+
+.notification.info {
+    border-left-color: #3b82f6;
+    background: linear-gradient(to right, #eff6ff 0%, white 8%);
+}
+
+.notification-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.notification.success .notification-icon {
+    background: #10b981;
+    color: white;
+}
+
+.notification.error .notification-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.notification.warning .notification-icon {
+    background: #f59e0b;
+    color: white;
+}
+
+.notification.info .notification-icon {
+    background: #3b82f6;
+    color: white;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.notification-message {
+    font-size: 0.875rem;
+    color: #64748b;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.notification-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.notification-close:hover {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification.hiding {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================================
+   MODAL DE CONFIRMACIÓN ELIMINAR SERVICIO
+   ============================================================================ */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-confirmar-eliminar {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.modal-overlay.active .modal-confirmar-eliminar {
+    transform: scale(1);
+}
+
+.modal-header-eliminar {
+    padding: 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-header-eliminar i {
+    font-size: 24px;
+    color: #ef4444;
+}
+
+.modal-header-eliminar h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.modal-body-eliminar {
+    padding: 24px;
+}
+
+.info-servicio-eliminar {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e2e8f0;
+}
+
+.info-servicio-eliminar h4 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.info-grid-eliminar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+}
+
+.info-item-eliminar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label-eliminar {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value-eliminar {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.warning-box-eliminar {
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.warning-box-eliminar i {
+    color: #f59e0b;
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.warning-box-eliminar p {
+    margin: 0;
+    font-size: 14px;
+    color: #92400e;
+    line-height: 1.5;
+}
+
+.modal-footer-eliminar {
+    padding: 24px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-confirmar-eliminar {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-confirmar-eliminar:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-cancelar-eliminar {
+    padding: 12px 24px;
+    background: white;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-cancelar-eliminar:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+/* ============================================================================
+   MODAL CREAR SERVICIO
+   ============================================================================ */
+.modal-crear-servicio {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.modal-overlay.active .modal-crear-servicio {
+    transform: scale(1);
+}
+
+.modal-header-crear {
+    padding: 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+}
+
+.modal-header-crear i {
+    font-size: 24px;
+    color: var(--primary-color);
+}
+
+.modal-header-crear h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    flex: 1;
+}
+
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s;
+    width: 36px;
+    height: 36px;
+}
+
+.modal-close-btn:hover {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.modal-body-crear {
+    padding: 24px;
+    max-height: calc(90vh - 200px);
+    overflow-y: auto;
+}
+
+.form-group-modal-servicio {
+    margin-bottom: 20px;
+}
+
+.label-modal-servicio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.label-modal-servicio i {
+    color: var(--primary-color);
+    font-size: 16px;
+}
+
+.required {
+    color: #ef4444;
+    margin-left: 2px;
+}
+
+.input-modal-servicio,
+.select-modal-servicio {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.input-modal-servicio:focus,
+.select-modal-servicio:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    background: #fafbfc;
+}
+
+.textarea-modal-servicio {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+
+.precio-input-modal {
+    font-weight: 600;
+    color: #10b981;
+    font-size: 16px;
+}
+
+.select-modal-servicio {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 40px;
+}
+
+.hint-modal-servicio {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.form-grid-modal-servicio {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.checkbox-group-modal-servicio {
+    margin-bottom: 16px;
+}
+
+.checkbox-label-modal-servicio {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    padding: 14px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.checkbox-label-modal-servicio:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.checkbox-modal-servicio {
+    display: none;
+}
+
+.checkbox-custom-modal {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.2s ease;
+}
+
+.checkbox-modal-servicio:checked + .checkbox-custom-modal {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.checkbox-modal-servicio:checked + .checkbox-custom-modal::after {
+    content: '\f00c';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    color: white;
+    font-size: 11px;
+}
+
+.checkbox-content-modal {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.checkbox-content-modal i {
+    color: var(--primary-color);
+    font-size: 16px;
+}
+
+.checkbox-content-modal strong {
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.modal-footer-crear {
+    padding: 24px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-confirmar-crear {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-confirmar-crear:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-confirmar-crear:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-cancelar-crear {
+    padding: 12px 24px;
+    background: white;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-cancelar-crear:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+@media (max-width: 768px) {
+    .form-grid-modal-servicio {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-footer-crear {
+        flex-direction: column;
+    }
+    
+    .btn-confirmar-crear,
+    .btn-cancelar-crear {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+
+<!-- Modal de Crear Servicio -->
+<div class="modal-overlay" id="modalCrearServicio" onclick="if(event.target === this) cerrarModalCrearServicio()">
+    <div class="modal-crear-servicio" onclick="event.stopPropagation()">
+        <div class="modal-header-crear">
+            <i class="fas fa-plus-circle"></i>
+            <h3>Crear Nuevo Servicio</h3>
+            <button type="button" class="modal-close-btn" onclick="cerrarModalCrearServicio()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="formCrearServicio" method="post" action="{% url 'crear_servicio' %}">
+            {% csrf_token %}
+            <div class="modal-body-crear">
+                <div class="form-group-modal-servicio">
+                    <label class="label-modal-servicio">
+                        <i class="fas fa-tasks"></i>
+                        Nombre del Servicio <span class="required">*</span>
+                    </label>
+                    <input type="text" name="nombre" id="crearNombre" required placeholder="Ej: Limpieza Dental, Extracción..." class="input-modal-servicio">
+                    <small class="hint-modal-servicio">Nombre descriptivo del servicio dental</small>
+                </div>
+
+                <div class="form-group-modal-servicio">
+                    <label class="label-modal-servicio">
+                        <i class="fas fa-align-left"></i>
+                        Descripción
+                    </label>
+                    <textarea name="descripcion" id="crearDescripcion" rows="3" placeholder="Descripción detallada del servicio (opcional)..." class="input-modal-servicio textarea-modal-servicio"></textarea>
+                </div>
+
+                <div class="form-grid-modal-servicio">
+                    <div class="form-group-modal-servicio">
+                        <label class="label-modal-servicio">
+                            <i class="fas fa-tags"></i>
+                            Categoría <span class="required">*</span>
+                        </label>
+                        <select name="categoria" id="crearCategoria" required class="select-modal-servicio">
+                            {% for cat_code, cat_name in categorias %}
+                            <option value="{{ cat_code }}">{{ cat_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group-modal-servicio">
+                        <label class="label-modal-servicio">
+                            <i class="fas fa-dollar-sign"></i>
+                            Precio Base <span class="required">*</span>
+                        </label>
+                        <input type="text" inputmode="numeric" pattern="[0-9.,]*" name="precio_base" id="crearPrecio" required placeholder="60.000" class="input-modal-servicio precio-input-modal formato-numero">
+                    </div>
+                </div>
+
+                <div class="form-group-modal-servicio">
+                    <label class="label-modal-servicio">
+                        <i class="fas fa-clock"></i>
+                        Duración Estimada (minutos)
+                    </label>
+                    <input type="number" name="duracion_estimada" id="crearDuracion" min="0" placeholder="Ej: 30, 60, 90..." class="input-modal-servicio">
+                </div>
+
+                <div class="checkbox-group-modal-servicio">
+                    <label class="checkbox-label-modal-servicio">
+                        <input type="checkbox" name="requiere_dentista" id="crearRequiereDentista" checked class="checkbox-modal-servicio">
+                        <span class="checkbox-custom-modal"></span>
+                        <div class="checkbox-content-modal">
+                            <i class="fas fa-user-md"></i>
+                            <span><strong>Requiere Dentista</strong></span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="checkbox-group-modal-servicio">
+                    <label class="checkbox-label-modal-servicio">
+                        <input type="checkbox" name="activo" id="crearActivo" checked class="checkbox-modal-servicio">
+                        <span class="checkbox-custom-modal"></span>
+                        <div class="checkbox-content-modal">
+                            <i class="fas fa-toggle-on"></i>
+                            <span><strong>Servicio Activo</strong></span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer-crear">
+                <button type="button" class="btn-cancelar-crear" onclick="cerrarModalCrearServicio()">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button type="submit" class="btn-confirmar-crear">
+                    <i class="fas fa-save"></i>
+                    Crear Servicio
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Confirmación Eliminar Servicio -->
+<div class="modal-overlay" id="modalEliminarServicio" onclick="if(event.target === this) cerrarModalEliminarServicio()">
+    <div class="modal-confirmar-eliminar" onclick="event.stopPropagation()">
+        <div class="modal-header-eliminar">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Confirmar Eliminación</h3>
+        </div>
+        <div class="modal-body-eliminar">
+            <p style="margin: 0 0 20px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
+                ¿Está seguro de eliminar este servicio? Esta acción <strong>no se puede deshacer</strong>.
+            </p>
+            
+            <div class="info-servicio-eliminar">
+                <h4>Información del Servicio</h4>
+                <div class="info-grid-eliminar">
+                    <div class="info-item-eliminar">
+                        <div class="info-label-eliminar">Nombre</div>
+                        <div class="info-value-eliminar" id="modalNombreServicio"></div>
+                    </div>
+                    <div class="info-item-eliminar">
+                        <div class="info-label-eliminar">Categoría</div>
+                        <div class="info-value-eliminar" id="modalCategoriaServicio"></div>
+                    </div>
+                    <div class="info-item-eliminar">
+                        <div class="info-label-eliminar">Precio Base</div>
+                        <div class="info-value-eliminar" style="color: #10b981;" id="modalPrecioServicio"></div>
+                    </div>
+                    <div class="info-item-eliminar">
+                        <div class="info-label-eliminar">Estado</div>
+                        <div class="info-value-eliminar" id="modalEstadoServicio"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="warning-box-eliminar">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>
+                    <strong>Advertencia:</strong> Si este servicio tiene citas asociadas, deberá desactivarlo en lugar de eliminarlo.
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer-eliminar">
+            <a href="#" class="btn-cancelar-eliminar" onclick="cerrarModalEliminarServicio(); return false;">
+                <i class="fas fa-times"></i>
+                Cancelar
+            </a>
+            <form method="post" action="" id="formEliminarServicio" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-confirmar-eliminar">
+                    <i class="fas fa-trash-alt"></i>
+                    Sí, Eliminar Servicio
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== SISTEMA DE NOTIFICACIONES ==========
+function showNotification(type, message, duration = 5000) {
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(notification);
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+
+// ========== MODAL ELIMINAR SERVICIO ==========
+function abrirModalEliminarServicio(servicioId, nombre, categoria, precio, activo) {
+    document.getElementById('modalNombreServicio').textContent = nombre;
+    document.getElementById('modalCategoriaServicio').textContent = categoria;
+    document.getElementById('modalPrecioServicio').textContent = '$' + precio.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    document.getElementById('modalEstadoServicio').textContent = activo ? 'Activo' : 'Inactivo';
+    document.getElementById('formEliminarServicio').action = '{% url "eliminar_servicio" 0 %}'.replace('0', servicioId);
+    
+    const modal = document.getElementById('modalEliminarServicio');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalEliminarServicio() {
+    const modal = document.getElementById('modalEliminarServicio');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// ========== MODAL CREAR SERVICIO ==========
+function abrirModalCrearServicio() {
+    const modal = document.getElementById('modalCrearServicio');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    // Limpiar formulario
+    document.getElementById('formCrearServicio').reset();
+}
+
+function cerrarModalCrearServicio() {
+    const modal = document.getElementById('modalCrearServicio');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    // Limpiar formulario
+    document.getElementById('formCrearServicio').reset();
+}
+
+// Función para formatear número con separadores de miles
+function formatearNumero(numero) {
+    if (!numero) return '';
+    let numeroLimpio = numero.toString().replace(/[^\d]/g, '');
+    if (!numeroLimpio) return '';
+    return numeroLimpio.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Función para limpiar formato (remover puntos) antes de enviar
+function limpiarFormatoNumero(numero) {
+    if (!numero) return '';
+    return numero.toString().replace(/\./g, '');
+}
+
+// Aplicar formato a campos numéricos en el modal
+document.addEventListener('DOMContentLoaded', function() {
+    const camposNumeros = document.querySelectorAll('.formato-numero');
+    
+    camposNumeros.forEach(function(campo) {
+        campo.addEventListener('input', function(e) {
+            const cursorPos = e.target.selectionStart;
+            const valorOriginal = e.target.value;
+            const valorFormateado = formatearNumero(valorOriginal);
+            
+            e.target.value = valorFormateado;
+            
+            const diferencia = valorFormateado.length - valorOriginal.length;
+            const nuevaPos = cursorPos + diferencia;
+            e.target.setSelectionRange(nuevaPos, nuevaPos);
+        });
+    });
+    
+    // Manejar envío del formulario de crear servicio
+    const formCrearServicio = document.getElementById('formCrearServicio');
+    if (formCrearServicio) {
+        formCrearServicio.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Limpiar formato del precio antes de enviar
+            const precioInput = document.getElementById('crearPrecio');
+            if (precioInput && precioInput.value) {
+                precioInput.value = limpiarFormatoNumero(precioInput.value);
+            }
+            
+            const formData = new FormData(formCrearServicio);
+            formData.append('X-Requested-With', 'XMLHttpRequest');
+            
+            const submitBtn = formCrearServicio.querySelector('.btn-confirmar-crear');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+            
+            fetch(formCrearServicio.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-save"></i> Crear Servicio';
+                
+                if (data.success) {
+                    showNotification('success', data.message);
+                    cerrarModalCrearServicio();
+                    // Recargar la página después de 1 segundo para mostrar el nuevo servicio
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotification('error', data.message);
+                }
+            })
+            .catch(error => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-save"></i> Crear Servicio';
+                showNotification('error', 'Error al crear el servicio. Por favor, intente nuevamente.');
+                console.error('Error:', error);
+            });
+        });
+    }
+});
+
+// Mostrar notificaciones de Django messages
+{% if messages %}
+    {% for message in messages %}
+        {% if message.tags == 'error' %}
+            showNotification('error', '{{ message|escapejs }}');
+        {% elif message.tags == 'warning' %}
+            showNotification('warning', '{{ message|escapejs }}');
+        {% elif message.tags == 'success' %}
+            showNotification('success', '{{ message|escapejs }}');
+        {% else %}
+            showNotification('info', '{{ message|escapejs }}');
+        {% endif %}
+    {% endfor %}
+{% endif %}
+</script>
+{% endblock %}

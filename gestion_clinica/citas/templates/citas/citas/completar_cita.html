@@ -1,0 +1,1196 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+{% load humanize %}
+
+{% block title %}Completar Cita - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<div class="personal-container">
+    <!-- Header -->
+    <div class="header-with-stats">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-check-circle"></i> Completar Cita</h1>
+            <p class="page-subtitle">Confirma los datos de la cita y el precio a cobrar</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'panel_trabajador' %}" class="btn-back">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver al Panel</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Información de la Cita -->
+    <div class="section form-section-completar">
+        <div class="completar-cita-card">
+            <div class="card-header-completar">
+                <i class="fas fa-calendar-check"></i>
+                <h3>Resumen de la Cita</h3>
+            </div>
+            <div class="card-body-completar">
+                <div class="info-grid-completar">
+                    <div class="info-item-completar">
+                        <div class="info-label-completar">
+                            <i class="fas fa-user"></i>
+                            Cliente
+                        </div>
+                        <div class="info-value-completar">
+                            {{ cita.paciente_nombre|default:"Sin nombre" }}
+                        </div>
+                    </div>
+
+                    <div class="info-item-completar">
+                        <div class="info-label-completar">
+                            <i class="fas fa-calendar"></i>
+                            Fecha y Hora
+                        </div>
+                        <div class="info-value-completar">
+                            {{ cita.fecha_hora|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+
+                    <div class="info-item-completar">
+                        <div class="info-label-completar">
+                            <i class="fas fa-user-md"></i>
+                            Dentista
+                        </div>
+                        <div class="info-value-completar">
+                            {% if cita.dentista %}{{ cita.dentista.nombre_completo }}{% else %}Sin asignar{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="info-item-completar">
+                        <div class="info-label-completar">
+                            <i class="fas fa-tasks"></i>
+                            Servicio
+                        </div>
+                        <div class="info-value-completar">
+                            {% if cita.tipo_servicio %}
+                            <strong>{{ cita.tipo_servicio.nombre }}</strong>
+                            {% if cita.tipo_servicio.precio_base %}
+                            <br><small style="color: #64748b; font-weight: normal;">Precio: {{
+                                cita.tipo_servicio.precio_base|pesos_chilenos }}</small>
+                            {% endif %}
+                            {% elif cita.tipo_consulta %}
+                            {{ cita.tipo_consulta }}
+                            {% else %}
+                            No especificado
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="info-item-completar">
+                        <div class="info-label-completar">
+                            <i class="fas fa-file-medical"></i>
+                            Ficha Odontológica
+                        </div>
+                        <div class="info-value-completar">
+                            {% if tiene_ficha %}
+                            <span style="color: #10b981; font-weight: 600;">
+                                <i class="fas fa-check-circle"></i> Ficha creada
+                            </span>
+                            {% if odontograma %}
+                            <a href="{% url 'detalle_odontograma' odontograma.id %}"
+                                style="margin-left: 8px; color: #3b82f6; text-decoration: underline;">
+                                Ver ficha
+                            </a>
+                            {% endif %}
+                            {% else %}
+                            <span style="color: #ef4444; font-weight: 600;">
+                                <i class="fas fa-exclamation-triangle"></i> Ficha no creada
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel de Validaciones -->
+                <div class="validaciones-panel">
+                    <h4 class="validaciones-title">
+                        <i class="fas fa-clipboard-check"></i>
+                        Validaciones Requeridas
+                    </h4>
+                    <div class="validaciones-list">
+                        <!-- Validación 1: Fecha -->
+                        <div
+                            class="validation-item {% if validaciones.fecha_valida %}success{% else %}error{% endif %}">
+                            {% if validaciones.fecha_valida %}
+                            <i class="fas fa-check-circle validation-icon success"></i>
+                            {% else %}
+                            <i class="fas fa-times-circle validation-icon error"></i>
+                            {% endif %}
+                            <div class="validation-content">
+                                <strong
+                                    class="validation-label {% if validaciones.fecha_valida %}success{% else %}error{% endif %}">
+                                    Fecha de la Cita
+                                </strong>
+                                <span
+                                    class="validation-message {% if validaciones.fecha_valida %}success{% else %}error{% endif %}">
+                                    {% if validaciones.fecha_valida %}
+                                    ✓ La cita ya ha ocurrido ({{ cita.fecha_hora|date:"d/m/Y H:i" }})
+                                    {% else %}
+                                    ✗ La cita es futura ({{ cita.fecha_hora|date:"d/m/Y H:i" }}). No se puede completar
+                                    hasta que ocurra.
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Validación 2: Ficha Odontológica -->
+                        <div
+                            class="validation-item {% if validaciones.tiene_ficha and validaciones.ficha_completa %}success{% elif validaciones.tiene_ficha %}warning{% else %}error{% endif %}">
+                            {% if validaciones.tiene_ficha and validaciones.ficha_completa %}
+                            <i class="fas fa-check-circle validation-icon success"></i>
+                            {% elif validaciones.tiene_ficha %}
+                            <i class="fas fa-exclamation-triangle validation-icon warning"></i>
+                            {% else %}
+                            <i class="fas fa-times-circle validation-icon error"></i>
+                            {% endif %}
+                            <div class="validation-content">
+                                <strong
+                                    class="validation-label {% if validaciones.tiene_ficha and validaciones.ficha_completa %}success{% elif validaciones.tiene_ficha %}warning{% else %}error{% endif %}">
+                                    Ficha Odontológica
+                                </strong>
+                                <span
+                                    class="validation-message {% if validaciones.tiene_ficha and validaciones.ficha_completa %}success{% elif validaciones.tiene_ficha %}warning{% else %}error{% endif %}">
+                                    {% if validaciones.tiene_ficha and validaciones.ficha_completa %}
+                                    ✓ Ficha creada y completa
+                                    {% elif validaciones.tiene_ficha %}
+                                    ⚠ Ficha existe pero está incompleta (falta información requerida)
+                                    {% else %}
+                                    ✗ No se ha creado la ficha odontológica. El dentista debe crearla primero.
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Validación 3: Precio -->
+                        <div
+                            class="validation-item {% if validaciones.tiene_precio %}success{% else %}error{% endif %}">
+                            {% if validaciones.tiene_precio %}
+                            <i class="fas fa-check-circle validation-icon success"></i>
+                            {% else %}
+                            <i class="fas fa-times-circle validation-icon error"></i>
+                            {% endif %}
+                            <div class="validation-content">
+                                <strong
+                                    class="validation-label {% if validaciones.tiene_precio %}success{% else %}error{% endif %}">
+                                    Precio a Cobrar
+                                </strong>
+                                <span
+                                    class="validation-message {% if validaciones.tiene_precio %}success{% else %}error{% endif %}">
+                                    {% if validaciones.tiene_precio %}
+                                    ✓ Precio asignado o disponible desde el servicio
+                                    {% else %}
+                                    ✗ Debe asignar un precio para completar la cita
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resumen final -->
+                    {% if validaciones.puede_completar %}
+                    <div class="validation-summary success">
+                        <div class="validation-summary-content">
+                            <i class="fas fa-check-double" style="color: #059669; font-size: 18px;"></i>
+                            <strong class="validation-summary-text">
+                                ✓ Todas las validaciones pasaron. Puede completar la cita.
+                            </strong>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="validation-summary error">
+                        <div class="validation-summary-content">
+                            <i class="fas fa-exclamation-triangle" style="color: #dc2626; font-size: 18px;"></i>
+                            <strong class="validation-summary-text">
+                                ⚠ No se puede completar la cita. Revise las validaciones pendientes arriba.
+                            </strong>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Formulario para precio -->
+                <form method="post" class="form-completar-precio">
+                    {% csrf_token %}
+                    <div class="precio-section">
+                        <div class="precio-header">
+                            <i class="fas fa-dollar-sign"></i>
+                            <h4>Precio a Cobrar</h4>
+                        </div>
+                        <div class="precio-content">
+                            <div class="precio-input-group">
+                                <div
+                                    style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px;">
+                                    <div
+                                        style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 200px;">
+                                        <span class="precio-actual-label">
+                                            Precio base del servicio{% if cita.tipo_servicio and
+                                            cita.tipo_servicio.nombre %} ({{ cita.tipo_servicio.nombre }}){% endif %}:
+                                        </span>
+
+                                        <div class="precio-input-wrapper" style="flex: 1; max-width: 200px;">
+                                            <span class="precio-symbol">$</span>
+                                            <input type="text" name="precio_cobrado" inputmode="numeric"
+                                                pattern="[0-9.,]*" {% if precio_servicio or cita.tipo_servicio and
+                                                cita.tipo_servicio.precio_base %} disabled id="precio_cobrado_input" {%
+                                                else %} required id="precio_cobrado_input" {% endif %} value=""
+                                                placeholder="60.000" class="precio-input-field formato-numero">
+                                        </div>
+                                    </div>
+
+                                    <!-- Checkbox para habilitar edición de precio -->
+                                    {% if precio_servicio or cita.tipo_servicio and cita.tipo_servicio.precio_base %}
+                                    <label
+                                        style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; white-space: nowrap;">
+                                        <input type="checkbox" id="habilitar_ajuste_precio"
+                                            name="habilitar_ajuste_precio"
+                                            style="width: 18px; height: 18px; cursor: pointer;">
+                                        <span style="font-weight: 500; color: #64748b; font-size: 14px;">
+                                            <i class="fas fa-edit" style="color: #3b82f6;"></i>
+                                            Editar
+                                        </span>
+                                    </label>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Campo oculto para enviar el precio del servicio cuando está deshabilitado -->
+                                {% if precio_servicio or cita.tipo_servicio and cita.tipo_servicio.precio_base %}
+                                <input type="hidden" name="precio_servicio_base"
+                                    value="{% if precio_servicio %}{{ precio_servicio|stringformat:" d" }}{% elif
+                                    cita.tipo_servicio and cita.tipo_servicio.precio_base %}{{
+                                    cita.tipo_servicio.precio_base|stringformat:"d" }}{% endif %}"
+                                    id="precio_servicio_base_hidden">
+                                {% endif %}
+                            </div>
+
+                            <!-- Método de Pago -->
+                            <div class="metodo-pago-section"
+                                style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #d1fae5;">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600; color: #1e293b; font-size: 14px;">
+                                    <i class="fas fa-credit-card" style="color: var(--primary-color);"></i>
+                                    Método de Pago
+                                </label>
+                                <div class="metodo-pago-options" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                    <label class="metodo-pago-option">
+                                        <input type="radio" name="metodo_pago" value="efectivo" required>
+                                        <div class="metodo-pago-card">
+                                            <i class="fas fa-money-bill-wave"></i>
+                                            <span>Efectivo</span>
+                                        </div>
+                                    </label>
+                                    <label class="metodo-pago-option">
+                                        <input type="radio" name="metodo_pago" value="transferencia">
+                                        <div class="metodo-pago-card">
+                                            <i class="fas fa-exchange-alt"></i>
+                                            <span>Transferencia</span>
+                                        </div>
+                                    </label>
+                                    <label class="metodo-pago-option">
+                                        <input type="radio" name="metodo_pago" value="tarjeta">
+                                        <div class="metodo-pago-card">
+                                            <i class="fas fa-credit-card"></i>
+                                            <span>Tarjeta</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Motivo del Ajuste de Precio (solo si se edita el precio) -->
+                            <div id="motivo-ajuste-container"
+                                style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #d1fae5;">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600; color: #1e293b; font-size: 14px;">
+                                    <i class="fas fa-info-circle" style="color: #f59e0b;"></i>
+                                    Motivo del Ajuste de Precio
+                                </label>
+                                <textarea name="motivo_ajuste_precio" id="motivo_ajuste_precio" rows="3"
+                                    placeholder="Ej: Descuento por pago anticipado, Recargo por urgencia, etc."
+                                    class="form-control"
+                                    style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; min-height: 80px;"></textarea>
+                                <small style="color: #64748b; font-size: 12px; margin-top: 6px; display: block;">
+                                    Justifique el motivo si el precio difiere del precio base del servicio
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas de Finalización -->
+                    <div class="notas-finalizacion-section"
+                        style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                            <i class="fas fa-sticky-note" style="color: var(--primary-color); font-size: 18px;"></i>
+                            <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Notas de
+                                Finalización (Opcional)</h4>
+                        </div>
+                        <textarea name="notas_finalizacion" rows="3"
+                            placeholder="Agregue observaciones adicionales sobre la finalización de la cita..."
+                            class="form-control"
+                            style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; min-height: 80px;"></textarea>
+                        <small style="color: #64748b; font-size: 12px; margin-top: 6px; display: block;">
+                            <i class="fas fa-info-circle"></i> Estas notas son opcionales y se guardarán en el historial
+                            de la cita
+                        </small>
+                    </div>
+
+                    <!-- Botones de Acción -->
+                    <div class="form-actions-completar">
+                        <button type="submit" class="btn-completar-primary" {% if not validaciones.puede_completar
+                            %}disabled{% endif %}
+                            title="{% if not validaciones.puede_completar %}Complete todas las validaciones requeridas para habilitar este botón{% endif %}">
+                            <i class="fas fa-check-double"></i>
+                            <span>Confirmar y Completar Cita</span>
+                        </button>
+                        <a href="{% url 'panel_trabajador' %}" class="btn-completar-secondary">
+                            <i class="fas fa-times"></i>
+                            <span>Cancelar</span>
+                        </a>
+                    </div>
+
+                    {% if not validaciones.puede_completar %}
+                    <div
+                        style="margin-top: 16px; padding: 12px; background: #fef3c7; border-radius: 8px; border: 1px solid #fbbf24;">
+                        <p
+                            style="margin: 0; color: #92400e; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Nota:</strong> El botón "Confirmar y Completar Cita" estará deshabilitado hasta que
+                            todas las validaciones requeridas estén completas.
+                        </p>
+                    </div>
+                    {% endif %}
+                </form>
+
+                <!-- Historial de la Cita (si ya está completada) -->
+                {% if cita.estado == 'completada' and cita.completada_por %}
+                <div class="historial-cita-section"
+                    style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
+                    <details style="cursor: pointer;">
+                        <summary
+                            style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: #1e293b; font-size: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; list-style: none;">
+                            <i class="fas fa-history" style="color: var(--primary-color);"></i>
+                            <span>Historial de Finalización</span>
+                            <i class="fas fa-chevron-down" style="margin-left: auto; transition: transform 0.3s;"></i>
+                        </summary>
+                        <div
+                            style="margin-top: 16px; padding: 20px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <div class="historial-grid"
+                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                                <div class="historial-item">
+                                    <div
+                                        style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+                                        <i class="fas fa-user-check"></i> Completada por
+                                    </div>
+                                    <div style="font-size: 15px; font-weight: 600; color: #1e293b;">
+                                        {{ cita.completada_por.nombre_completo }}
+                                    </div>
+                                </div>
+                                <div class="historial-item">
+                                    <div
+                                        style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+                                        <i class="fas fa-calendar-check"></i> Fecha de Finalización
+                                    </div>
+                                    <div style="font-size: 15px; font-weight: 600; color: #1e293b;">
+                                        {{ cita.fecha_completada|date:"d/m/Y H:i" }}
+                                    </div>
+                                </div>
+                                {% if cita.precio_cobrado %}
+                                <div class="historial-item">
+                                    <div
+                                        style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+                                        <i class="fas fa-dollar-sign"></i> Precio Cobrado
+                                    </div>
+                                    <div style="font-size: 15px; font-weight: 600; color: #10b981;">
+                                        ${{ cita.precio_cobrado|floatformat:0|stringformat:"d" }}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% if cita.metodo_pago %}
+                                <div class="historial-item">
+                                    <div
+                                        style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+                                        <i class="fas fa-credit-card"></i> Método de Pago
+                                    </div>
+                                    <div style="font-size: 15px; font-weight: 600; color: #1e293b;">
+                                        {{ cita.get_metodo_pago_display }}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if cita.motivo_ajuste_precio %}
+                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                                <div
+                                    style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+                                    <i class="fas fa-info-circle"></i> Motivo del Ajuste
+                                </div>
+                                <div style="font-size: 14px; color: #1e293b; line-height: 1.6;">
+                                    {{ cita.motivo_ajuste_precio }}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cita.notas_finalizacion %}
+                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                                <div
+                                    style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+                                    <i class="fas fa-sticky-note"></i> Notas de Finalización
+                                </div>
+                                <div style="font-size: 14px; color: #1e293b; line-height: 1.6;">
+                                    {{ cita.notas_finalizacion }}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </details>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ============================================================================
+   ESTILOS PARA COMPLETAR CITA
+   ============================================================================ */
+
+    .personal-container {
+        padding: 0;
+    }
+
+    /* Header */
+    .header-with-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 32px;
+        gap: 20px;
+    }
+
+    .page-header {
+        flex: 1;
+    }
+
+    .page-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-subtitle {
+        color: #64748b;
+        font-size: 16px;
+        margin: 0;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .btn-back {
+        padding: 12px 20px;
+        background: white;
+        color: #64748b;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+
+    .btn-back:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #475569;
+        transform: translateX(-2px);
+    }
+
+    /* Card de completar */
+    .form-section-completar {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        padding: 0;
+    }
+
+    .completar-cita-card {
+        padding: 0;
+    }
+
+    .card-header-completar {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: white;
+        padding: 24px 32px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .card-header-completar i {
+        font-size: 24px;
+    }
+
+    .card-header-completar h3 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+    }
+
+    .card-body-completar {
+        padding: 32px;
+    }
+
+    /* Grid de información */
+    .info-grid-completar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 24px;
+        margin-bottom: 32px;
+        padding-bottom: 32px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .info-item-completar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .info-label-completar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-label-completar i {
+        color: var(--primary-color);
+        font-size: 14px;
+    }
+
+    .info-value-completar {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    /* Sección de precio */
+    .precio-section {
+        background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        border: 2px solid #86efac;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+
+    .precio-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .precio-header i {
+        font-size: 20px;
+        color: #10b981;
+    }
+
+    .precio-header h4 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .precio-display {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding: 16px;
+        background: white;
+        border-radius: 10px;
+        border: 2px solid #d1fae5;
+    }
+
+    .precio-actual-label {
+        font-size: 14px;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .precio-actual {
+        font-size: 24px;
+        font-weight: 700;
+        color: #10b981;
+    }
+
+    .precio-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .precio-input-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .precio-input-label i {
+        color: var(--primary-color);
+    }
+
+    .precio-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .precio-symbol {
+        position: absolute;
+        left: 16px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #10b981;
+        z-index: 1;
+    }
+
+    .precio-input-field {
+        width: 100%;
+        padding: 14px 16px 14px 40px;
+        border: 2px solid #86efac;
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #10b981;
+        background: white;
+        transition: all 0.2s ease;
+    }
+
+    .precio-input-field:focus {
+        outline: none;
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .precio-input-field::placeholder {
+        color: #94a3b8;
+        font-weight: 400;
+    }
+
+    .precio-hint {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.4;
+    }
+
+    .precio-hint i {
+        color: #94a3b8;
+    }
+
+    /* Botones de acción */
+    .form-actions-completar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding-top: 24px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .btn-completar-primary {
+        padding: 14px 28px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-completar-primary:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-completar-primary i {
+        font-size: 16px;
+    }
+
+    .btn-completar-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #9ca3af;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .btn-completar-secondary {
+        padding: 14px 28px;
+        background: white;
+        color: #64748b;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-completar-secondary:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #475569;
+        transform: translateY(-2px);
+    }
+
+    .btn-completar-secondary i {
+        font-size: 16px;
+    }
+
+    /* Método de Pago */
+    .metodo-pago-option {
+        cursor: pointer;
+        flex: 1;
+        min-width: 120px;
+    }
+
+    .metodo-pago-option input[type="radio"] {
+        display: none;
+    }
+
+    .metodo-pago-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 20px;
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .metodo-pago-card i {
+        font-size: 24px;
+        color: #94a3b8;
+        transition: all 0.3s ease;
+    }
+
+    .metodo-pago-option input[type="radio"]:checked+.metodo-pago-card {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        border-color: var(--primary-color);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .metodo-pago-option input[type="radio"]:checked+.metodo-pago-card i {
+        color: white;
+    }
+
+    .metodo-pago-option:hover .metodo-pago-card {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .header-with-stats {
+            flex-direction: column;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .btn-back {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .info-grid-completar {
+            grid-template-columns: 1fr;
+        }
+
+        .form-actions-completar {
+            flex-direction: column;
+        }
+
+        .btn-completar-primary,
+        .btn-completar-secondary {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .card-body-completar {
+            padding: 24px;
+        }
+    }
+
+    /* Estilos para el panel de validaciones */
+    .validaciones-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+        border: 2px solid #e2e8f0;
+    }
+
+    .validaciones-title {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .validaciones-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .validation-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+    }
+
+    .validation-item.success {
+        background: #f0fdf4;
+        border-color: #86efac;
+    }
+
+    .validation-item.error {
+        background: #fef2f2;
+        border-color: #fecaca;
+    }
+
+    .validation-item.warning {
+        background: #fffbeb;
+        border-color: #fcd34d;
+    }
+
+    .validation-icon {
+        font-size: 20px;
+    }
+
+    .validation-icon.success {
+        color: #10b981;
+    }
+
+    .validation-icon.error {
+        color: #ef4444;
+    }
+
+    .validation-icon.warning {
+        color: #f59e0b;
+    }
+
+    .validation-content {
+        flex: 1;
+    }
+
+    .validation-label {
+        display: block;
+        margin-bottom: 2px;
+        font-weight: 700;
+    }
+
+    .validation-label.success {
+        color: #065f46;
+    }
+
+    .validation-label.error {
+        color: #991b1b;
+    }
+
+    .validation-label.warning {
+        color: #92400e;
+    }
+
+    .validation-message {
+        font-size: 13px;
+    }
+
+    .validation-message.success {
+        color: #047857;
+    }
+
+    .validation-message.error {
+        color: #dc2626;
+    }
+
+    .validation-message.warning {
+        color: #b45309;
+    }
+
+    .validation-summary {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+    }
+
+    .validation-summary.success {
+        background: #d1fae5;
+        border-color: #10b981;
+    }
+
+    .validation-summary.error {
+        background: #fee2e2;
+        border-color: #ef4444;
+    }
+
+    .validation-summary-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .validation-summary-text {
+        font-weight: 700;
+    }
+
+    .validation-summary.success .validation-summary-text {
+        color: #065f46;
+    }
+
+    .validation-summary.error .validation-summary-text {
+        color: #991b1b;
+    }
+</style>
+
+<script>
+    // Función para formatear número con separadores de miles
+    function formatearNumero(numero) {
+        if (!numero) return '';
+        // Remover todo excepto números
+        let numeroLimpio = numero.toString().replace(/[^\d]/g, '');
+        if (!numeroLimpio) return '';
+        // Formatear con puntos como separadores de miles
+        return numeroLimpio.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    // Función para limpiar formato (remover puntos) antes de enviar
+    function limpiarFormatoNumero(numero) {
+        if (!numero) return '';
+        return numero.toString().replace(/\./g, '');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const precioInput = document.getElementById('precio_cobrado_input');
+        const checkboxAjuste = document.getElementById('habilitar_ajuste_precio');
+        const precioServicioHidden = document.getElementById('precio_servicio_base_hidden');
+
+        // Cargar el precio inicial desde el campo oculto
+        if (precioInput && precioServicioHidden && precioServicioHidden.value) {
+            // El valor del campo oculto viene sin formato desde el template (ej: "60000")
+            var valorOriginal = precioServicioHidden.value.toString().trim();
+
+            // Remover cualquier carácter que no sea dígito (por si acaso)
+            var valorNumerico = valorOriginal.replace(/[^\d]/g, '');
+
+            // Convertir a número entero para asegurar que no haya problemas
+            var numeroInt = parseInt(valorNumerico, 10);
+
+            if (!isNaN(numeroInt) && numeroInt > 0) {
+                // Formatear el número correctamente
+                // Ejemplo: 60000 -> "60.000"
+                var numeroStr = numeroInt.toString();
+                var valorFormateado = numeroStr.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                precioInput.value = valorFormateado;
+            }
+        } else if (precioInput && precioInput.value) {
+            // Si no hay campo oculto pero hay valor en el input, formatearlo
+            precioInput.value = formatearNumero(precioInput.value);
+        }
+
+        // Aplicar formato mientras se escribe
+        if (precioInput) {
+            precioInput.addEventListener('input', function (e) {
+                const cursorPos = e.target.selectionStart;
+                const valorOriginal = e.target.value;
+                const valorFormateado = formatearNumero(valorOriginal);
+
+                e.target.value = valorFormateado;
+
+                // Ajustar posición del cursor
+                const diferencia = valorFormateado.length - valorOriginal.length;
+                const nuevaPos = cursorPos + diferencia;
+                e.target.setSelectionRange(nuevaPos, nuevaPos);
+            });
+
+            // Formatear al perder el foco
+            precioInput.addEventListener('blur', function (e) {
+                if (e.target.value) {
+                    e.target.value = formatearNumero(e.target.value);
+                }
+            });
+        }
+
+        // Si hay checkbox para habilitar ajuste de precio
+        if (checkboxAjuste && precioInput) {
+            // Función para habilitar/deshabilitar el campo de precio
+            function togglePrecioInput() {
+                if (checkboxAjuste.checked) {
+                    precioInput.disabled = false;
+                    precioInput.style.backgroundColor = 'white';
+                    precioInput.style.cursor = 'text';
+                    precioInput.focus();
+                } else {
+                    precioInput.disabled = true;
+                    precioInput.style.backgroundColor = '#f1f5f9';
+                    precioInput.style.cursor = 'not-allowed';
+                    // Restaurar el precio del servicio si se desmarca
+                    if (precioServicioHidden) {
+                        var valorNumerico = precioServicioHidden.value.toString().trim();
+                        valorNumerico = valorNumerico.replace(/[^\d]/g, '');
+                        if (valorNumerico) {
+                            precioInput.value = formatearNumero(valorNumerico);
+                        }
+                    }
+                }
+            }
+
+            // Event listener para el checkbox
+            checkboxAjuste.addEventListener('change', togglePrecioInput);
+
+            // Asegurar que el precio del servicio esté en el campo cuando está deshabilitado
+            if (!checkboxAjuste.checked && precioServicioHidden) {
+                precioInput.value = formatearNumero(precioServicioHidden.value);
+            }
+        }
+
+        // Asegurar que el campo de precio se complete con el precio del servicio si no tiene valor
+        if (precioInput && !precioInput.value) {
+            // Si el campo está vacío, intentar obtener el precio del servicio desde el display
+            const precioDisplay = document.querySelector('.precio-actual');
+            if (precioDisplay && precioDisplay.textContent) {
+                // Extraer el número del texto (remover símbolos de moneda y formato)
+                const precioTexto = precioDisplay.textContent.trim();
+                // Remover puntos de miles y símbolos, mantener solo números y coma/punto decimal
+                const precioNumero = precioTexto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+                const precio = parseFloat(precioNumero);
+                if (!isNaN(precio) && precio > 0) {
+                    precioInput.value = precio;
+                }
+            }
+        }
+
+        // También asegurar que si hay tipo_servicio pero no precio_cobrado, se use el precio_base
+        {% if precio_servicio and not cita.precio_cobrado %}
+        if (precioInput && !precioInput.value) {
+            precioInput.value = {{ precio_servicio }
+        };
+    }
+    {% elif cita.tipo_servicio and cita.tipo_servicio.precio_base and not cita.precio_cobrado %}
+    if (precioInput && !precioInput.value) {
+        precioInput.value = {{ cita.tipo_servicio.precio_base }
+    };
+    }
+    {% endif %}
+
+    // Asegurar que el formulario envíe el precio correcto incluso si el campo está deshabilitado
+    const form = document.querySelector('.form-completar-precio');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            // Limpiar formato antes de enviar
+            if (precioInput && !precioInput.disabled && precioInput.value) {
+                precioInput.value = limpiarFormatoNumero(precioInput.value);
+            }
+
+            // Si el campo está deshabilitado, usar el precio del servicio
+            if (precioInput && precioInput.disabled && precioServicioHidden) {
+                // Crear un input temporal con el valor correcto
+                const tempInput = document.createElement('input');
+                tempInput.type = 'hidden';
+                tempInput.name = 'precio_cobrado';
+                tempInput.value = precioServicioHidden.value;
+                form.appendChild(tempInput);
+            }
+        });
+    }
+
+    // Mostrar/ocultar campo de motivo de ajuste cuando se edita el precio
+    const motivoAjusteContainer = document.getElementById('motivo-ajuste-container');
+    const precioServicioBase = precioServicioHidden ? parseFloat(precioServicioHidden.value.replace(/\./g, '')) : null;
+
+    function verificarAjustePrecio() {
+        if (!precioInput || !motivoAjusteContainer) return;
+
+        const precioActual = precioInput.value ? parseFloat(precioInput.value.replace(/\./g, '')) : null;
+
+        // Mostrar motivo de ajuste si:
+        // 1. El precio está habilitado (se está editando)
+        // 2. Y el precio difiere del precio base
+        if (!precioInput.disabled && precioActual && precioServicioBase && precioActual !== precioServicioBase) {
+            motivoAjusteContainer.style.display = 'block';
+        } else {
+            motivoAjusteContainer.style.display = 'none';
+        }
+    }
+
+    // Verificar cuando se habilita/deshabilita el precio
+    if (checkboxAjuste) {
+        checkboxAjuste.addEventListener('change', function () {
+            setTimeout(verificarAjustePrecio, 100);
+        });
+    }
+
+    // Verificar cuando cambia el valor del precio
+    if (precioInput) {
+        precioInput.addEventListener('input', verificarAjustePrecio);
+        precioInput.addEventListener('blur', verificarAjustePrecio);
+    }
+
+    // Verificar inicialmente
+    setTimeout(verificarAjustePrecio, 500);
+});
+</script>
+{% endblock %}

@@ -134,13 +134,14 @@ except:
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Autenticación
 LOGIN_REDIRECT_URL = 'panel_cliente'
 LOGOUT_REDIRECT_URL = 'inicio'
 
@@ -150,51 +151,52 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # Backend estándar como fallback
 ]
 
-# Archivos estáticos
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
 # Archivos media (uploaded files)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Configuración de Twilio
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', 'default')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', 'default')
-TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"  # Mantener para compatibilidad
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '+1234567890')
-TWILIO_FROM_SMS = "+15005550006"  # Número de origen para SMS (usar tu número de Twilio)
-TWILIO_CONTENT_SID = "HXb5b62575e6e4ff6129ad7c8efe1f983e"
-TWILIO_FORCE_BODY = True  # Forzar texto simple (sin plantillas) para pruebas inmediatas
+# Configuración de Twilio para SMS y WhatsApp
+# ⚠️ IMPORTANTE: Configura estos valores en el archivo .env
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', 'AC7319b0ea75ab89067722861358686b39')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', 'cfa7d326a809fd880175c86e59f6a228')
+
+# Número de teléfono de Twilio para SMS (formato E.164: +1234567890)
+TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '+15005550006')
+TWILIO_FROM_SMS = os.getenv('TWILIO_FROM_SMS', TWILIO_PHONE_NUMBER)
+
+# Número de WhatsApp de Twilio (puede ser sandbox o número de WhatsApp Business)
+# Formato: whatsapp:+14155238886 (sandbox) o whatsapp:+1234567890 (número real)
+TWILIO_WHATSAPP_NUMBER = os.getenv('TWILIO_WHATSAPP_NUMBER', 'whatsapp:+14155238886')
+TWILIO_FROM_WHATSAPP = os.getenv('TWILIO_FROM_WHATSAPP', TWILIO_WHATSAPP_NUMBER)
+TWILIO_WHATSAPP_BUSINESS_NUMBER = os.getenv('TWILIO_WHATSAPP_BUSINESS_NUMBER', TWILIO_FROM_WHATSAPP)
+
+# URL de callback para recibir actualizaciones de estado de mensajes (opcional)
+TWILIO_STATUS_CALLBACK = os.getenv('TWILIO_STATUS_CALLBACK', None)
 
 # URL base del sitio para construir enlaces en mensajes
 SITE_URL = "http://localhost:8000"
 
-# Datos de la clínica para personalizar mensajes
-CLINIC_NAME = "Clínica Dental"
-CLINIC_ADDRESS = "Av. Principal 123, Santiago"
-CLINIC_PHONE = "+56 2 2345 6789"
-CLINIC_MAP_URL = "https://maps.app.goo.gl/X7qXc81STzVDCbA7A"  # Ej: https://maps.app.goo.gl/xxxx
-CLINIC_LAT = ""  # Opcional: latitud, ej. -33.4489
-CLINIC_LNG = ""  # Opcional: longitud, ej. -70.6693
-CLINIC_EMAIL = "contacto@clinicasonrisas.cl"
-CLINIC_WEBSITE = "www.clinicasonrisas.cl"
+# Información de la clínica para personalizar mensajes (opcional, se obtiene del modelo si no se define)
+CLINIC_NAME = os.getenv('CLINIC_NAME', 'Clínica Dental San Felipe')
+CLINIC_ADDRESS = os.getenv('CLINIC_ADDRESS', '')
+CLINIC_PHONE = os.getenv('CLINIC_PHONE', '')
+CLINIC_EMAIL = os.getenv('CLINIC_EMAIL', '')
+CLINIC_WEBSITE = os.getenv('CLINIC_WEBSITE', '')
+CLINIC_MAP_URL = os.getenv('CLINIC_MAP_URL', 'https://www.google.com/maps/place/Clinica+San+Felipe/@-38.2356192,-72.3361399,17z/data=!3m1!4b1!4m6!3m5!1s0x966b155a8306e093:0x46de06dfbc92e29d!8m2!3d-38.2356192!4d-72.333565!16s%2Fg%2F11sswz76yt?hl=es&entry=ttu')
 
 # Configuración para conectar con el sistema de gestión
 GESTION_API_URL = "http://localhost:8001/api"  # URL del sistema de gestión
 GESTION_BASE_URL = "http://localhost:8001"  # URL base del sistema de gestión (para media files)
 GESTION_API_TOKEN = ""  # Token de autenticación para la API
 
-# Configuración de Email (para notificaciones por email y Email-to-SMS)
-# Configura estos valores con tu proveedor de email (Gmail, Outlook, etc.)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # Cambiar según tu proveedor (smtp.gmail.com, smtp.outlook.com, etc.)
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'tu-email@gmail.com'  # Tu dirección de email
-EMAIL_HOST_PASSWORD = 'tu-contraseña-app'  # Contraseña de aplicación (no la contraseña normal)
-EMAIL_FROM = 'tu-email@gmail.com'  # Email del remitente (generalmente igual a EMAIL_HOST_USER)
-
-# Nota: Para Gmail, necesitas crear una "Contraseña de aplicación" en:
-# https://myaccount.google.com/apppasswords
-# Para Outlook, activa SMTP en la configuración de seguridad
+# Configuración de Email
+# Email de la clínica para enviar correos
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'miclinicacontacto@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'rlih chbj etez srst')
+# Email desde el cual se enviarán los correos (debe ser el mismo que EMAIL_HOST_USER para Gmail)
+EMAIL_FROM = os.getenv('EMAIL_FROM', 'miclinicacontacto@gmail.com')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'miclinicacontacto@gmail.com')

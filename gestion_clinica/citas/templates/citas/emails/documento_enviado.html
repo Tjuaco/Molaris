@@ -1,0 +1,63 @@
+{% extends 'citas/emails/base_email.html' %}
+{% load custom_filters %}
+
+{% block header_title %}{{ nombre_clinica }}{% endblock %}
+
+{% block content %}
+<h2>Documento Enviado</h2>
+
+<p>Estimado/a <strong>{{ cliente_nombre }}</strong>,</p>
+
+<p>Le informamos que hemos generado y adjuntado el siguiente documento:</p>
+
+<div class="info-box">
+    <strong>Tipo de Documento</strong>
+    <p>{{ tipo_documento }}</p>
+    
+    <strong>Título</strong>
+    <p>{{ titulo }}</p>
+    
+    <strong>Fecha de Generación</strong>
+    <p>{{ fecha_generacion|date:"d/m/Y H:i" }}</p>
+</div>
+
+{% if observaciones %}
+<div class="info-box">
+    <strong>Observaciones</strong>
+    <p>{{ observaciones }}</p>
+</div>
+{% endif %}
+
+<p>El documento se encuentra adjunto a este correo en formato PDF. Puede descargarlo y guardarlo para sus registros.</p>
+
+{% if mensaje_adicional %}
+<p>{{ mensaje_adicional }}</p>
+{% endif %}
+
+<p>Si tiene alguna consulta sobre este documento o necesita información adicional, no dude en contactarnos.</p>
+
+<p>Saludos cordiales,<br>
+<strong>{{ nombre_clinica }}</strong></p>
+{% endblock %}
+
+{% block clinic_name %}{{ nombre_clinica }}{% endblock %}
+
+{% block contact_info %}
+{% if direccion_clinica %}<p><strong>Dirección:</strong> {{ direccion_clinica }}</p>{% endif %}
+{% if telefono_clinica %}<p><strong>Teléfono:</strong> {{ telefono_clinica }}</p>{% endif %}
+{% if email_clinica %}<p><strong>Email:</strong> <a href="mailto:{{ email_clinica }}">{{ email_clinica }}</a></p>{% endif %}
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

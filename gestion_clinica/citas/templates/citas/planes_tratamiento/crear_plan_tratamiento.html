@@ -1,0 +1,670 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Crear Plan de Tratamiento - Clínica Dental{% endblock %}
+{% block page_title %}<i class="fas fa-plus"></i> Crear Plan de Tratamiento{% endblock %}
+{% block page_subtitle %}Crea un nuevo plan de tratamiento para un paciente{% endblock %}
+
+{% block content %}
+<div class="section">
+    <form method="POST" id="planForm">
+        {% csrf_token %}
+        
+        <!-- Información Básica -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-info-circle"></i> Información Básica
+            </h3>
+            <div style="display: grid; gap: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Cliente *</label>
+                    <div class="cliente-search-wrapper">
+                        <input type="text" id="planClienteSearchInput" class="form-control-modal" placeholder="Buscar por nombre..." autocomplete="off">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    <select id="planClienteSelect" class="form-control-modal" style="display: none; visibility: hidden; position: absolute; width: 1px; height: 1px; opacity: 0;">
+                        <option value="">-- Seleccionar cliente --</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre_completo }}" data-email="{{ cliente.email }}" data-telefono="{{ cliente.telefono }}" {% if cliente_pre_seleccionado == cliente.id|stringformat:"s" %}selected{% endif %}>
+                            {{ cliente.nombre_completo }} - {{ cliente.email }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="cliente_id" id="planClienteIdInput" value="{% if cliente_pre_seleccionado %}{{ cliente_pre_seleccionado }}{% endif %}" required>
+                    <div id="planClienteResults" class="cliente-results-list"></div>
+                    <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Escribe el nombre del cliente para buscar
+                    </small>
+                </div>
+                
+                {% if mostrar_selector_dentista %}
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Dentista *</label>
+                    <div class="cliente-search-wrapper">
+                        <input type="text" id="planDentistaSearchInput" class="form-control-modal" placeholder="Buscar por nombre..." autocomplete="off">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    <select id="planDentistaSelect" class="form-control-modal" style="display: none; visibility: hidden; position: absolute; width: 1px; height: 1px; opacity: 0;">
+                        <option value="">-- Seleccionar dentista --</option>
+                        {% for dentista in dentistas %}
+                        <option value="{{ dentista.id }}" data-nombre="{{ dentista.nombre_completo }}">
+                            {{ dentista.nombre_completo }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="dentista_id" id="planDentistaIdInput" value="" required>
+                    <div id="planDentistaResults" class="cliente-results-list"></div>
+                    <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Escribe el nombre del dentista para buscar
+                    </small>
+                </div>
+                {% else %}
+                <input type="hidden" name="dentista_id" value="{{ dentistas.0.id }}">
+                {% endif %}
+                
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Nombre del Plan *</label>
+                    <input type="text" name="nombre" required placeholder="Ej: Tratamiento de Ortodoncia Completo" 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Descripción *</label>
+                    <textarea name="descripcion" required rows="4" placeholder="Describe el plan de tratamiento..." 
+                              style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Diagnóstico *</label>
+                    <textarea name="diagnostico" required rows="4" placeholder="Diagnóstico del paciente..." 
+                              style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Objetivo *</label>
+                    <textarea name="objetivo" required rows="3" placeholder="Objetivo del tratamiento..." 
+                              style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Presupuesto -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-dollar-sign"></i> Presupuesto
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Presupuesto Total *</label>
+                    <input type="text" name="presupuesto_total" id="presupuesto_total" required placeholder="$0" 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <input type="hidden" name="presupuesto_total_raw" id="presupuesto_total_raw">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Descuento</label>
+                    <input type="text" name="descuento" id="descuento" placeholder="$0" 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <input type="hidden" name="descuento_raw" id="descuento_raw">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Citas Estimadas</label>
+                    <input type="number" name="citas_estimadas" min="0" placeholder="Ej: 5" 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 4px;">
+                        Número estimado de citas que requerirá este tratamiento
+                    </small>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Estado *</label>
+                    <select name="estado" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        <option value="borrador">Borrador</option>
+                        <option value="pendiente_aprobacion">Pendiente Aprobación</option>
+                        {% if es_admin %}
+                        <option value="aprobado">Aprobado</option>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fechas Estimadas -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-calendar"></i> Fechas Estimadas
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Fecha de Inicio Estimada</label>
+                    <input type="date" name="fecha_inicio_estimada" 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Fecha de Fin Estimada</label>
+                    <input type="date" name="fecha_fin_estimada" 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notas -->
+        {% if es_admin %}
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-sticky-note"></i> Notas
+            </h3>
+            <div style="display: grid; gap: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Notas Internas</label>
+                    <textarea name="notas_internas" rows="3" placeholder="Notas solo visibles para el personal administrativo..." 
+                              style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Notas para el Paciente</label>
+                    <textarea name="notas_paciente" rows="3" placeholder="Notas que pueden ser visibles para el paciente..." 
+                              style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-sticky-note"></i> Notas para el Paciente
+            </h3>
+            <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">Notas</label>
+                <textarea name="notas_paciente" rows="3" placeholder="Notas que pueden ser visibles para el paciente..." 
+                          style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Botones de acción -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+            <a href="{% url 'listar_planes_tratamiento' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Crear Plan de Tratamiento
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+.cliente-search-wrapper {
+    position: relative;
+}
+
+.cliente-search-wrapper .search-icon {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.cliente-results-list {
+    margin-top: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    display: none;
+}
+
+.cliente-results-list.show {
+    display: block;
+}
+
+.cliente-result-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cliente-result-item:last-child {
+    border-bottom: none;
+}
+
+.cliente-result-item:hover {
+    background: var(--primary-bg);
+    border-left: 3px solid var(--primary-color);
+}
+
+.cliente-result-item.selected {
+    background: var(--primary-bg);
+    border-left: 3px solid var(--primary-color);
+}
+
+.cliente-result-nombre {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.875rem;
+}
+
+.cliente-result-email {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.cliente-results-list.empty {
+    padding: 20px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+.form-control-modal {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.form-control-modal:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+</style>
+
+<script>
+// Función de búsqueda de cliente para plan de tratamiento (igual que en modal de agregar cita)
+window.searchPlanCliente = function() {
+    var searchInput = document.getElementById('planClienteSearchInput');
+    var clienteSelect = document.getElementById('planClienteSelect');
+    var resultsList = document.getElementById('planClienteResults');
+    var clienteIdInput = document.getElementById('planClienteIdInput');
+    
+    if (!searchInput || !clienteSelect || !resultsList) {
+        return;
+    }
+    
+    var searchTerm = searchInput.value.toLowerCase().trim();
+    resultsList.innerHTML = '';
+    
+    if (searchTerm.length === 0) {
+        resultsList.classList.remove('show');
+        if (clienteIdInput) clienteIdInput.value = '';
+        return;
+    }
+    
+    var matches = [];
+    var options = clienteSelect.getElementsByTagName('option');
+    
+    for (var i = 0; i < options.length; i++) {
+        var option = options[i];
+        if (!option.value || option.value === '' || option.disabled) continue;
+        
+        var nombre = option.getAttribute('data-nombre') || '';
+        var email = option.getAttribute('data-email') || '';
+        
+        if (!nombre && !email) {
+            var optionText = option.textContent || option.innerText || '';
+            var parts = optionText.split(' - ');
+            if (parts.length >= 2) {
+                nombre = parts[0].trim();
+                email = parts[1].trim();
+            } else if (parts.length === 1) {
+                nombre = parts[0].trim();
+            }
+        }
+        
+        var nombreMatch = nombre && nombre.toLowerCase().includes(searchTerm);
+        
+        if (nombreMatch) {
+            matches.push({
+                id: option.value,
+                nombre: nombre || 'Sin nombre',
+                email: email || 'Sin email',
+                telefono: option.getAttribute('data-telefono') || ''
+            });
+        }
+    }
+    
+    if (matches.length === 0) {
+        var emptyDiv = document.createElement('div');
+        emptyDiv.className = 'cliente-results-list empty';
+        emptyDiv.textContent = 'No se encontraron clientes';
+        resultsList.appendChild(emptyDiv);
+        resultsList.classList.add('show');
+        return;
+    }
+    
+    var maxResults = Math.min(matches.length, 8);
+    for (var j = 0; j < maxResults; j++) {
+        var match = matches[j];
+        var item = document.createElement('div');
+        item.className = 'cliente-result-item';
+        item.setAttribute('data-id', match.id);
+        item.innerHTML = '<div class="cliente-result-nombre">' + match.nombre + '</div>' +
+                        '<div class="cliente-result-email">' + match.email + '</div>';
+        
+        item.addEventListener('click', function() {
+            var clienteId = this.getAttribute('data-id');
+            if (clienteIdInput) clienteIdInput.value = clienteId;
+            
+            var nombre = this.querySelector('.cliente-result-nombre').textContent;
+            if (searchInput) {
+                searchInput.value = nombre;
+            }
+            
+            var items = resultsList.querySelectorAll('.cliente-result-item');
+            items.forEach(function(item) {
+                item.classList.remove('selected');
+            });
+            this.classList.add('selected');
+            
+            setTimeout(function() {
+                resultsList.classList.remove('show');
+            }, 200);
+        });
+        
+        resultsList.appendChild(item);
+    }
+    
+    resultsList.classList.add('show');
+};
+
+{% if mostrar_selector_dentista %}
+// Función de búsqueda de dentista para plan de tratamiento
+window.searchPlanDentista = function() {
+    var searchInput = document.getElementById('planDentistaSearchInput');
+    var dentistaSelect = document.getElementById('planDentistaSelect');
+    var resultsList = document.getElementById('planDentistaResults');
+    var dentistaIdInput = document.getElementById('planDentistaIdInput');
+    
+    if (!searchInput || !dentistaSelect || !resultsList) {
+        return;
+    }
+    
+    var searchTerm = searchInput.value.toLowerCase().trim();
+    resultsList.innerHTML = '';
+    
+    if (searchTerm.length === 0) {
+        resultsList.classList.remove('show');
+        if (dentistaIdInput) dentistaIdInput.value = '';
+        return;
+    }
+    
+    var matches = [];
+    var options = dentistaSelect.getElementsByTagName('option');
+    
+    for (var i = 0; i < options.length; i++) {
+        var option = options[i];
+        if (!option.value || option.value === '' || option.disabled) continue;
+        
+        var nombre = option.getAttribute('data-nombre') || '';
+        
+        if (!nombre) {
+            nombre = option.textContent || option.innerText || '';
+        }
+        
+        var nombreMatch = nombre && nombre.toLowerCase().includes(searchTerm);
+        
+        if (nombreMatch) {
+            matches.push({
+                id: option.value,
+                nombre: nombre
+            });
+        }
+    }
+    
+    if (matches.length === 0) {
+        var emptyDiv = document.createElement('div');
+        emptyDiv.className = 'cliente-results-list empty';
+        emptyDiv.textContent = 'No se encontraron dentistas';
+        resultsList.appendChild(emptyDiv);
+        resultsList.classList.add('show');
+        return;
+    }
+    
+    var maxResults = Math.min(matches.length, 8);
+    for (var j = 0; j < maxResults; j++) {
+        var match = matches[j];
+        var item = document.createElement('div');
+        item.className = 'cliente-result-item';
+        item.setAttribute('data-id', match.id);
+        item.innerHTML = '<div class="cliente-result-nombre">' + match.nombre + '</div>';
+        
+        item.addEventListener('click', function() {
+            var dentistaId = this.getAttribute('data-id');
+            if (dentistaIdInput) dentistaIdInput.value = dentistaId;
+            
+            var nombre = this.querySelector('.cliente-result-nombre').textContent;
+            if (searchInput) {
+                searchInput.value = nombre;
+            }
+            
+            var items = resultsList.querySelectorAll('.cliente-result-item');
+            items.forEach(function(item) {
+                item.classList.remove('selected');
+            });
+            this.classList.add('selected');
+            
+            setTimeout(function() {
+                resultsList.classList.remove('show');
+            }, 200);
+        });
+        
+        resultsList.appendChild(item);
+    }
+    
+    resultsList.classList.add('show');
+};
+{% endif %}
+
+// Inicializar búsqueda de cliente
+window.initPlanClienteSearch = function() {
+    var searchInput = document.getElementById('planClienteSearchInput');
+    if (!searchInput) return;
+    
+    if (searchInput.hasAttribute('data-search-initialized')) {
+        return;
+    }
+    
+    searchInput.setAttribute('data-search-initialized', 'true');
+    
+    searchInput.addEventListener('input', function(e) {
+        e.stopPropagation();
+        var input = this;
+        clearTimeout(input.searchTimeout);
+        input.searchTimeout = setTimeout(function() {
+            searchPlanCliente();
+        }, 150);
+    }, false);
+    
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var resultsList = document.getElementById('planClienteResults');
+            if (resultsList) {
+                resultsList.classList.remove('show');
+            }
+        }
+    }, false);
+    
+    if (!window.planClienteSearchClickHandler) {
+        window.planClienteSearchClickHandler = function(e) {
+            var resultsList = document.getElementById('planClienteResults');
+            var searchInput = document.getElementById('planClienteSearchInput');
+            if (resultsList && searchInput && !resultsList.contains(e.target) && e.target !== searchInput && !searchInput.contains(e.target)) {
+                resultsList.classList.remove('show');
+            }
+        };
+        document.addEventListener('click', window.planClienteSearchClickHandler, true);
+    }
+};
+
+{% if mostrar_selector_dentista %}
+// Inicializar búsqueda de dentista
+window.initPlanDentistaSearch = function() {
+    var searchInput = document.getElementById('planDentistaSearchInput');
+    if (!searchInput) return;
+    
+    if (searchInput.hasAttribute('data-search-initialized')) {
+        return;
+    }
+    
+    searchInput.setAttribute('data-search-initialized', 'true');
+    
+    searchInput.addEventListener('input', function(e) {
+        e.stopPropagation();
+        var input = this;
+        clearTimeout(input.searchTimeout);
+        input.searchTimeout = setTimeout(function() {
+            searchPlanDentista();
+        }, 150);
+    }, false);
+    
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var resultsList = document.getElementById('planDentistaResults');
+            if (resultsList) {
+                resultsList.classList.remove('show');
+            }
+        }
+    }, false);
+    
+    if (!window.planDentistaSearchClickHandler) {
+        window.planDentistaSearchClickHandler = function(e) {
+            var resultsList = document.getElementById('planDentistaResults');
+            var searchInput = document.getElementById('planDentistaSearchInput');
+            if (resultsList && searchInput && !resultsList.contains(e.target) && e.target !== searchInput && !searchInput.contains(e.target)) {
+                resultsList.classList.remove('show');
+            }
+        };
+        document.addEventListener('click', window.planDentistaSearchClickHandler, true);
+    }
+};
+{% endif %}
+
+// Funciones para formatear moneda chilena (sin decimales)
+function formatearMonedaChilena(valor) {
+    // Remover todo excepto números
+    var numero = valor.toString().replace(/\D/g, '');
+    
+    if (numero === '' || numero === '0') {
+        return '$0';
+    }
+    
+    // Formatear con puntos como separadores de miles
+    var formateado = numero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return '$' + formateado;
+}
+
+function obtenerNumeroDesdeMoneda(valor) {
+    // Remover todo excepto números
+    return valor.toString().replace(/\D/g, '') || '0';
+}
+
+// Inicializar formateo de moneda para campos de presupuesto
+function initFormatoMoneda() {
+    var presupuestoInput = document.getElementById('presupuesto_total');
+    var descuentoInput = document.getElementById('descuento');
+    var presupuestoRaw = document.getElementById('presupuesto_total_raw');
+    var descuentoRaw = document.getElementById('descuento_raw');
+    
+    // Presupuesto Total
+    if (presupuestoInput) {
+        presupuestoInput.addEventListener('input', function(e) {
+            var valor = e.target.value;
+            var numero = obtenerNumeroDesdeMoneda(valor);
+            var formateado = formatearMonedaChilena(numero);
+            
+            // Actualizar el valor formateado
+            e.target.value = formateado;
+            
+            // Guardar el valor numérico en el campo hidden
+            if (presupuestoRaw) {
+                presupuestoRaw.value = numero;
+            }
+        });
+        
+        presupuestoInput.addEventListener('blur', function(e) {
+            var numero = obtenerNumeroDesdeMoneda(e.target.value);
+            if (numero === '0' || numero === '') {
+                e.target.value = '$0';
+                if (presupuestoRaw) presupuestoRaw.value = '0';
+            }
+        });
+    }
+    
+    // Descuento
+    if (descuentoInput) {
+        descuentoInput.addEventListener('input', function(e) {
+            var valor = e.target.value;
+            var numero = obtenerNumeroDesdeMoneda(valor);
+            var formateado = formatearMonedaChilena(numero);
+            
+            // Actualizar el valor formateado
+            e.target.value = formateado;
+            
+            // Guardar el valor numérico en el campo hidden
+            if (descuentoRaw) {
+                descuentoRaw.value = numero;
+            }
+        });
+        
+        descuentoInput.addEventListener('blur', function(e) {
+            var numero = obtenerNumeroDesdeMoneda(e.target.value);
+            if (numero === '0' || numero === '') {
+                e.target.value = '$0';
+                if (descuentoRaw) descuentoRaw.value = '0';
+            }
+        });
+    }
+    
+    // Antes de enviar el formulario, asegurar que los valores raw estén actualizados
+    var form = document.getElementById('planForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (presupuestoInput && presupuestoRaw) {
+                var numero = obtenerNumeroDesdeMoneda(presupuestoInput.value);
+                presupuestoRaw.value = numero;
+                // También actualizar el campo visible con el valor numérico para el backend
+                presupuestoInput.value = numero;
+            }
+            
+            if (descuentoInput && descuentoRaw) {
+                var numero = obtenerNumeroDesdeMoneda(descuentoInput.value);
+                descuentoRaw.value = numero;
+                // También actualizar el campo visible con el valor numérico para el backend
+                descuentoInput.value = numero;
+            }
+        });
+    }
+}
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    initPlanClienteSearch();
+    {% if mostrar_selector_dentista %}
+    initPlanDentistaSearch();
+    {% endif %}
+    
+    // Inicializar formateo de moneda
+    initFormatoMoneda();
+    
+    // Si hay cliente pre-seleccionado, mostrar su información
+    {% if cliente_pre_seleccionado %}
+    {% for cliente in clientes %}
+    {% if cliente_pre_seleccionado == cliente.id|stringformat:"s" %}
+    var clienteInput = document.getElementById('planClienteSearchInput');
+    if (clienteInput) {
+        clienteInput.value = '{{ cliente.nombre_completo }}';
+    }
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+});
+</script>
+{% endblock %}
+

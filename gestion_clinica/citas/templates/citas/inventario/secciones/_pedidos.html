@@ -1,0 +1,126 @@
+{% load custom_filters %}
+<!-- Header con Estadísticas -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-shopping-cart"></i> Pedidos</h1>
+        <p class="page-subtitle">Gestiona los pedidos de insumos a proveedores</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_pedidos.total_pedidos }}</div>
+                    <div class="stat-label">Total Pedidos</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_pedidos.pedidos_pendientes }}</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_pedidos.pedidos_enviados }}</div>
+                    <div class="stat-label">Enviados</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas_pedidos.pedidos_recibidos }}</div>
+                    <div class="stat-label">Recibidos</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Pedidos -->
+<div class="section">
+    <div class="actions-bar">
+        <div></div>
+        <div>
+            <a href="{% url 'crear_pedido' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo Pedido
+            </a>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th><i class="fas fa-hashtag"></i> Número</th>
+                    <th><i class="fas fa-truck"></i> Proveedor</th>
+                    <th><i class="fas fa-calendar"></i> Fecha</th>
+                    <th><i class="fas fa-calendar-check"></i> Entrega</th>
+                    <th><i class="fas fa-boxes"></i> Insumos</th>
+                    <th><i class="fas fa-dollar-sign"></i> Monto</th>
+                    <th><i class="fas fa-info-circle"></i> Estado</th>
+                    <th><i class="fas fa-cog"></i> Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if pedidos %}
+                {% for pedido in pedidos %}
+                <tr>
+                    <td><strong style="color: #1e293b; font-size: 14px; font-weight: 600;">{{ pedido.numero_pedido }}</strong></td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                            <i class="fas fa-truck" style="color: var(--turquesa-primary); width: 16px;"></i>
+                            <span>{{ pedido.proveedor.nombre }}</span>
+                        </div>
+                    </td>
+                    <td style="font-size: 14px;">{{ pedido.fecha_pedido|date:"d/m/Y" }}</td>
+                    <td style="font-size: 14px;">{{ pedido.fecha_entrega_esperada|date:"d/m/Y" }}</td>
+                    <td>
+                        <span style="color: #1e293b; font-weight: 600; font-size: 14px;">{{ pedido.solicitudes.count }}</span>
+                        <span style="color: #64748b; font-size: 12px; margin-left: 4px;">insumo{{ pedido.solicitudes.count|pluralize }}</span>
+                    </td>
+                    <td>
+                        {% if pedido.monto_total %}
+                        <strong style="color: #1e293b; font-size: 14px; font-weight: 600;">{{ pedido.monto_total|pesos_chilenos }}</strong>
+                        {% else %}
+                        <span style="color: #9ca3af; font-size: 14px;">Pendiente</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: {% if pedido.estado == 'recibido' %}#d1fae5; color: #065f46;{% elif pedido.estado == 'enviado' %}#dbeafe; color: #1e40af;{% elif pedido.estado == 'cancelado' %}#fee2e2; color: #991b1b;{% else %}#fef3c7; color: #92400e;{% endif %};">
+                            <i class="fas fa-{% if pedido.estado == 'recibido' %}check-circle{% elif pedido.estado == 'enviado' %}paper-plane{% elif pedido.estado == 'cancelado' %}times-circle{% else %}clock{% endif %}" style="font-size: 10px;"></i>
+                            {{ pedido.get_estado_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'detalle_pedido' pedido.id %}" class="btn-action btn-primary" style="width: auto; padding: 6px 12px;">
+                            <i class="fas fa-eye"></i> Ver
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 60px 20px;">
+                        <div class="empty-state">
+                            <i class="fas fa-shopping-cart"></i>
+                            <h3>No hay pedidos</h3>
+                            <p>Crea tu primer pedido para comenzar</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

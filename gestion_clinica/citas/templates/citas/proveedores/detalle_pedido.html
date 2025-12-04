@@ -1,0 +1,900 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Pedido {{ pedido.numero_pedido }} - Clínica Dental{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .section-container {
+        animation: fadeIn 0.4s ease;
+    }
+    
+    :root {
+        --turquesa-primary: #14b8a6;
+        --turquesa-dark: #0d9488;
+        --turquesa-light: #5eead4;
+        --turquesa-bg: #f0fdfa;
+    }
+    
+    .header-section {
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .header-section h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .header-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-item i {
+        font-size: 1.25rem;
+    }
+
+    .section {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--turquesa-bg);
+    }
+
+    .section-title i {
+        color: var(--turquesa-primary);
+    }
+
+    .badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .badge-borrador {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .badge-pendiente {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-enviado {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .badge-confirmado {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-en_transito {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+
+    .badge-recibido {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-cancelado {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .insumos-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .insumos-table thead {
+        background: var(--turquesa-bg);
+    }
+
+    .insumos-table th {
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 0.875rem;
+        border-bottom: 2px solid var(--turquesa-primary);
+    }
+
+    .insumos-table td {
+        padding: 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.875rem;
+        color: #4b5563;
+    }
+
+    .insumos-table tbody tr:hover {
+        background: var(--turquesa-bg);
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        color: white;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .actions-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--turquesa-bg);
+    }
+
+    .modal-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-header h3 i {
+        color: var(--turquesa-primary);
+    }
+
+    .modal-close {
+        background: transparent;
+        border: none;
+        font-size: 1.5rem;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 4px;
+        transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+        color: #374151;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.875rem;
+        margin-bottom: 8px;
+    }
+
+    .form-group label i {
+        color: var(--turquesa-primary);
+        margin-right: 6px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--turquesa-primary);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 2px solid var(--turquesa-bg);
+    }
+
+    .resumen-box {
+        background: var(--turquesa-bg);
+        padding: 20px;
+        border-radius: 12px;
+        border-left: 4px solid var(--turquesa-primary);
+        margin-top: 20px;
+    }
+
+    .resumen-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(20, 184, 166, 0.2);
+    }
+
+    .resumen-item:last-child {
+        border-bottom: none;
+        font-weight: 700;
+        font-size: 1.125rem;
+        color: var(--turquesa-dark);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6b7280;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: #d1d5db;
+        margin-bottom: 16px;
+    }
+</style>
+
+<div class="section-container">
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <!-- Header del Pedido -->
+    <div class="header-section">
+        <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 20px;">
+            <div>
+                <h1>
+                    <i class="fas fa-shopping-cart"></i>
+                    Pedido {{ pedido.numero_pedido }}
+                </h1>
+                <span class="badge badge-{{ pedido.estado }}" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">
+                    <i class="fas fa-{% if pedido.estado == 'recibido' %}check-circle{% elif pedido.estado == 'enviado' %}paper-plane{% elif pedido.estado == 'cancelado' %}times-circle{% else %}clock{% endif %}"></i>
+                    {{ pedido.get_estado_display }}
+                </span>
+            </div>
+            <div>
+                <a href="{% url 'gestor_inventario_unificado' %}?seccion=pedidos" class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">
+                    <i class="fas fa-arrow-left"></i> Volver a Pedidos
+                </a>
+            </div>
+        </div>
+        
+        <div class="header-info">
+            <div class="info-item">
+                <i class="fas fa-truck"></i>
+                <div>
+                    <div style="font-size: 0.75rem; opacity: 0.9;">Proveedor</div>
+                    <div style="font-weight: 600;">{{ pedido.proveedor.nombre }}</div>
+                </div>
+            </div>
+            <div class="info-item">
+                <i class="fas fa-calendar"></i>
+                <div>
+                    <div style="font-size: 0.75rem; opacity: 0.9;">Fecha Pedido</div>
+                    <div style="font-weight: 600;">{{ pedido.fecha_pedido|date:"d/m/Y" }}</div>
+                </div>
+            </div>
+            <div class="info-item">
+                <i class="fas fa-calendar-check"></i>
+                <div>
+                    <div style="font-size: 0.75rem; opacity: 0.9;">Entrega Esperada</div>
+                    <div style="font-weight: 600;">{{ pedido.fecha_entrega_esperada|date:"d/m/Y" }}</div>
+                </div>
+            </div>
+            {% if pedido.monto_total %}
+            <div class="info-item">
+                <i class="fas fa-dollar-sign"></i>
+                <div>
+                    <div style="font-size: 0.75rem; opacity: 0.9;">Monto Total</div>
+                    <div style="font-weight: 600;">{{ pedido.monto_total|pesos_chilenos }}</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Insumos del Pedido -->
+    <div class="section">
+        <div class="actions-bar">
+            <h2 class="section-title" style="margin: 0;">
+                <i class="fas fa-boxes"></i> Insumos del Pedido
+            </h2>
+            {% if pedido.estado == 'borrador' %}
+            <button onclick="abrirModalAgregarInsumo()" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Agregar Insumo
+            </button>
+            {% endif %}
+        </div>
+        
+        {% if pedido.solicitudes.all %}
+        <div style="overflow-x: auto;">
+            <table class="insumos-table">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-box"></i> Insumo</th>
+                        <th><i class="fas fa-hashtag"></i> Cantidad</th>
+                        <th><i class="fas fa-dollar-sign"></i> Precio Unitario</th>
+                        <th><i class="fas fa-calculator"></i> Monto</th>
+                        <th><i class="fas fa-sticky-note"></i> Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for solicitud in pedido.solicitudes.all %}
+                    <tr>
+                        <td>
+                            <strong style="color: var(--turquesa-dark);">{{ solicitud.insumo.nombre }}</strong>
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                                {{ solicitud.insumo.get_categoria_display }}
+                            </div>
+                        </td>
+                        <td>
+                            <span style="color: var(--turquesa-dark); font-weight: 600;">{{ solicitud.cantidad_solicitada }}</span>
+                            <span style="color: #6b7280; font-size: 0.75rem;">{{ solicitud.insumo.unidad_medida }}</span>
+                        </td>
+                        <td>
+                            {% if solicitud.precio_unitario %}
+                            <strong>{{ solicitud.precio_unitario|pesos_chilenos }}</strong>
+                            {% else %}
+                            <span style="color: #9ca3af;">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if solicitud.monto_egreso %}
+                            <strong style="color: var(--turquesa-dark);">{{ solicitud.monto_egreso|pesos_chilenos }}</strong>
+                            {% else %}
+                            <span style="color: #9ca3af;">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if solicitud.observaciones %}
+                            <span style="color: #6b7280; font-size: 0.875rem;">{{ solicitud.observaciones|truncatewords:10 }}</span>
+                            {% else %}
+                            <span style="color: #9ca3af;">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Resumen -->
+        <div class="resumen-box">
+            <div class="resumen-item">
+                <span style="color: #6b7280;">Total de Insumos:</span>
+                <strong style="color: var(--turquesa-dark);">{{ pedido.solicitudes.count }}</strong>
+            </div>
+            <div class="resumen-item">
+                <span style="color: #6b7280;">Monto Total:</span>
+                <strong style="color: var(--turquesa-dark); font-size: 1.25rem;">
+                    {% if pedido.monto_total %}
+                    {{ pedido.monto_total|pesos_chilenos }}
+                    {% else %}
+                    Pendiente
+                    {% endif %}
+                </strong>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-box-open"></i>
+            <h3 style="color: #374151; margin-bottom: 8px;">No hay insumos en este pedido</h3>
+            <p style="color: #6b7280; margin-bottom: 24px;">
+                {% if pedido.estado == 'borrador' %}
+                    Agrega insumos al pedido para poder enviarlo al proveedor.
+                {% else %}
+                    Este pedido no tiene insumos asociados.
+                {% endif %}
+            </p>
+            {% if pedido.estado == 'borrador' %}
+            <button onclick="abrirModalAgregarInsumo()" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Agregar Primer Insumo
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Observaciones -->
+    {% if pedido.observaciones %}
+    <div class="section">
+        <h2 class="section-title">
+            <i class="fas fa-sticky-note"></i> Observaciones Generales
+        </h2>
+        <p style="color: #4b5563; line-height: 1.6;">{{ pedido.observaciones }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Acciones -->
+    {% if pedido.estado == 'borrador' and pedido.solicitudes.count > 0 %}
+    <div class="section">
+        <h2 class="section-title">
+            <i class="fas fa-paper-plane"></i> Enviar Pedido
+        </h2>
+        <p style="color: #6b7280; margin-bottom: 20px;">
+            Al enviar el pedido, se generará y enviará automáticamente un correo electrónico al proveedor con todos los detalles del pedido.
+        </p>
+        <button onclick="enviarPedido()" class="btn btn-success">
+            <i class="fas fa-paper-plane"></i> Enviar Pedido por Correo
+        </button>
+    </div>
+    {% elif pedido.estado == 'enviado' %}
+    <div class="section">
+        <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <p style="color: #1e40af; margin: 0;">
+                <i class="fas fa-info-circle"></i> 
+                <strong>Pedido enviado</strong> el {{ pedido.fecha_envio_correo|date:"d/m/Y H:i" }} a {{ pedido.proveedor.email }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Agregar Insumo -->
+<div id="modalAgregarInsumo" class="modal-overlay" onclick="if(event.target === this) cerrarModalAgregarInsumo()">
+    <div class="modal-content" onclick="event.stopPropagation();">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus-circle"></i> Agregar Insumo al Pedido</h3>
+            <button class="modal-close" onclick="cerrarModalAgregarInsumo()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="formAgregarInsumo">
+            {% csrf_token %}
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label for="insumo_id">
+                    <i class="fas fa-box"></i> Insumo <span style="color: #ef4444;">*</span>
+                </label>
+                <select id="insumo_id" name="insumo_id" class="form-control" required>
+                    <option value="">-- Seleccionar insumo --</option>
+                    {% for insumo in insumos %}
+                    <option value="{{ insumo.id }}" data-precio="{% if insumo.precio_unitario %}{{ insumo.precio_unitario|floatformat:0 }}{% endif %}">
+                        {{ insumo.nombre }} {% if insumo.precio_unitario %}({{ insumo.precio_unitario|pesos_chilenos }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="cantidad">
+                    <i class="fas fa-hashtag"></i> Cantidad <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="number" id="cantidad" name="cantidad" class="form-control" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="precio_unitario">
+                    <i class="fas fa-dollar-sign"></i> Precio Unitario
+                </label>
+                <input type="number" id="precio_unitario" name="precio_unitario" class="form-control" min="0" step="1" placeholder="Se llenará automáticamente si el insumo tiene precio">
+                <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
+                    Si no se especifica, se usará el precio del insumo
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="observaciones">
+                    <i class="fas fa-sticky-note"></i> Observaciones
+                </label>
+                <textarea id="observaciones" name="observaciones" class="form-control" rows="3" placeholder="Observaciones sobre este insumo..."></textarea>
+            </div>
+            
+            <div id="mensajeAgregarInsumo" style="display: none; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
+            
+            <div class="form-actions">
+                <button type="button" onclick="cerrarModalAgregarInsumo()" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Agregar Insumo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Auto-completar precio cuando se selecciona un insumo
+    document.getElementById('insumo_id').addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        const precio = option.getAttribute('data-precio');
+        const precioInput = document.getElementById('precio_unitario');
+        
+        if (precio) {
+            precioInput.value = precio;
+        } else {
+            precioInput.value = '';
+        }
+    });
+
+    function abrirModalAgregarInsumo() {
+        document.getElementById('modalAgregarInsumo').classList.add('active');
+    }
+
+    function cerrarModalAgregarInsumo() {
+        document.getElementById('modalAgregarInsumo').classList.remove('active');
+        document.getElementById('formAgregarInsumo').reset();
+        document.getElementById('mensajeAgregarInsumo').style.display = 'none';
+    }
+
+    // Manejar envío del formulario de agregar insumo
+    document.getElementById('formAgregarInsumo').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const mensajeDiv = document.getElementById('mensajeAgregarInsumo');
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
+        mensajeDiv.style.display = 'none';
+        
+        fetch('{% url "agregar_insumo_pedido" pedido.id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            
+            if (data.success) {
+                showNotification('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                mensajeDiv.style.display = 'block';
+                mensajeDiv.style.background = '#fef2f2';
+                mensajeDiv.style.color = '#dc2626';
+                mensajeDiv.style.border = '1px solid #ef4444';
+                mensajeDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + data.message;
+            }
+        })
+        .catch(error => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            console.error('Error:', error);
+            showNotification('error', 'Error al agregar el insumo. Por favor, intenta nuevamente.');
+        });
+    });
+
+    function enviarPedido() {
+        if (!confirm('¿Estás seguro de que deseas enviar este pedido por correo al proveedor?')) {
+            return;
+        }
+        
+        // Obtener el token CSRF
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        fetch('{% url "enviar_pedido_correo" pedido.id %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showNotification('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('error', 'Error al enviar el pedido. Por favor, intenta nuevamente.');
+        });
+    }
+
+    function showNotification(type, message, duration = 5000) {
+        const validTypes = ['success', 'error', 'warning', 'info'];
+        type = validTypes.includes(type) ? type : 'info';
+        
+        let container = document.getElementById('notificationContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notificationContainer';
+            container.className = 'notification-container';
+            document.body.appendChild(container);
+        }
+        
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icons = {
+            success: '<i class="fas fa-check-circle"></i>',
+            error: '<i class="fas fa-exclamation-circle"></i>',
+            warning: '<i class="fas fa-exclamation-triangle"></i>',
+            info: '<i class="fas fa-info-circle"></i>'
+        };
+        
+        notification.innerHTML = `
+            <div class="notification-icon">${icons[type]}</div>
+            <div class="notification-content">
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" onclick="this.closest('.notification').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        container.appendChild(notification);
+        
+        if (duration > 0) {
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.classList.add('hiding');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, duration);
+        }
+    }
+</script>
+
+<style>
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+
+    .notification.success {
+        border-left-color: #10b981;
+    }
+
+    .notification.error {
+        border-left-color: #ef4444;
+    }
+
+    .notification.warning {
+        border-left-color: #f59e0b;
+    }
+
+    .notification.info {
+        border-left-color: var(--turquesa-primary);
+    }
+
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+        color: white;
+    }
+
+    .notification.success .notification-icon {
+        background: #10b981;
+    }
+
+    .notification.error .notification-icon {
+        background: #ef4444;
+    }
+
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+    }
+
+    .notification.info .notification-icon {
+        background: var(--turquesa-primary);
+    }
+
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+    }
+
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+</style>
+{% endblock %}

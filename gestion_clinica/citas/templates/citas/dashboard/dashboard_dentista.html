@@ -1,0 +1,537 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Inicio - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    .dashboard-wrapper {
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .dashboard-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+        color: white;
+        padding: 32px 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 16px rgba(20, 184, 166, 0.25);
+    }
+    
+    .dashboard-header h1 {
+        margin: 0 0 8px 0;
+        font-size: 2rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .dashboard-header p {
+        margin: 0;
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    
+    .stats-grid-main {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .stat-card-main {
+        background: white;
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stat-card-main::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--primary-color);
+    }
+    
+    .stat-card-main:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    
+    .stat-card-main.blue::before { background: #3b82f6; }
+    .stat-card-main.green::before { background: #10b981; }
+    .stat-card-main.purple::before { background: #8b5cf6; }
+    .stat-card-main.orange::before { background: #f59e0b; }
+    .stat-card-main.teal::before { background: #14b8a6; }
+    
+    .stat-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+    
+    .stat-card-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: white;
+    }
+    
+    .stat-card-main.blue .stat-card-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .stat-card-main.green .stat-card-icon { background: linear-gradient(135deg, #10b981, #059669); }
+    .stat-card-main.purple .stat-card-icon { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .stat-card-main.orange .stat-card-icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .stat-card-main.teal .stat-card-icon { background: linear-gradient(135deg, #14b8a6, #0d9488); }
+    
+    .stat-card-value {
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+    
+    .stat-card-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    
+    .dashboard-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 2px solid #e2e8f0;
+        margin-bottom: 24px;
+    }
+    
+    .dashboard-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .dashboard-card-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .dashboard-card-header h3 i {
+        color: var(--primary-color);
+    }
+    
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+    
+    .quick-action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 12px;
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #1e293b;
+        transition: all 0.2s;
+    }
+    
+    .quick-action-btn:hover {
+        border-color: var(--primary-color);
+        background: #f0fdfa;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .quick-action-btn i {
+        font-size: 1.5rem;
+        color: var(--primary-color);
+    }
+    
+    .quick-action-btn span {
+        font-weight: 600;
+        font-size: 0.8125rem;
+    }
+    
+    .citas-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .cita-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border-left: 4px solid var(--primary-color);
+        transition: all 0.2s;
+    }
+    
+    .cita-item:hover {
+        background: #f0fdfa;
+        transform: translateX(4px);
+    }
+    
+    .cita-info {
+        flex: 1;
+    }
+    
+    .cita-paciente {
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .cita-detalle {
+        font-size: 0.875rem;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .cita-hora {
+        font-weight: 600;
+        color: var(--primary-color);
+        font-size: 1rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #94a3b8;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 12px;
+        opacity: 0.5;
+    }
+    
+    .empty-state p {
+        margin: 0;
+        font-size: 0.875rem;
+    }
+    
+    .badge-accion {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-disponible { background: #dbeafe; color: #1e40af; }
+    .badge-reservada { background: #fef3c7; color: #92400e; }
+    .badge-confirmada { background: #d1fae5; color: #065f46; }
+    .badge-completada { background: #dcfce7; color: #166534; }
+    .badge-cancelada { background: #fee2e2; color: #991b1b; }
+    
+    .alert-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .dashboard-grid-citas {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+    
+    @media (max-width: 1200px) {
+        .dashboard-grid-citas {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<script>
+    // Event listener para el botón Mi Perfil en el Dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        const btnDashboard = document.getElementById('btnMiPerfilDashboard');
+        if (btnDashboard) {
+            btnDashboard.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof abrirModalPerfil === 'function') {
+                    abrirModalPerfil();
+                } else {
+                    setTimeout(function() {
+                        if (typeof abrirModalPerfil === 'function') {
+                            abrirModalPerfil();
+                        }
+                    }, 100);
+                }
+            });
+        }
+    });
+</script>
+
+<div class="dashboard-wrapper">
+    <!-- Header del Dashboard -->
+    <div class="dashboard-header">
+        <h1><i class="fas fa-home"></i> Inicio</h1>
+        <p>Bienvenido, Dr(a). {{ perfil.nombre_completo }} - Resumen de tu actividad</p>
+    </div>
+    
+    <!-- Acciones Rápidas -->
+    <div class="dashboard-card">
+        <div class="dashboard-card-header">
+            <h3><i class="fas fa-bolt"></i> Accesos Rápidos</h3>
+        </div>
+        <div class="quick-actions">
+            <a href="{% url 'mis_citas_dentista' %}" class="quick-action-btn">
+                <i class="fas fa-calendar-check"></i>
+                <span>Mis Citas</span>
+            </a>
+            <a href="{% url 'mis_pacientes' %}" class="quick-action-btn">
+                <i class="fas fa-users"></i>
+                <span>Mis Pacientes</span>
+            </a>
+            <a href="{% url 'ver_mi_horario' %}" class="quick-action-btn">
+                <i class="fas fa-clock"></i>
+                <span>Mi Horario</span>
+            </a>
+            <a href="{% url 'listar_planes_tratamiento' %}" class="quick-action-btn">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Planes de Tratamiento</span>
+            </a>
+            <a href="javascript:void(0);" class="quick-action-btn" id="btnMiPerfilDashboard">
+                <i class="fas fa-user-circle"></i>
+                <span>Mi Perfil</span>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Estadísticas Principales -->
+    <div class="stats-grid-main">
+        <div class="stat-card-main blue">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.citas_hoy }}</div>
+                    <div class="stat-card-label">Citas Hoy</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card-main green">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.citas_semana }}</div>
+                    <div class="stat-card-label">Citas Esta Semana</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-calendar-week"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card-main purple">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.citas_mes }}</div>
+                    <div class="stat-card-label">Citas Este Mes</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card-main orange">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.citas_pendientes }}</div>
+                    <div class="stat-card-label">Citas Pendientes</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card-main teal">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.citas_completadas }}</div>
+                    <div class="stat-card-label">Citas Completadas</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card-main green">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.pacientes_count }}</div>
+                    <div class="stat-card-label">Pacientes</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-user-friends"></i>
+                </div>
+            </div>
+        </div>
+
+        {% if estadisticas.planes_activos > 0 %}
+        <div class="stat-card-main purple">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-card-value">{{ estadisticas.planes_activos }}</div>
+                    <div class="stat-card-label">Planes Activos</div>
+                </div>
+                <div class="stat-card-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Grid Principal: Citas de Hoy y Próximas -->
+    <div class="dashboard-grid-citas" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+        {% if citas_hoy_detalle %}
+        <!-- Citas de Hoy -->
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <h3><i class="fas fa-calendar-check"></i> Citas de Hoy</h3>
+                <span class="alert-badge">{{ citas_hoy_detalle|length }} citas</span>
+            </div>
+            <div class="citas-list">
+                {% for cita in citas_hoy_detalle|slice:":5" %}
+                <div class="cita-item">
+                    <div class="cita-info">
+                        <div class="cita-paciente">
+                            {{ cita.cliente.nombre_completo|default:"Sin asignar" }}
+                        </div>
+                        <div class="cita-detalle">
+                            <span><i class="fas fa-clock"></i> {{ cita.fecha_hora|date:"H:i" }}</span>
+                            <span class="badge-accion badge-{{ cita.estado }}">
+                                {{ cita.get_estado_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="cita-hora">
+                        {{ cita.fecha_hora|date:"H:i" }}
+                    </div>
+                </div>
+                {% endfor %}
+                {% if citas_hoy_detalle|length > 5 %}
+                <div style="text-align: center; margin-top: 12px;">
+                    <a href="{% url 'mis_citas_dentista' %}" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">
+                        Ver todas las citas de hoy →
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <h3><i class="fas fa-calendar-check"></i> Citas de Hoy</h3>
+            </div>
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <p>No tienes citas programadas para hoy</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Próximas Citas -->
+        {% if citas_proximas %}
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <h3><i class="fas fa-calendar-plus"></i> Próximas Citas</h3>
+            </div>
+            <div class="citas-list">
+                {% for cita in citas_proximas|slice:":5" %}
+                <div class="cita-item">
+                    <div class="cita-info">
+                        <div class="cita-paciente">
+                            {{ cita.cliente.nombre_completo|default:"Sin asignar" }}
+                        </div>
+                        <div class="cita-detalle">
+                            <span><i class="fas fa-calendar"></i> {{ cita.fecha_hora|date:"d/m/Y" }}</span>
+                            <span><i class="fas fa-clock"></i> {{ cita.fecha_hora|date:"H:i" }}</span>
+                        </div>
+                    </div>
+                    <span class="badge-accion badge-{{ cita.estado }}">
+                        {{ cita.get_estado_display }}
+                    </span>
+                </div>
+                {% endfor %}
+                {% if citas_proximas|length > 5 %}
+                <div style="text-align: center; margin-top: 12px;">
+                    <a href="{% url 'mis_citas_dentista' %}" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">
+                        Ver todas las próximas citas →
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <h3><i class="fas fa-calendar-plus"></i> Próximas Citas</h3>
+            </div>
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <p>No tienes citas próximas programadas</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+{% endblock %}
+

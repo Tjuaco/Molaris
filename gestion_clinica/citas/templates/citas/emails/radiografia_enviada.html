@@ -1,0 +1,62 @@
+{% extends 'citas/emails/base_email.html' %}
+{% load custom_filters %}
+
+{% block header_title %}{{ nombre_clinica }}{% endblock %}
+
+{% block content %}
+<h2>Radiografía Dental</h2>
+
+<p>Estimado/a <strong>{{ cliente_nombre }}</strong>,</p>
+
+<p>Le enviamos su radiografía dental según solicitó. Esta imagen corresponde a su archivo médico y está disponible para su uso cuando la necesite.</p>
+
+<div class="info-box">
+    <strong>Tipo de Radiografía</strong>
+    <p>{{ tipo_radiografia }}</p>
+    
+    <strong>Fecha</strong>
+    <p>{{ fecha_carga|date:"d/m/Y" }}</p>
+    
+    <strong>Dentista</strong>
+    <p>{{ dentista_nombre }}</p>
+    
+    {% if descripcion %}
+    <strong>Descripción</strong>
+    <p>{{ descripcion }}</p>
+    {% endif %}
+</div>
+
+<div class="alert-box">
+    <strong>📋 Importante</strong>
+    <p>Esta radiografía forma parte de su historial médico en nuestra clínica. Le recomendamos guardarla en un lugar seguro.</p>
+</div>
+
+<p>La imagen de la radiografía se encuentra adjunta a este correo.</p>
+
+<p>Si tiene alguna pregunta o necesita más información, no dude en contactarnos.</p>
+
+<p>Atentamente,<br>
+<strong>{{ nombre_clinica }}</strong></p>
+{% endblock %}
+
+{% block clinic_name %}{{ nombre_clinica }}{% endblock %}
+
+{% block contact_info %}
+{% if direccion_clinica %}<p><strong>Dirección:</strong> {{ direccion_clinica }}</p>{% endif %}
+{% if telefono_clinica %}<p><strong>Teléfono:</strong> {{ telefono_clinica }}</p>{% endif %}
+{% if email_clinica %}<p><strong>Email:</strong> <a href="mailto:{{ email_clinica }}">{{ email_clinica }}</a></p>{% endif %}
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

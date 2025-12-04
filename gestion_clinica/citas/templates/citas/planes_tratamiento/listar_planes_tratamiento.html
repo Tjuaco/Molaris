@@ -1,0 +1,311 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Planes de Tratamiento - Clínica Dental{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .section-container {
+        animation: fadeIn 0.4s ease;
+    }
+    
+    .section {
+        animation: fadeIn 0.5s ease;
+        animation-delay: 0.1s;
+        animation-fill-mode: both;
+    }
+    
+    .header-with-stats {
+        animation: fadeIn 0.3s ease;
+    }
+</style>
+
+<div class="section-container">
+<!-- Header con Estadísticas -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-clipboard-list"></i> Planes de Tratamiento</h1>
+        <p class="page-subtitle">Gestiona los planes de tratamiento</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon primary">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.total_planes }}</div>
+                    <div class="stat-label">Total Planes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success">
+                    <i class="fas fa-spinner"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.planes_activos }}</div>
+                    <div class="stat-label">En Progreso</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon completed">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.planes_completados }}</div>
+                    <div class="stat-label">Completados</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <!-- Barra de acciones -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <a href="{% url 'crear_plan_tratamiento' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Crear Nuevo Plan
+            </a>
+        </div>
+        
+        <!-- Filtros y Ordenamiento -->
+        <form method="GET" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Buscar por nombre, cliente, RUT..." 
+                   style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; min-width: 220px;">
+            
+            <select name="estado" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                <option value="">Todos los estados</option>
+                <option value="borrador" {% if estado_filtro == 'borrador' %}selected{% endif %}>Borrador</option>
+                <option value="pendiente_aprobacion" {% if estado_filtro == 'pendiente_aprobacion' %}selected{% endif %}>Pendiente Aprobación</option>
+                <option value="aprobado" {% if estado_filtro == 'aprobado' %}selected{% endif %}>Aprobado</option>
+                <option value="en_progreso" {% if estado_filtro == 'en_progreso' %}selected{% endif %}>En Progreso</option>
+                <option value="completado" {% if estado_filtro == 'completado' %}selected{% endif %}>Completado</option>
+                <option value="cancelado" {% if estado_filtro == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                <option value="rechazado" {% if estado_filtro == 'rechazado' %}selected{% endif %}>Rechazado</option>
+            </select>
+            
+            {% if es_admin and dentistas %}
+            <select name="dentista_id" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                <option value="">Todos los dentistas</option>
+                {% for dentista in dentistas %}
+                    <option value="{{ dentista.id }}" {% if dentista_filtro == dentista.id|stringformat:"s" %}selected{% endif %}>
+                        {{ dentista.nombre_completo }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            
+            <select name="orden" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                <option value="-creado_el" {% if orden == '-creado_el' %}selected{% endif %}>Más recientes</option>
+                <option value="creado_el" {% if orden == 'creado_el' %}selected{% endif %}>Más antiguos</option>
+                <option value="-precio_final" {% if orden == '-precio_final' %}selected{% endif %}>Mayor presupuesto</option>
+                <option value="precio_final" {% if orden == 'precio_final' %}selected{% endif %}>Menor presupuesto</option>
+                <option value="-progreso_porcentaje" {% if orden == '-progreso_porcentaje' %}selected{% endif %}>Mayor progreso</option>
+                <option value="progreso_porcentaje" {% if orden == 'progreso_porcentaje' %}selected{% endif %}>Menor progreso</option>
+                <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre A-Z</option>
+                <option value="-nombre" {% if orden == '-nombre' %}selected{% endif %}>Nombre Z-A</option>
+            </select>
+            
+            <button type="submit" class="btn" style="padding: 8px 16px;">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+            
+            {% if search or estado_filtro or dentista_filtro or orden != '-creado_el' %}
+            <a href="{% url 'listar_planes_tratamiento' %}" class="btn btn-secondary" style="padding: 8px 16px;">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+    
+    <!-- Lista de planes -->
+    {% if planes %}
+        <div style="display: grid; gap: 16px;">
+            {% for plan in planes %}
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); transition: all 0.2s; position: relative;">
+                <!-- Indicador de estado visual -->
+                <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: {% if plan.estado == 'en_progreso' %}#10b981{% elif plan.estado == 'completado' %}#3b82f6{% elif plan.estado == 'cancelado' %}#ef4444{% elif plan.estado == 'aprobado' %}#10b981{% else %}#6b7280{% endif %}; border-radius: 12px 0 0 12px;"></div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; padding-left: 8px;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <h3 style="margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                                {{ plan.nombre }}
+                            </h3>
+                            <span class="badge" style="background: {% if plan.estado == 'en_progreso' or plan.estado == 'aprobado' %}#10b981{% elif plan.estado == 'completado' %}#3b82f6{% elif plan.estado == 'cancelado' %}#ef4444{% else %}#6b7280{% endif %}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                <i class="fas fa-{% if plan.estado == 'en_progreso' or plan.estado == 'aprobado' %}check-circle{% elif plan.estado == 'completado' %}check-double{% elif plan.estado == 'cancelado' %}times-circle{% else %}clock{% endif %}"></i> {{ plan.get_estado_display }}
+                            </span>
+                            {% if plan.tiene_consentimientos_pendientes %}
+                            <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 500;">
+                                <i class="fas fa-exclamation-triangle"></i> Docs pendientes
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Información principal -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; color: #64748b; font-size: 0.875rem; margin-bottom: 12px;">
+                            <div>
+                                <i class="fas fa-user" style="color: var(--primary-color);"></i> <strong>Cliente:</strong> {{ plan.cliente.nombre_completo }}
+                                {% if plan.cliente.rut %}
+                                <span style="color: #94a3b8; font-size: 0.8rem;">({{ plan.cliente.rut }})</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <i class="fas fa-user-md" style="color: var(--primary-color);"></i> <strong>Dentista:</strong> {{ plan.dentista.nombre_completo }}
+                            </div>
+                            <div>
+                                <i class="fas fa-calendar-plus" style="color: var(--primary-color);"></i> <strong>Creado:</strong> {{ plan.creado_el|date:"d/m/Y" }}
+                            </div>
+                            {% if plan.fecha_inicio_estimada %}
+                            <div>
+                                <i class="fas fa-play-circle" style="color: #10b981;"></i> <strong>Inicio estimado:</strong> {{ plan.fecha_inicio_estimada|date:"d/m/Y" }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Información financiera -->
+                        <div style="background: #f8fafc; border-radius: 8px; padding: 12px; margin-bottom: 12px; border-left: 3px solid var(--primary-color);">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; font-size: 0.85rem;">
+                                <div>
+                                    <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Presupuesto Total</div>
+                                    <div style="color: #1e293b; font-weight: 600; font-size: 0.95rem;">{{ plan.precio_final|pesos_chilenos }}</div>
+                                </div>
+                                <div>
+                                    <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Pagado</div>
+                                    <div style="color: #10b981; font-weight: 600; font-size: 0.95rem;">{{ plan.total_pagado|pesos_chilenos }}</div>
+                                    <div style="color: #94a3b8; font-size: 0.7rem;">({{ plan.porcentaje_pagado|floatformat:0 }}%)</div>
+                                </div>
+                                <div>
+                                    <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Saldo Pendiente</div>
+                                    <div style="color: {% if plan.saldo_pendiente > 0 %}#f59e0b{% else %}#10b981{% endif %}; font-weight: 600; font-size: 0.95rem;">{{ plan.saldo_pendiente|pesos_chilenos }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Fechas importantes -->
+                        {% if plan.fecha_inicio_estimada or plan.fecha_fin_estimada or plan.citas.all %}
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 0.8rem; color: #64748b; margin-bottom: 12px;">
+                            {% if plan.fecha_inicio_estimada %}
+                            <div>
+                                <i class="fas fa-calendar-check" style="color: #10b981;"></i> <strong>Inicio:</strong> {{ plan.fecha_inicio_estimada|date:"d/m/Y" }}
+                            </div>
+                            {% endif %}
+                            {% if plan.fecha_fin_estimada %}
+                            <div>
+                                <i class="fas fa-calendar-times" style="color: #3b82f6;"></i> <strong>Fin estimado:</strong> {{ plan.fecha_fin_estimada|date:"d/m/Y" }}
+                            </div>
+                            {% endif %}
+                            {% if plan.ultima_cita_obj %}
+                            <div>
+                                <i class="fas fa-history" style="color: #8b5cf6;"></i> <strong>Última cita:</strong> {{ plan.ultima_cita_obj.fecha_hora|date:"d/m/Y" }}
+                            </div>
+                            {% endif %}
+                            {% if plan.proxima_cita_obj %}
+                            <div>
+                                <i class="fas fa-calendar-alt" style="color: #f59e0b;"></i> <strong>Próxima cita:</strong> {{ plan.proxima_cita_obj.fecha_hora|date:"d/m/Y H:i" }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: flex-start; flex-direction: column;">
+                        <a href="{% url 'detalle_plan_tratamiento' plan.id %}" class="btn btn-sm btn-info" style="width: 100%; justify-content: center;">
+                            <i class="fas fa-eye"></i> Ver Detalles
+                        </a>
+                        {# La funcionalidad de editar ha sido deshabilitada. Si necesita cambios, cancele y elimine el plan. #}
+                    </div>
+                </div>
+                
+                <!-- Barras de progreso -->
+                <div style="margin-top: 16px; padding-left: 8px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <!-- Progreso de citas -->
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 0.8rem; color: #64748b; font-weight: 500;">
+                                    <i class="fas fa-calendar-check"></i> Progreso de Citas
+                                </span>
+                                <span style="font-size: 0.8rem; color: #1e293b; font-weight: 600;">{{ plan.progreso_porcentaje }}%</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                                <div style="width: {{ plan.progreso_porcentaje }}%; height: 100%; background: var(--primary-color); transition: width 0.3s;"></div>
+                            </div>
+                            <div style="margin-top: 4px; font-size: 0.7rem; color: #64748b;">
+                                {{ plan.citas_completadas }} de {{ plan.total_citas }} citas completadas
+                            </div>
+                        </div>
+                        
+                        <!-- Progreso de pagos -->
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 0.8rem; color: #64748b; font-weight: 500;">
+                                    <i class="fas fa-dollar-sign"></i> Progreso de Pagos
+                                </span>
+                                <span style="font-size: 0.8rem; color: #1e293b; font-weight: 600;">{{ plan.porcentaje_pagado|floatformat:0 }}%</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                                <div style="width: {{ plan.porcentaje_pagado|floatformat:0 }}%; height: 100%; background: #10b981; transition: width 0.3s;"></div>
+                            </div>
+                            <div style="margin-top: 4px; font-size: 0.7rem; color: #64748b;">
+                                {{ plan.total_pagado|pesos_chilenos }} de {{ plan.precio_final|pesos_chilenos }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Paginación -->
+        {% if planes.has_other_pages %}
+        <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap;">
+            {% if planes.has_previous %}
+                <a href="?page={{ planes.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if dentista_filtro %}&dentista_id={{ dentista_filtro }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}" class="btn btn-sm">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </a>
+            {% endif %}
+            
+            <span style="padding: 8px 16px; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                Página {{ planes.number }} de {{ planes.paginator.num_pages }}
+            </span>
+            
+            {% if planes.has_next %}
+                <a href="?page={{ planes.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if dentista_filtro %}&dentista_id={{ dentista_filtro }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}" class="btn btn-sm">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state" style="text-align: center; padding: 60px 20px; background: white; border-radius: 12px; border: 2px dashed #e5e7eb;">
+            <i class="fas fa-clipboard-list" style="font-size: 4rem; color: #9ca3af; margin-bottom: 16px;"></i>
+            <h3 style="color: #374151; margin-bottom: 8px;">No hay planes de tratamiento</h3>
+            <p style="color: #6b7280; margin-bottom: 24px;">
+                {% if search or estado_filtro %}
+                    No se encontraron planes con los filtros aplicados.
+                {% else %}
+                    Aún no se han creado planes de tratamiento.
+                {% endif %}
+            </p>
+            <a href="{% url 'crear_plan_tratamiento' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Crear Primer Plan
+            </a>
+        </div>
+    {% endif %}
+</div>
+</div>
+{% endblock %}

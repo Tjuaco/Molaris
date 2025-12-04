@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ClienteBackend(ModelBackend):
     """
-    Backend de autenticación que verifica que el cliente exista en citas_cliente del sistema de gestión.
+    Backend de autenticación que verifica que el cliente exista en pacientes_cliente del sistema de gestión.
     """
     
     def authenticate(self, request, username=None, password=None, **kwargs):
@@ -46,9 +46,9 @@ class ClienteBackend(ModelBackend):
             logger.warning(f"Usuario {username} intentó iniciar sesión pero no tiene PerfilCliente")
             return None
         
-        # Verificar el estado del cliente en citas_cliente del sistema de gestión
+        # Verificar el estado del cliente en pacientes_cliente del sistema de gestión
         # IMPORTANTE: El sistema de gestión es la fuente de verdad
-        # - Si el cliente NO existe en citas_cliente: Permitir login (puede ser un registro nuevo)
+        # - Si el cliente NO existe en pacientes_cliente: Permitir login (puede ser un registro nuevo)
         # - Si el cliente existe pero está INACTIVO: Bloquear login (fue borrado/desactivado)
         # - Si el cliente existe y está ACTIVO: Permitir login
         try:
@@ -62,16 +62,16 @@ class ClienteBackend(ModelBackend):
                 # Cliente existe en el sistema de gestión
                 if not cliente_doc.activo:
                     # Cliente fue borrado/desactivado en el sistema de gestión
-                    logger.warning(f"Usuario {username} intentó iniciar sesión pero está INACTIVO en citas_cliente del sistema de gestión")
+                    logger.warning(f"Usuario {username} intentó iniciar sesión pero está INACTIVO en pacientes_cliente del sistema de gestión")
                     return None
                 else:
                     # Cliente existe y está activo
-                    logger.info(f"Cliente {username} encontrado y activo en citas_cliente del sistema de gestión")
+                    logger.info(f"Cliente {username} encontrado y activo en pacientes_cliente del sistema de gestión")
             else:
-                # Cliente no existe en citas_cliente (puede ser registro nuevo, permitir login)
-                logger.info(f"Cliente {username} no encontrado en citas_cliente (puede ser registro nuevo), permitiendo login")
+                # Cliente no existe en pacientes_cliente (puede ser registro nuevo, permitir login)
+                logger.info(f"Cliente {username} no encontrado en pacientes_cliente (puede ser registro nuevo), permitiendo login")
         except Exception as e:
-            logger.error(f"Error al verificar cliente en citas_cliente: {e}")
+            logger.error(f"Error al verificar cliente en pacientes_cliente: {e}")
             # En caso de error de conexión, permitir el login pero registrar el error
             # Esto evita que problemas de conexión bloqueen a todos los usuarios
         

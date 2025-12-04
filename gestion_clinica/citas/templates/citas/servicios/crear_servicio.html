@@ -1,0 +1,863 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Crear Servicio - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<div class="personal-container">
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <!-- Header -->
+    <div class="header-with-stats">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-plus-circle"></i> Crear Nuevo Servicio</h1>
+            <p class="page-subtitle">Agrega un nuevo tipo de servicio dental con su precio base</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'gestor_servicios' %}" class="btn-back">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver a Servicios</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Formulario -->
+    <div class="section form-section-servicio">
+        <form method="post" class="form-crear-servicio">
+            {% csrf_token %}
+            
+            <!-- Información Básica -->
+            <div class="form-section-card">
+                <div class="section-card-header">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>Información Básica</h3>
+                </div>
+                <div class="section-card-body">
+                    <div class="form-group-modern full-width">
+                        <label class="label-modern">
+                            <i class="fas fa-tasks"></i>
+                            Nombre del Servicio <span class="required">*</span>
+                        </label>
+                        <div class="input-wrapper-modern">
+                            <input type="text" name="nombre" required placeholder="Ej: Limpieza Dental, Extracción, Empaste..." class="input-modern">
+                        </div>
+                        <small class="hint-text">
+                            <i class="fas fa-info-circle"></i> Nombre descriptivo del servicio dental que aparecerá en las citas
+                        </small>
+                    </div>
+
+                    <div class="form-group-modern full-width">
+                        <label class="label-modern">
+                            <i class="fas fa-align-left"></i>
+                            Descripción
+                        </label>
+                        <div class="input-wrapper-modern">
+                            <textarea name="descripcion" rows="4" placeholder="Descripción detallada del servicio (opcional)..." class="input-modern textarea-modern"></textarea>
+                        </div>
+                        <small class="hint-text">
+                            <i class="fas fa-info-circle"></i> Descripción opcional que ayuda a entender mejor el servicio
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categoría y Precio -->
+            <div class="form-section-card">
+                <div class="section-card-header">
+                    <i class="fas fa-tag"></i>
+                    <h3>Categoría y Precio</h3>
+                </div>
+                <div class="section-card-body">
+                    <div class="form-grid-2">
+                        <div class="form-group-modern">
+                            <label class="label-modern">
+                                <i class="fas fa-tags"></i>
+                                Categoría <span class="required">*</span>
+                            </label>
+                            <div class="input-wrapper-modern">
+                                <select name="categoria" required class="select-modern">
+                                    {% for cat_code, cat_name in categorias %}
+                                    <option value="{{ cat_code }}">{{ cat_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <small class="hint-text">
+                                Clasifica el servicio por su tipo
+                            </small>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="label-modern">
+                                <i class="fas fa-dollar-sign"></i>
+                                Precio Base <span class="required">*</span>
+                            </label>
+                            <div class="input-wrapper-modern">
+                                <input type="text" inputmode="numeric" pattern="[0-9.,]*" name="precio_base" required placeholder="60.000" class="input-modern precio-input formato-numero">
+                            </div>
+                            <small class="hint-text">
+                                Precio estándar que se asignará automáticamente a las citas
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuración Adicional -->
+            <div class="form-section-card">
+                <div class="section-card-header">
+                    <i class="fas fa-cog"></i>
+                    <h3>Configuración Adicional</h3>
+                </div>
+                <div class="section-card-body">
+                    <div class="form-group-modern">
+                        <label class="label-modern">
+                            <i class="fas fa-clock"></i>
+                            Duración Estimada (minutos)
+                        </label>
+                        <div class="input-wrapper-modern">
+                            <input type="number" name="duracion_estimada" min="0" placeholder="Ej: 30, 60, 90..." class="input-modern">
+                        </div>
+                        <small class="hint-text">
+                            Duración estimada del servicio en minutos (opcional)
+                        </small>
+                    </div>
+
+                    <div class="checkbox-group-modern">
+                        <div class="checkbox-item-modern">
+                            <label class="checkbox-label-modern">
+                                <input type="checkbox" name="requiere_dentista" checked class="checkbox-modern">
+                                <span class="checkbox-custom"></span>
+                                <div class="checkbox-content">
+                                    <i class="fas fa-user-md"></i>
+                                    <span><strong>Requiere Dentista</strong></span>
+                                </div>
+                            </label>
+                            <small class="hint-text checkbox-hint">
+                                Si este servicio requiere un dentista específico para realizarlo
+                            </small>
+                        </div>
+
+                        <div class="checkbox-item-modern">
+                            <label class="checkbox-label-modern">
+                                <input type="checkbox" name="activo" checked class="checkbox-modern">
+                                <span class="checkbox-custom"></span>
+                                <div class="checkbox-content">
+                                    <i class="fas fa-toggle-on"></i>
+                                    <span><strong>Servicio Activo</strong></span>
+                                </div>
+                            </label>
+                            <small class="hint-text checkbox-hint">
+                                Los servicios inactivos no aparecerán al crear o editar citas
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="form-actions-modern">
+                <button type="submit" class="btn-primary-modern">
+                    <i class="fas fa-save"></i>
+                    <span>Crear Servicio</span>
+                </button>
+                <a href="{% url 'gestor_servicios' %}" class="btn-secondary-modern">
+                    <i class="fas fa-times"></i>
+                    <span>Cancelar</span>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* ============================================================================
+   ESTILOS MEJORADOS PARA CREAR SERVICIO
+   ============================================================================ */
+
+.personal-container {
+    padding: 0;
+}
+
+/* Header mejorado */
+.header-with-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+    gap: 20px;
+}
+
+.page-header {
+    flex: 1;
+}
+
+.page-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.page-subtitle {
+    color: #64748b;
+    font-size: 16px;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-back {
+    padding: 12px 20px;
+    background: white;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-back:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+    transform: translateX(-2px);
+}
+
+/* Sección del formulario */
+.form-section-servicio {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    padding: 0;
+}
+
+.form-crear-servicio {
+    padding: 0;
+}
+
+/* Cards de sección */
+.form-section-card {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.form-section-card:last-of-type {
+    border-bottom: none;
+}
+
+.section-card-header {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.section-card-header i {
+    font-size: 18px;
+    color: var(--primary-color);
+}
+
+.section-card-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.section-card-body {
+    padding: 24px;
+}
+
+/* Grid del formulario */
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+}
+
+.form-group-modern {
+    margin-bottom: 24px;
+}
+
+.form-group-modern.full-width {
+    grid-column: 1 / -1;
+}
+
+.label-modern {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.label-modern i {
+    color: var(--primary-color);
+    font-size: 16px;
+}
+
+.required {
+    color: #ef4444;
+    margin-left: 2px;
+}
+
+.input-wrapper-modern {
+    position: relative;
+}
+
+.input-modern {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.input-modern:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    background: #fafbfc;
+}
+
+.input-modern::placeholder {
+    color: #9ca3af;
+}
+
+.textarea-modern {
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+}
+
+.precio-input {
+    font-weight: 600;
+    color: #10b981;
+    font-size: 16px;
+}
+
+.select-modern {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    background: white;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 40px;
+}
+
+.select-modern:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.hint-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.hint-text i {
+    margin-right: 4px;
+    color: #94a3b8;
+}
+
+/* Checkboxes mejorados */
+.checkbox-group-modern {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-top: 16px;
+}
+
+.checkbox-item-modern {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.checkbox-label-modern {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    padding: 16px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.checkbox-label-modern:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.checkbox-modern {
+    display: none;
+}
+
+.checkbox-custom {
+    width: 22px;
+    height: 22px;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.2s ease;
+}
+
+.checkbox-modern:checked + .checkbox-custom {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.checkbox-modern:checked + .checkbox-custom::after {
+    content: '\f00c';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    color: white;
+    font-size: 12px;
+}
+
+.checkbox-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.checkbox-content i {
+    color: var(--primary-color);
+    font-size: 16px;
+}
+
+.checkbox-content strong {
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.checkbox-hint {
+    margin-left: 34px;
+    margin-top: 4px;
+}
+
+/* Botones de acción */
+.form-actions-modern {
+    padding: 24px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-primary-modern {
+    padding: 14px 28px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.btn-primary-modern:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary-modern i {
+    font-size: 16px;
+}
+
+.btn-secondary-modern {
+    padding: 14px 28px;
+    background: white;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary-modern:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+    transform: translateY(-2px);
+}
+
+.btn-secondary-modern i {
+    font-size: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header-with-stats {
+        flex-direction: column;
+    }
+    
+    .header-actions {
+        width: 100%;
+    }
+    
+    .btn-back {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions-modern {
+        flex-direction: column;
+    }
+    
+    .btn-primary-modern,
+    .btn-secondary-modern {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .section-card-body {
+        padding: 20px;
+    }
+}
+</style>
+
+<script>
+// Función para formatear número con separadores de miles
+function formatearNumero(numero) {
+    if (!numero) return '';
+    let numeroLimpio = numero.toString().replace(/[^\d]/g, '');
+    if (!numeroLimpio) return '';
+    return numeroLimpio.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Función para limpiar formato (remover puntos) antes de enviar
+function limpiarFormatoNumero(numero) {
+    if (!numero) return '';
+    return numero.toString().replace(/\./g, '');
+}
+
+// Aplicar formato a todos los campos con clase formato-numero
+document.addEventListener('DOMContentLoaded', function() {
+    const camposNumeros = document.querySelectorAll('.formato-numero');
+    
+    camposNumeros.forEach(function(campo) {
+        // Formatear valor inicial
+        if (campo.value) {
+            campo.value = formatearNumero(campo.value);
+        }
+        
+        // Formatear mientras se escribe
+        campo.addEventListener('input', function(e) {
+            const cursorPos = e.target.selectionStart;
+            const valorOriginal = e.target.value;
+            const valorFormateado = formatearNumero(valorOriginal);
+            
+            e.target.value = valorFormateado;
+            
+            const diferencia = valorFormateado.length - valorOriginal.length;
+            const nuevaPos = cursorPos + diferencia;
+            e.target.setSelectionRange(nuevaPos, nuevaPos);
+        });
+        
+        // Formatear al perder el foco
+        campo.addEventListener('blur', function(e) {
+            if (e.target.value) {
+                e.target.value = formatearNumero(e.target.value);
+            }
+        });
+    });
+    
+    // Limpiar formato antes de enviar formularios
+    const forms = document.querySelectorAll('form');
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            const camposNumerosEnForm = form.querySelectorAll('.formato-numero');
+            camposNumerosEnForm.forEach(function(campo) {
+                if (campo.value) {
+                    campo.value = limpiarFormatoNumero(campo.value);
+                }
+            });
+        });
+    });
+});
+
+// ========== SISTEMA DE NOTIFICACIONES ==========
+function showNotification(type, message, duration = 5000) {
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(notification);
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+
+// Mostrar notificaciones de Django messages
+{% if messages %}
+    {% for message in messages %}
+        {% if message.tags == 'error' %}
+            showNotification('error', '{{ message|escapejs }}');
+        {% elif message.tags == 'warning' %}
+            showNotification('warning', '{{ message|escapejs }}');
+        {% elif message.tags == 'success' %}
+            showNotification('success', '{{ message|escapejs }}');
+        {% else %}
+            showNotification('info', '{{ message|escapejs }}');
+        {% endif %}
+    {% endfor %}
+{% endif %}
+</script>
+
+<style>
+/* Sistema de Notificaciones */
+.notification-container {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.notification {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    animation: slideInRight 0.3s ease-out;
+    pointer-events: auto;
+    border-left: 4px solid;
+    min-width: 320px;
+    max-width: 400px;
+}
+
+.notification.success {
+    border-left-color: #10b981;
+    background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+}
+
+.notification.error {
+    border-left-color: #ef4444;
+    background: linear-gradient(to right, #fef2f2 0%, white 8%);
+}
+
+.notification.warning {
+    border-left-color: #f59e0b;
+    background: linear-gradient(to right, #fffbeb 0%, white 8%);
+}
+
+.notification.info {
+    border-left-color: #3b82f6;
+    background: linear-gradient(to right, #eff6ff 0%, white 8%);
+}
+
+.notification-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.notification.success .notification-icon {
+    background: #10b981;
+    color: white;
+}
+
+.notification.error .notification-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.notification.warning .notification-icon {
+    background: #f59e0b;
+    color: white;
+}
+
+.notification.info .notification-icon {
+    background: #3b82f6;
+    color: white;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.notification-message {
+    font-size: 0.875rem;
+    color: #64748b;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.notification-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.notification-close:hover {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification.hiding {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+</style>
+{% endblock %}

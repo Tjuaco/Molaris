@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel del Cliente - Clínica Dental</title>
+    <title>Panel del Cliente - Clínica San Felipe</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -19,10 +19,17 @@
             color: #1e293b;
         }
 
-        .container {
-            max-width: 1200px;
+        .main-layout {
+            display: flex;
+            gap: 24px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
+        }
+
+        .container {
+            flex: 1;
+            min-width: 0;
         }
 
         /* Header */
@@ -51,7 +58,7 @@
         }
         
         .header h2 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .user-info {
@@ -64,7 +71,7 @@
         .user-avatar {
             width: 48px;
             height: 48px;
-            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            background: linear-gradient(135deg, #14b8a6, #0f766e);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -72,7 +79,7 @@
             color: white;
             font-size: 1.3rem;
             font-weight: bold;
-            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 6px rgba(20, 184, 166, 0.3);
         }
 
         .user-details h3 {
@@ -89,7 +96,7 @@
         }
 
         .menu-toggle-btn {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             border: none;
             padding: 12px 16px;
@@ -104,9 +111,9 @@
         }
 
         .menu-toggle-btn:hover {
-            background: linear-gradient(135deg, #2563eb, #1e40af);
+            background: linear-gradient(135deg, #0d9488, #0f766e);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         /* Sidebar Menu */
@@ -148,7 +155,7 @@
         }
 
         .sidebar-header {
-            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            background: linear-gradient(135deg, #14b8a6, #0f766e);
             color: white;
             padding: 30px 24px;
             position: relative;
@@ -188,7 +195,7 @@
             width: 60px;
             height: 60px;
             background: white;
-            color: #3b82f6;
+            color: #14b8a6;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -237,7 +244,7 @@
 
         .sidebar-menu-link:hover {
             background: #f8fafc;
-            color: #3b82f6;
+            color: #14b8a6;
             padding-left: 32px;
         }
 
@@ -249,17 +256,63 @@
         }
 
         .sidebar-menu-link:hover i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .sidebar-menu-link .badge {
             margin-left: auto;
-            background: #3b82f6;
+            background: #14b8a6;
             color: white;
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 600;
+        }
+
+        .sidebar-contact {
+            padding: 20px 24px;
+            border-top: 1px solid #f1f5f9;
+            background: #f0fdfa;
+        }
+
+        .sidebar-contact-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #0f766e;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-contact-info {
+            font-size: 0.8125rem;
+            color: #475569;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-contact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: #0f766e;
+            font-weight: 500;
+        }
+
+        .sidebar-contact-item i {
+            color: #14b8a6;
+            width: 16px;
+        }
+
+        .sidebar-contact-message {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-style: italic;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e0f2f1;
         }
 
         .sidebar-footer {
@@ -269,10 +322,10 @@
 
         .sidebar-logout-btn {
             width: 100%;
-            background: #fee2e2;
-            color: #991b1b;
-            border: none;
-            padding: 14px 20px;
+            background: linear-gradient(135deg, #f0fdfa, #e0f2f1);
+            color: #0f766e;
+            border: 2px solid #14b8a6;
+            padding: 12px 20px;
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
@@ -282,12 +335,18 @@
             justify-content: center;
             gap: 10px;
             font-size: 0.9375rem;
+            text-decoration: none;
         }
 
         .sidebar-logout-btn:hover {
-            background: #fecaca;
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        }
+
+        .sidebar-logout-btn:hover i {
+            color: white;
         }
 
         /* Responsive */
@@ -335,14 +394,50 @@
             border-left: 4px solid #ef4444;
         }
 
+        /* Sidebar Izquierdo - Filtros */
+        .filters-sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .filters-sidebar-header {
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
+            padding: 20px;
+            border-radius: 16px 16px 0 0;
+            text-align: center;
+        }
+
+        .filters-sidebar-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .filters-sidebar-header h3 i {
+            font-size: 1.125rem;
+        }
+
+        .filters-content {
+            padding: 20px;
+        }
+
         /* Filtros - Compacto */
         .filtros-section {
-            background: white;
-            padding: 16px;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
         }
         
         .filtros-title {
@@ -356,14 +451,14 @@
         }
         
         .filtros-title i {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 0.875rem;
         }
         
         .filtros-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
         
         .filtro-item {
@@ -403,18 +498,80 @@
         
         .filtro-select:focus, .filtro-input:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+            border-color: #14b8a6;
+            box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.1);
         }
         
         .filtro-actions {
             display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-filtrar, .btn-limpiar {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Mapa de Ubicación */
+        .mapa-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 2px solid #f1f5f9;
+        }
+
+        .mapa-title {
+            color: #1e293b;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
             gap: 8px;
-            margin-top: 12px;
+        }
+
+        .mapa-title i {
+            color: #14b8a6;
+        }
+
+        .mapa-container {
+            width: 100%;
+            height: 200px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #e2e8f0;
+            margin-bottom: 12px;
+        }
+
+        .mapa-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .mapa-info {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .mapa-info p {
+            margin: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mapa-info i {
+            color: #14b8a6;
+            width: 16px;
         }
         
         .btn-filtrar {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             border: none;
             padding: 8px 16px;
@@ -429,9 +586,9 @@
         }
         
         .btn-filtrar:hover {
-            background: linear-gradient(135deg, #2563eb, #1e40af);
+            background: linear-gradient(135deg, #0d9488, #0f766e);
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
         }
         
         .btn-limpiar {
@@ -457,7 +614,7 @@
         /* Alert Banner */
         .alert-banner {
             background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #14b8a6;
             border-radius: 12px;
             padding: 16px 20px;
             margin-bottom: 20px;
@@ -472,18 +629,18 @@
 
         .alert-content i {
             font-size: 1.5rem;
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .alert-content strong {
-            color: #1e40af;
+            color: #0f766e;
             font-size: 1rem;
             display: block;
             margin-bottom: 4px;
         }
 
         .alert-content p {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 0.875rem;
             margin: 0;
         }
@@ -545,14 +702,14 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #3b82f6, #2563eb);
+            background: linear-gradient(90deg, #14b8a6, #0d9488);
             transform: scaleX(0);
             transition: transform 0.3s ease;
         }
 
         .horario-card:hover {
-            border-color: #3b82f6;
-            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+            border-color: #14b8a6;
+            box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
             transform: translateY(-4px);
         }
 
@@ -575,14 +732,14 @@
         }
 
         .horario-fecha {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             border-radius: 12px;
             padding: 14px 16px;
             min-width: 70px;
             text-align: center;
             flex-shrink: 0;
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 8px rgba(20, 184, 166, 0.3);
         }
 
         .horario-dia {
@@ -611,7 +768,7 @@
         }
 
         .horario-hora i {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 1rem;
         }
 
@@ -620,7 +777,7 @@
             background: linear-gradient(135deg, #f8fafc, #f1f5f9);
             border-radius: 12px;
             padding: 16px;
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #14b8a6;
         }
 
         .horario-tipo {
@@ -634,7 +791,7 @@
         }
         
         .horario-tipo i {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 1rem;
         }
         
@@ -706,8 +863,8 @@
             height: 80px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid #3b82f6;
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2);
+            border: 3px solid #14b8a6;
+            box-shadow: 0 4px 8px rgba(20, 184, 166, 0.2);
         }
 
         .dentist-details-mini {
@@ -726,7 +883,7 @@
         }
 
         .dentist-nombre-mini i {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 0.875rem;
         }
 
@@ -740,7 +897,7 @@
         }
 
         .dentist-especialidad-mini i {
-            color: #3b82f6;
+            color: #14b8a6;
             font-size: 0.75rem;
         }
 
@@ -762,7 +919,7 @@
         }
 
         .btn-reservar-mini {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             border: none;
             padding: 14px 24px;
@@ -776,14 +933,14 @@
             justify-content: center;
             gap: 8px;
             width: 100%;
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 8px rgba(20, 184, 166, 0.3);
             margin-top: auto;
         }
 
         .btn-reservar-mini:hover {
-            background: linear-gradient(135deg, #2563eb, #1e40af);
+            background: linear-gradient(135deg, #0d9488, #0f766e);
             transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 6px 16px rgba(20, 184, 166, 0.4);
         }
 
         .btn-reservar-mini i {
@@ -792,8 +949,8 @@
 
         /* Sección Bloqueada */
         .blocked-section {
-            background: #fef3c7;
-            border: 2px dashed #f59e0b;
+            background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+            border: 2px solid #14b8a6;
             border-radius: 12px;
             padding: 40px;
             text-align: center;
@@ -801,15 +958,33 @@
 
         .blocked-section i {
             font-size: 3rem;
-            color: #f59e0b;
+            color: #14b8a6;
+            margin-bottom: 16px;
+        }
+
+        .blocked-section h4 {
+            color: #0f766e;
             margin-bottom: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
         }
 
         .blocked-section p {
-            color: #92400e;
+            color: #065f46;
             font-size: 1rem;
-            margin: 0;
+            margin: 8px 0;
             font-weight: 500;
+            line-height: 1.6;
+        }
+
+        .blocked-section a {
+            color: #14b8a6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .blocked-section a:hover {
+            text-decoration: underline;
         }
 
         /* No Horarios */
@@ -852,7 +1027,7 @@
         }
         
         .section h3 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         /* Citas Lista */
@@ -922,7 +1097,7 @@
         }
         
         .cita-dentista-nombre i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
         
         .cita-estado-badge {
@@ -938,7 +1113,7 @@
         
         .cita-estado-badge.confirmada {
             background: #dbeafe;
-            color: #1e40af;
+            color: #0f766e;
         }
         
         .cita-estado-badge.realizada {
@@ -976,8 +1151,8 @@
         
         .btn-descargar {
             background: white;
-            color: #3b82f6;
-            border: 2px solid #3b82f6;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
             padding: 10px 20px;
             border-radius: 8px;
             cursor: pointer;
@@ -991,11 +1166,11 @@
         }
         
         .btn-descargar:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
-            border-color: #3b82f6;
+            border-color: #14b8a6;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         .info-cita { 
@@ -1014,7 +1189,7 @@
         }
         
         .fecha-hora i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
         
         .fecha-dia {
@@ -1041,7 +1216,7 @@
         }
 
         .estado.reserved {
-            color: #2563eb;
+            color: #0d9488;
             background: #dbeafe;
         }
 
@@ -1066,7 +1241,7 @@
         .dentista-badge {
             margin-top: 10px;
             padding: 8px 14px;
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             border-radius: 8px;
             color: white;
             font-size: 0.875rem;
@@ -1074,7 +1249,7 @@
             align-items: center;
             gap: 8px;
             font-weight: 500;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
         }
 
         .dentista-badge i {
@@ -1131,7 +1306,7 @@
 
         /* Buttons */
         .btn-reservar { 
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             border: none;
             padding: 12px 24px;
@@ -1148,8 +1323,8 @@
         }
 
         .btn-reservar:hover { 
-            background: linear-gradient(135deg, #2563eb, #1e40af);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            background: linear-gradient(135deg, #0d9488, #0f766e);
+            box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
             transform: translateY(-2px);
         }
         
@@ -1237,9 +1412,26 @@
         }
 
         /* Responsive */
+        @media (max-width: 1024px) {
+            .main-layout {
+                flex-direction: column;
+            }
+
+            .filters-sidebar {
+                width: 100%;
+                position: relative;
+                top: 0;
+                max-height: none;
+            }
+        }
+
         @media (max-width: 768px) {
-            .container {
+            .main-layout {
                 padding: 15px;
+            }
+
+            .container {
+                padding: 0;
             }
 
             .header {
@@ -1506,7 +1698,7 @@
             height: 120px;
             border-radius: 50%;
             object-fit: cover;
-            border: 4px solid #667eea;
+            border: 4px solid #14b8a6;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
 
@@ -1522,7 +1714,7 @@
         }
 
         .dentist-details .specialty {
-            color: #667eea;
+            color: #14b8a6;
             font-size: 1rem;
             font-weight: 500;
             margin: 0 0 4px 0;
@@ -1550,7 +1742,7 @@
         }
 
         .dentist-details .contact-info i {
-            color: #667eea;
+            color: #14b8a6;
             width: 16px;
             text-align: center;
         }
@@ -1599,7 +1791,7 @@
             display: block;
             font-size: 1.2rem;
             font-weight: bold;
-            color: #667eea;
+            color: #14b8a6;
             margin-bottom: 2px;
         }
 
@@ -1690,7 +1882,123 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="main-layout">
+        <!-- Sidebar de Filtros -->
+        <aside class="filters-sidebar">
+            <div class="filters-sidebar-header">
+                <h3>
+                    <i class="fas fa-filter"></i>
+                    Filtros
+                </h3>
+            </div>
+            <div class="filters-content">
+                <!-- Filtros -->
+                <div class="filtros-section">
+                    <form method="get" action="{% url 'panel_cliente' %}">
+                        <div class="filtros-grid">
+                            <div class="filtro-item">
+                                <label class="filtro-label">
+                                    <i class="fas fa-stethoscope"></i>
+                                    Tipo de cita
+                                </label>
+                                <select name="tipo_consulta" class="filtro-select" id="tipo_consulta">
+                                    <option value="">Todos los tipos</option>
+                                    <option value="Limpieza dental">Limpieza dental</option>
+                                    <option value="Ortodoncia">Ortodoncia</option>
+                                    <option value="Extracción">Extracción</option>
+                                    <option value="Endodoncia">Endodoncia</option>
+                                    <option value="Odontopediatría">Odontopediatría</option>
+                                    <option value="Estética dental">Estética dental</option>
+                                    <option value="Consulta general">Consulta general</option>
+                                </select>
+                            </div>
+                            <div class="filtro-item">
+                                <label class="filtro-label">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    Fecha
+                                </label>
+                                <input type="date" name="fecha" class="filtro-input">
+                            </div>
+                            <div class="filtro-item">
+                                <label class="filtro-label">
+                                    <i class="fas fa-user-md"></i>
+                                    Dentista
+                                </label>
+                                <select name="dentista_id" class="filtro-select" id="dentista_id">
+                                    <option value="">Todos los dentistas</option>
+                                    {% for dentista in dentistas_disponibles %}
+                                    <option value="{{ dentista.id }}" {% if dentista.id|stringformat:"s" == request.GET.dentista_id %}selected{% endif %}>
+                                        Dr(a). {{ dentista.nombre }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="filtro-actions">
+                            <button type="submit" class="btn-filtrar">
+                                <i class="fas fa-search"></i>
+                                Buscar citas
+                            </button>
+                            <a href="{% url 'panel_cliente' %}" class="btn-limpiar">
+                                <i class="fas fa-times"></i>
+                                Limpiar filtros
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Mapa de Ubicación -->
+                <div class="mapa-section">
+                    <h4 class="mapa-title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Ubicación
+                    </h4>
+                    <div class="mapa-container">
+                        {% if CLINIC_MAP_URL %}
+                        <iframe
+                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3153.83543450904!2d-72.333565!3d-38.2356192!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x966b155a8306e093%3A0x46de06dfbc92e29d!2sCl%C3%ADnica%20San%20Felipe!5e0!3m2!1ses!2scl!4v1733265600000!5m2!1ses!2scl"
+                            allowfullscreen=""
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            title="Ubicación de Clínica San Felipe">
+                        </iframe>
+                        <div style="margin-top: 8px;">
+                            <a href="https://www.google.com/maps/place/Clinica+San+Felipe/@-38.2356192,-72.3361399,17z/data=!3m1!4b1!4m6!3m5!1s0x966b155a8306e093:0x46de06dfbc92e29d!8m2!3d-38.2356192!4d-72.333565!16s%2Fg%2F11sswz76yt?hl=es&entry=ttu" target="_blank" rel="noopener noreferrer" style="color: #14b8a6; text-decoration: none; font-size: 0.875rem; display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-external-link-alt"></i>
+                                Ver en Google Maps
+                            </a>
+                        </div>
+                        {% else %}
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f1f5f9; color: #64748b;">
+                            <div style="text-align: center;">
+                                <i class="fas fa-map-marker-alt" style="font-size: 2rem; margin-bottom: 8px; color: #14b8a6;"></i>
+                                <p style="margin: 0; font-size: 0.875rem;">Mapa no disponible</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="mapa-info">
+                        <p>
+                            <i class="fas fa-map-marker-alt"></i>
+                            <strong>Clínica San Felipe</strong>
+                        </p>
+                        <p>
+                            <i class="fas fa-location-dot"></i>
+                            {% if CLINIC_ADDRESS %}{{ CLINIC_ADDRESS }}{% else %}Victoria, Región de la Araucanía{% endif %}
+                        </p>
+                        {% if telefono_clinica %}
+                        <p>
+                            <i class="fas fa-phone"></i>
+                            <a href="tel:{{ telefono_clinica }}" style="color: #14b8a6; text-decoration: none;">{{ telefono_clinica }}</a>
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Contenido Principal -->
+        <div class="container">
         <!-- Header -->
         <div class="header">
             <div>
@@ -1749,91 +2057,40 @@
             </div>
         {% endif %}
 
-        <!-- Filtros -->
-        <div class="filtros-section">
-            <h3 class="filtros-title">
-                <i class="fas fa-filter"></i>
-                Filtrar citas disponibles
-            </h3>
-            <form method="get" action="{% url 'panel_cliente' %}">
-                <div class="filtros-grid">
-                    <div class="filtro-item">
-                        <label class="filtro-label">
-                            <i class="fas fa-stethoscope"></i>
-                            Tipo de cita
-                        </label>
-                        <select name="tipo_consulta" class="filtro-select" id="tipo_consulta">
-                            <option value="">Todos los tipos</option>
-                            <option value="Limpieza dental">Limpieza dental</option>
-                            <option value="Ortodoncia">Ortodoncia</option>
-                            <option value="Extracción">Extracción</option>
-                            <option value="Endodoncia">Endodoncia</option>
-                            <option value="Odontopediatría">Odontopediatría</option>
-                            <option value="Estética dental">Estética dental</option>
-                            <option value="Consulta general">Consulta general</option>
-                        </select>
-                        <script>
-                            // Mantener el valor seleccionado después de filtrar
-                            document.addEventListener('DOMContentLoaded', function() {
-                                const urlParams = new URLSearchParams(window.location.search);
-                                const tipoConsulta = urlParams.get('tipo_consulta');
-                                if (tipoConsulta) {
-                                    document.getElementById('tipo_consulta').value = tipoConsulta;
-                                }
-                                const fecha = urlParams.get('fecha');
-                                if (fecha) {
-                                    document.querySelector('input[name="fecha"]').value = fecha;
-                                }
-                                const dentistaId = urlParams.get('dentista_id');
-                                if (dentistaId) {
-                                    document.getElementById('dentista_id').value = dentistaId;
-                                }
-                            });
-                        </script>
-                    </div>
-                    <div class="filtro-item">
-                        <label class="filtro-label">
-                            <i class="fas fa-calendar-alt"></i>
-                            Fecha
-                        </label>
-                        <input type="date" name="fecha" class="filtro-input">
-                    </div>
-                    <div class="filtro-item">
-                        <label class="filtro-label">
-                            <i class="fas fa-user-md"></i>
-                            Dentista
-                        </label>
-                        <select name="dentista_id" class="filtro-select" id="dentista_id">
-                            <option value="">Todos los dentistas</option>
-                            {% for dentista in dentistas_disponibles %}
-                            <option value="{{ dentista.id }}" {% if dentista.id|stringformat:"s" == request.GET.dentista_id %}selected{% endif %}>
-                                Dr(a). {{ dentista.nombre }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="filtro-actions">
-                    <button type="submit" class="btn-filtrar">
-                        <i class="fas fa-search"></i>
-                        Buscar citas
-                    </button>
-                    <a href="{% url 'panel_cliente' %}" class="btn-limpiar">
-                        <i class="fas fa-times"></i>
-                        Limpiar filtros
-                    </a>
-                </div>
-            </form>
-        </div>
+        <script>
+            // Mantener el valor seleccionado después de filtrar
+            document.addEventListener('DOMContentLoaded', function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const tipoConsulta = urlParams.get('tipo_consulta');
+                if (tipoConsulta) {
+                    const select = document.getElementById('tipo_consulta');
+                    if (select) select.value = tipoConsulta;
+                }
+                const fecha = urlParams.get('fecha');
+                if (fecha) {
+                    const input = document.querySelector('input[name="fecha"]');
+                    if (input) input.value = fecha;
+                }
+                const dentistaId = urlParams.get('dentista_id');
+                if (dentistaId) {
+                    const select = document.getElementById('dentista_id');
+                    if (select) select.value = dentistaId;
+                }
+            });
+        </script>
 
         <!-- Alerta si ya tiene cita -->
         {% if citas_reservadas.count > 0 %}
-        <div class="alert-banner">
+        <div class="alert-banner" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-left: 4px solid #14b8a6;">
             <div class="alert-content">
-                <i class="fas fa-check-circle"></i>
+                <i class="fas fa-info-circle" style="color: #14b8a6;"></i>
                 <div>
-                    <strong>Tienes una cita activa</strong>
-                    <p>Revísala en el menú → Historial de Citas</p>
+                    <strong style="color: #0f766e;">Tienes una cita activa</strong>
+                    <p style="color: #065f46; margin-top: 8px;">
+                        Puedes ver la información de tu cita en el apartado <strong>"Mis Citas Activas"</strong> del menú lateral.
+                        <br>
+                        Si deseas cancelar tu cita, por favor contáctanos al número celular: <strong><a href="tel:{{ telefono_clinica }}" style="color: #14b8a6; text-decoration: none;">{{ telefono_clinica }}</a></strong>
+                    </p>
                 </div>
             </div>
         </div>
@@ -1850,8 +2107,15 @@
 
             {% if citas_reservadas.count > 0 %}
                 <div class="blocked-section">
-                    <i class="fas fa-lock"></i>
-                    <p>Reservas bloqueadas - Ya tienes una cita activa</p>
+                    <i class="fas fa-info-circle"></i>
+                    <h4>Ya tienes una cita activa</h4>
+                    <p>
+                        Puedes ver la información de tu cita en el apartado <strong>"Mis Citas Activas"</strong> del menú lateral.
+                    </p>
+                    <p>
+                        Si deseas cancelar tu cita, por favor contáctanos al número celular: 
+                        <strong><a href="tel:{{ telefono_clinica }}">{{ telefono_clinica }}</a></strong>
+                    </p>
                 </div>
             {% else %}
                 {% if citas %}
@@ -1994,6 +2258,7 @@
                 Subir
             </button>
         </div>
+        </div>
     </div>
 
     <!-- Sidebar Menu -->
@@ -2039,7 +2304,7 @@
                     </a>
                 </li>
                 <li class="sidebar-menu-item">
-                    <a href="{% url 'historial_citas' %}" class="sidebar-menu-link">
+                    <a href="{% url 'mis_citas_activas' %}" class="sidebar-menu-link">
                         <i class="fas fa-calendar-check"></i>
                         <span>Mis Citas Activas</span>
                         {% if citas_reservadas.count > 0 %}
@@ -2060,9 +2325,21 @@
                     </a>
                 </li>
                 <li class="sidebar-menu-item">
-                    <a href="{% url 'ver_radiografias' %}" class="sidebar-menu-link">
-                        <i class="fas fa-x-ray"></i>
-                        <span>Mis Radiografías</span>
+                    <a href="{% url 'ver_consentimientos' %}" class="sidebar-menu-link">
+                        <i class="fas fa-file-signature"></i>
+                        <span>Consentimientos</span>
+                    </a>
+                </li>
+                <li class="sidebar-menu-item">
+                    <a href="{% url 'ver_presupuestos' %}" class="sidebar-menu-link">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Presupuestos</span>
+                    </a>
+                </li>
+                <li class="sidebar-menu-item">
+                    <a href="{% url 'ver_tratamientos' %}" class="sidebar-menu-link">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Mis Tratamientos</span>
                     </a>
                 </li>
                 <li class="sidebar-menu-item">
@@ -2074,8 +2351,28 @@
             </ul>
         </div>
 
+        <div class="sidebar-contact">
+            <div class="sidebar-contact-title">
+                <i class="fas fa-question-circle"></i>
+                ¿Necesitas contactarte con nosotros?
+            </div>
+            <div class="sidebar-contact-info">
+                <div class="sidebar-contact-item">
+                    <i class="fas fa-phone-alt"></i>
+                    <span>+56 9 2678 6544</span>
+                </div>
+                <div class="sidebar-contact-item">
+                    <i class="fas fa-envelope"></i>
+                    <span>miclinicacontacto@gmail.com</span>
+                </div>
+            </div>
+            <div class="sidebar-contact-message">
+                Tu consulta será atendida a la brevedad posible. Estamos aquí para ayudarte.
+            </div>
+        </div>
+
         <div class="sidebar-footer">
-            <a href="{% url 'logout_cliente' %}" class="sidebar-logout-btn">
+            <a href="#" onclick="abrirModalLogout(event); return false;" class="sidebar-logout-btn">
                 <i class="fas fa-sign-out-alt"></i>
                 Cerrar Sesión
             </a>
@@ -2157,7 +2454,46 @@
         </div>
     </div>
 
+    <!-- Modal de Confirmación de Logout -->
+    <div class="modal-overlay" id="modalLogout" onclick="cerrarModalLogout()">
+        <div class="modal-content modal-logout" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-sign-out-alt" style="color: #14b8a6;"></i>
+                    Cerrar Sesión
+                </h3>
+                <button class="modal-close" onclick="cerrarModalLogout()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="warning-box" style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); border-left: 4px solid #14b8a6;">
+                    <i class="fas fa-info-circle" style="color: #14b8a6;"></i>
+                    <p><strong>¿Estás seguro de que quieres cerrar sesión?</strong></p>
+                    <p>Podrás iniciar sesión nuevamente cuando lo desees.</p>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-cancelar-modal" onclick="cerrarModalLogout()">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button type="button" class="btn-confirmar-modal" onclick="confirmarLogout()" style="background: linear-gradient(135deg, #14b8a6, #0d9488);">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Sí, Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
+
     <style>
+        /* Modal de Logout */
+        .modal-logout .modal-header h3 i {
+            color: #14b8a6;
+        }
+
         /* Modal de Confirmación */
         .modal-overlay {
             position: fixed;
@@ -2204,7 +2540,7 @@
         }
 
         .modal-header {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             padding: 20px 24px;
             border-radius: 16px 16px 0 0;
@@ -2290,7 +2626,7 @@
         }
 
         .cita-info-box h4 i, .dentist-info-box h4 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .info-item {
@@ -2314,7 +2650,7 @@
         }
 
         .info-label i {
-            color: #3b82f6;
+            color: #14b8a6;
             width: 16px;
         }
 
@@ -2339,8 +2675,8 @@
             height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid #3b82f6;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            border: 3px solid #14b8a6;
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         .dentist-details-modal {
@@ -2355,7 +2691,7 @@
         }
 
         .dentist-especialidad {
-            color: #3b82f6;
+            color: #14b8a6;
             font-weight: 500;
             margin: 4px 0;
             font-size: 0.9375rem;
@@ -2510,14 +2846,25 @@
             });
         });
 
-        // Add confirmation for logout
-        document.querySelectorAll('a[href*="logout"]').forEach(function(link) {
-            link.addEventListener('click', function(e) {
-                if (!confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-                    e.preventDefault();
-                }
-            });
-        });
+        // Modal de Logout
+        function abrirModalLogout(e) {
+            e.preventDefault();
+            const modal = document.getElementById('modalLogout');
+            if (modal) {
+                modal.classList.add('active');
+            }
+        }
+
+        function cerrarModalLogout() {
+            const modal = document.getElementById('modalLogout');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        function confirmarLogout() {
+            window.location.href = '{% url "logout_cliente" %}';
+        }
 
         // Funciones del Modal de Confirmación
         function abrirModalConfirmacion(buttonElement) {

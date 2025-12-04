@@ -1,0 +1,107 @@
+{% extends 'citas/emails/base_email.html' %}
+{% load custom_filters %}
+
+{% block header_title %}{{ nombre_clinica }}{% endblock %}
+
+{% block content %}
+<h2>Pedido de Insumos</h2>
+
+<p>Estimado/a <strong>{{ nombre_proveedor }}</strong>,</p>
+
+<p>Por medio de la presente, nos dirigimos a usted para realizar el siguiente pedido de insumos:</p>
+
+<div class="info-box">
+    <strong>Número de Pedido</strong>
+    <p>{{ numero_pedido }}</p>
+    
+    <strong>Fecha del Pedido</strong>
+    <p>{{ fecha_pedido|date:"d/m/Y" }}</p>
+    
+    <strong>Fecha de Entrega Esperada</strong>
+    <p>{{ fecha_entrega_esperada|date:"d/m/Y" }}</p>
+</div>
+
+<h3>Insumos Solicitados</h3>
+
+<table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+    <thead>
+        <tr style="background-color: #f0fdfa; border-bottom: 2px solid #14b8a6;">
+            <th style="padding: 12px; text-align: left; color: #0d9488; font-weight: 600;">Insumo</th>
+            <th style="padding: 12px; text-align: center; color: #0d9488; font-weight: 600;">Cantidad</th>
+            <th style="padding: 12px; text-align: right; color: #0d9488; font-weight: 600;">Precio Unitario</th>
+            <th style="padding: 12px; text-align: right; color: #0d9488; font-weight: 600;">Monto Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for insumo in insumos %}
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 12px; color: #1e293b;">
+                <strong>{{ insumo.nombre }}</strong>
+                {% if insumo.observaciones %}
+                <br><small style="color: #64748b; font-size: 12px;">{{ insumo.observaciones }}</small>
+                {% endif %}
+            </td>
+            <td style="padding: 12px; text-align: center; color: #475569;">{{ insumo.cantidad }} {{ insumo.unidad }}</td>
+            <td style="padding: 12px; text-align: right; color: #475569;">{{ insumo.precio_unitario }}</td>
+            <td style="padding: 12px; text-align: right; color: #1e293b; font-weight: 600;">{{ insumo.monto_total }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    {% if monto_total %}
+    <tfoot>
+        <tr style="background-color: #f0fdfa; border-top: 2px solid #14b8a6;">
+            <td colspan="3" style="padding: 15px; text-align: right; color: #0d9488; font-weight: 700; font-size: 16px;">MONTO TOTAL DEL PEDIDO:</td>
+            <td style="padding: 15px; text-align: right; color: #0d9488; font-weight: 700; font-size: 18px;">{{ monto_total }}</td>
+        </tr>
+    </tfoot>
+    {% endif %}
+</table>
+
+{% if observaciones_generales %}
+<div class="info-box">
+    <strong>Observaciones Generales</strong>
+    <p>{{ observaciones_generales }}</p>
+</div>
+{% endif %}
+
+<h3>Información del Solicitante</h3>
+
+<ul class="info-list">
+    <li><strong>Clínica:</strong> {{ nombre_clinica }}</li>
+    <li><strong>Solicitado por:</strong> {{ nombre_solicitante }}</li>
+    <li><strong>Email:</strong> {{ email_solicitante }}</li>
+    <li><strong>Teléfono:</strong> {{ telefono_solicitante }}</li>
+</ul>
+
+<p>Agradecemos confirmar la recepción de este pedido y la disponibilidad de los insumos requeridos a la brevedad posible.</p>
+
+<p>En caso de requerir información adicional, favor contactarnos a través de los medios indicados.</p>
+
+<p>Quedamos atentos a su respuesta.</p>
+
+<p>Saludos cordiales,<br>
+<strong>{{ nombre_solicitante }}</strong><br>
+{{ nombre_clinica }}</p>
+{% endblock %}
+
+{% block clinic_name %}{{ nombre_clinica }}{% endblock %}
+
+{% block contact_info %}
+{% if direccion_clinica %}<p><strong>Dirección:</strong> {{ direccion_clinica }}</p>{% endif %}
+{% if telefono_clinica %}<p><strong>Teléfono:</strong> {{ telefono_clinica }}</p>{% endif %}
+{% if email_clinica %}<p><strong>Email:</strong> <a href="mailto:{{ email_clinica }}">{{ email_clinica }}</a></p>{% endif %}
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1600 @@
+{% extends 'citas/base.html' %}
+
+{% block page_title %}<i class="fas fa-edit"></i> Editar Odontograma - {{ odontograma.paciente_nombre }}{% endblock %}
+{% block page_subtitle %}Modifica la información del odontograma y edita los dientes{% endblock %}
+
+{% block content %}
+<div class="edit-odontograma-container">
+    <!-- Información del Paciente -->
+    <div class="section">
+        <h2><i class="fas fa-user"></i> Información del Paciente</h2>
+        
+        <form method="POST" id="odontogramaForm">
+            {% csrf_token %}
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nombre Completo *</label>
+                    <input type="text" name="paciente_nombre" value="{{ odontograma.paciente_nombre }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" name="paciente_email" value="{{ odontograma.paciente_email }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" name="paciente_telefono" value="{{ odontograma.paciente_telefono|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>Fecha de Nacimiento</label>
+                    <input type="date" name="paciente_fecha_nacimiento" 
+                           value="{% if odontograma.paciente_fecha_nacimiento %}{{ odontograma.paciente_fecha_nacimiento|date:'Y-m-d' }}{% endif %}">
+                </div>
+            </div>
+    </div>
+
+    <!-- Información Clínica -->
+    <div class="section">
+        <h2><i class="fas fa-stethoscope"></i> Información Clínica</h2>
+        
+        <!-- Selector de Cita Asociada -->
+        <div class="form-group">
+            <label>Cita Asociada (Opcional)</label>
+            <select name="cita_id" id="cita-select" class="form-control-select">
+                <option value="">No asociar a ninguna cita</option>
+                {% for cita in citas_disponibles %}
+                <option value="{{ cita.id }}" 
+                        {% if odontograma.cita and odontograma.cita.id == cita.id %}selected{% endif %}>
+                    {{ cita.fecha_hora|date:"d/m/Y H:i" }} - 
+                    {% if cita.cliente %}{{ cita.cliente.nombre_completo }}{% else %}{{ cita.paciente_nombre }}{% endif %} 
+                    ({{ cita.get_estado_display }})
+                </option>
+                {% endfor %}
+            </select>
+            <small style="color: #666; display: block; margin-top: 5px;">
+                Selecciona la cita en la que se creó esta ficha odontológica (opcional).
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label>Motivo de Consulta *</label>
+            <textarea name="motivo_consulta" required rows="3" placeholder="Describe el motivo de la consulta...">{{ odontograma.motivo_consulta }}</textarea>
+        </div>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Higiene Oral</label>
+                <select name="higiene_oral">
+                    {% for value, label in condiciones %}
+                    <option value="{{ value }}" {% if odontograma.higiene_oral == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Estado General</label>
+                <select name="estado_general">
+                    {% for value, label in condiciones %}
+                    <option value="{{ value }}" {% if odontograma.estado_general == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>Antecedentes Médicos</label>
+            <textarea name="antecedentes_medicos" rows="3" placeholder="Enfermedades, cirugías, etc...">{{ odontograma.antecedentes_medicos|default:'' }}</textarea>
+        </div>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Alergias</label>
+                <textarea name="alergias" rows="2" placeholder="Alergias conocidas...">{{ odontograma.alergias|default:'' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Medicamentos Actuales</label>
+                <textarea name="medicamentos_actuales" rows="2" placeholder="Medicamentos que toma actualmente...">{{ odontograma.medicamentos_actuales|default:'' }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Odontograma Interactivo (alineado a crear_odontograma) -->
+    <div class="section odontograma-section">
+        <h2><i class="fas fa-tooth"></i> Odontograma Interactivo</h2>
+        
+        <!-- Instrucciones -->
+        <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; padding: 12px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; color: #0c4a6e;">
+                <i class="fas fa-info-circle"></i>
+                <span style="font-size: 0.875rem; font-weight: 500;">
+                    <strong>Instrucciones:</strong> Haz clic en uno o varios dientes para seleccionarlos, luego haz clic en cualquier diente seleccionado para abrir el panel y aplicar la condición a todos los seleccionados.
+                </span>
+            </div>
+        </div>
+        
+        <!-- Panel Flotante Contextual -->
+        <div id="panel-diente" class="panel-diente" style="display: none;">
+            <div class="panel-diente-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="diente-preview" id="diente-preview">
+                        <span id="diente-numero-preview">-</span>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1rem; color: #1e293b; font-weight: 600;">
+                            <span id="diente-numero-header">-</span> <span id="dientes-seleccionados-text" style="font-size: 0.875rem; font-weight: 400; color: #64748b;"></span>
+                        </h3>
+                        <p style="margin: 0; font-size: 0.75rem; color: #64748b;">Complete la información para aplicar a todos los dientes seleccionados</p>
+                    </div>
+                </div>
+                <button type="button" id="cerrar-panel" class="btn-cerrar-panel" title="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="panel-diente-body">
+                <div class="form-group-panel">
+                    <label class="label-panel">
+                        <i class="fas fa-tooth"></i> Cara del Diente <span style="color: #dc2626;">*</span>
+                    </label>
+                    <div class="caras-selector">
+                        <button type="button" class="cara-btn" data-cara="oclusal" title="Oclusal (Superficie de masticación)">
+                            <i class="fas fa-circle"></i> O
+                        </button>
+                        <button type="button" class="cara-btn" data-cara="vestibular" title="Vestibular (Lado externo)">
+                            <i class="fas fa-circle"></i> V
+                        </button>
+                        <button type="button" class="cara-btn" data-cara="lingual" title="Lingual (Lado interno)">
+                            <i class="fas fa-circle"></i> L
+                        </button>
+                        <button type="button" class="cara-btn" data-cara="mesial" title="Mesial (Lado anterior)">
+                            <i class="fas fa-circle"></i> M
+                        </button>
+                        <button type="button" class="cara-btn" data-cara="distal" title="Distal (Lado posterior)">
+                            <i class="fas fa-circle"></i> D
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group-panel">
+                    <label class="label-panel" for="condicion-select-panel">
+                        <i class="fas fa-stethoscope"></i> Condición <span style="color: #dc2626;">*</span>
+                    </label>
+                    <select id="condicion-select-panel" class="input-panel">
+                        <option value="">Seleccione una condición</option>
+                        <option value="sano">Sano</option>
+                        <option value="caries">Caries</option>
+                        <option value="obturado">Obturado</option>
+                        <option value="corona">Corona</option>
+                        <option value="ausente">Ausente</option>
+                        <option value="endodoncia">Endodoncia</option>
+                        <option value="protesis">Prótesis</option>
+                        <option value="implante">Implante</option>
+                        <option value="sellante">Sellante</option>
+                        <option value="fractura">Fractura</option>
+                    </select>
+                </div>
+                
+            </div>
+            
+            <div class="panel-diente-footer">
+                <button type="button" id="aplicar-diente" class="btn-aplicar">
+                    <i class="fas fa-check"></i> Aplicar
+                </button>
+                <button type="button" id="cancelar-diente" class="btn-cancelar">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Odontograma Visual -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px;">
+            <!-- Superior Derecho -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Superior Derecho</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    {% for n in 18|make_list %}{% endfor %}
+                    <div class="diente-container" data-diente="18">
+                        <div class="diente" data-numero="18">18</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="17">
+                        <div class="diente" data-numero="17">17</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="16">
+                        <div class="diente" data-numero="16">16</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="15">
+                        <div class="diente" data-numero="15">15</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="14">
+                        <div class="diente" data-numero="14">14</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="13">
+                        <div class="diente" data-numero="13">13</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="12">
+                        <div class="diente" data-numero="12">12</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="11">
+                        <div class="diente" data-numero="11">11</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Superior Izquierdo -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Superior Izquierdo</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    <div class="diente-container" data-diente="21">
+                        <div class="diente" data-numero="21">21</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="22">
+                        <div class="diente" data-numero="22">22</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="23">
+                        <div class="diente" data-numero="23">23</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="24">
+                        <div class="diente" data-numero="24">24</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="25">
+                        <div class="diente" data-numero="25">25</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="26">
+                        <div class="diente" data-numero="26">26</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="27">
+                        <div class="diente" data-numero="27">27</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="28">
+                        <div class="diente" data-numero="28">28</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inferior Izquierdo -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Inferior Izquierdo</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    <div class="diente-container" data-diente="38">
+                        <div class="diente" data-numero="38">38</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="37">
+                        <div class="diente" data-numero="37">37</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="36">
+                        <div class="diente" data-numero="36">36</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="35">
+                        <div class="diente" data-numero="35">35</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="34">
+                        <div class="diente" data-numero="34">34</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="33">
+                        <div class="diente" data-numero="33">33</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="32">
+                        <div class="diente" data-numero="32">32</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="31">
+                        <div class="diente" data-numero="31">31</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inferior Derecho -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 1rem; text-align: center;">Cuadrante Inferior Derecho</h4>
+                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    <div class="diente-container" data-diente="41">
+                        <div class="diente" data-numero="41">41</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="42">
+                        <div class="diente" data-numero="42">42</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="43">
+                        <div class="diente" data-numero="43">43</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="44">
+                        <div class="diente" data-numero="44">44</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="45">
+                        <div class="diente" data-numero="45">45</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div la="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="46">
+                        <div class="diente" data-numero="46">46</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="47">
+                        <div class="diente" data-numero="47">47</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                    <div class="diente-container" data-diente="48">
+                        <div class="diente" data-numero="48">48</div>
+                        <div class="caras">
+                            <div class="cara oclusal" data-cara="oclusal">O</div>
+                            <div class="cara vestibular" data-cara="vestibular">V</div>
+                            <div class="cara lingual" data-cara="lingual">L</div>
+                            <div class="cara mesial" data-cara="mesial">M</div>
+                            <div class="cara distal" data-cara="distal">D</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" name="odontograma_data" id="odontograma_data">
+    </div>
+
+    <!-- Plan de Tratamiento -->
+    <div class="section">
+        <h2><i class="fas fa-clipboard-list"></i> Plan de Tratamiento</h2>
+        
+        <div class="form-group">
+            <label>Plan de Tratamiento</label>
+            <textarea name="plan_tratamiento" rows="4" placeholder="Describe el plan de tratamiento propuesto...">{{ odontograma.plan_tratamiento|default:'' }}</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Próxima Cita</label>
+            <input type="datetime-local" name="proxima_cita" 
+                   value="{% if odontograma.proxima_cita %}{{ odontograma.proxima_cita|date:'Y-m-d\TH:i' }}{% endif %}">
+        </div>
+    </div>
+
+    <!-- Observaciones -->
+    <div class="section">
+        <h2><i class="fas fa-comment"></i> Observaciones</h2>
+        
+        <div class="form-group">
+            <label>Observaciones Generales</label>
+            <textarea name="observaciones" rows="3" placeholder="Observaciones adicionales...">{{ odontograma.observaciones|default:'' }}</textarea>
+        </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="form-actions">
+        <button type="submit" class="btn btn-success">
+            <i class="fas fa-save"></i> Guardar Cambios
+        </button>
+        {% if paciente_id %}
+        <a href="{% url 'mis_pacientes_seccion' paciente_id 'odontogramas' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancelar
+        </a>
+        {% else %}
+        <a href="{% url 'listar_odontogramas' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancelar
+        </a>
+        {% endif %}
+    </div>
+    </form>
+</div>
+
+<style>
+.edit-odontograma-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    min-height: 100vh;
+}
+
+.section {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #cbd5e1;
+}
+
+.section h2 {
+    margin: 0 0 20px 0;
+    color: #1e293b;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Estilos del Odontograma */
+.odontograma-section {
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    border: 2px solid #94a3b8;
+}
+
+.section-header {
+    margin-bottom: 24px;
+}
+
+.odontograma-instructions {
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 12px;
+}
+
+.odontograma-instructions p {
+    margin: 0;
+    color: #1e40af;
+    font-size: 0.875rem;
+}
+
+.odontograma-controls {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: end;
+    flex-wrap: wrap;
+    border: 1px solid #e5e7eb;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 150px;
+}
+
+.control-group label {
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.control-group select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.odontograma-container {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    border: 2px solid var(--primary-color);
+}
+
+.odontograma-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.cuadrante {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+}
+
+.cuadrante-title {
+    text-align: center;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 12px;
+    font-size: 0.875rem;
+}
+
+.dientes-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.diente {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.diente:hover {
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.diente.selected {
+    border-color: var(--primary-color);
+    background: #dbeafe;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.numero-diente {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 2px;
+}
+
+.caras-diente {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.cara {
+    position: absolute;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.cara.oclusal {
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 4px;
+}
+
+.cara.vestibular {
+    top: 50%;
+    right: 2px;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 8px;
+}
+
+.cara.lingual {
+    top: 50%;
+    left: 2px;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 8px;
+}
+
+.cara.mesial {
+    bottom: 2px;
+    left: 25%;
+    width: 8px;
+    height: 4px;
+}
+
+.cara.distal {
+    bottom: 2px;
+    right: 25%;
+    width: 8px;
+    height: 4px;
+}
+
+/* Estados de los dientes */
+.cara.sano { background: #10b981; }
+.cara.caries { background: #dc2626; }
+.cara.obturado { background: #f59e0b; }
+.cara.corona { background: #fbbf24; }
+.cara.ausente { background: #6b7280; }
+.cara.endodoncia { background: #0ea5e9; }
+.cara.protesis { background: #8b5cf6; }
+.cara.implante { background: #06b6d4; }
+.cara.sellante { background: #84cc16; }
+.cara.fractura { background: #ef4444; }
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+}
+
+/* Panel Flotante Contextual - Mismos estilos que crear_odontograma */
+.panel-diente {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    width: 380px;
+    max-height: 90vh;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid #e2e8f0;
+    overflow: hidden;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateY(-50%) translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(-50%) translateX(0);
+        opacity: 1;
+    }
+}
+
+.panel-diente-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.diente-preview {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-cerrar-panel {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-cerrar-panel:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+.panel-diente-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.form-group-panel {
+    margin-bottom: 20px;
+}
+
+.label-panel {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.caras-selector {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.cara-btn {
+    padding: 10px 8px;
+    border: 2px solid #e2e8f0;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.cara-btn:hover {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+    color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.cara-btn.active {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.cara-btn i {
+    font-size: 0.875rem;
+}
+
+.input-panel {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.input-panel:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.panel-diente-footer {
+    padding: 16px 20px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.btn-aplicar {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+.btn-aplicar:hover {
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-cancelar {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+.btn-cancelar:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+}
+
+.diente-container.selected .diente {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    transform: scale(1.05);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .panel-diente {
+        width: 100%;
+        right: 0;
+        left: 0;
+        top: auto;
+        bottom: 0;
+        transform: translateY(0);
+        border-radius: 16px 16px 0 0;
+        max-height: 80vh;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
+    .odontograma-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .odontograma-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .control-group {
+        min-width: auto;
+    }
+    
+    .dientes-row {
+        gap: 4px;
+    }
+    
+    .diente {
+        width: 40px;
+        height: 40px;
+    }
+}
+</style>
+
+<script>
+let odontogramaData = {};
+let dientesSeleccionados = new Set();
+let caraSeleccionada = null;
+
+// Función para abrir el panel con dientes seleccionados
+function abrirPanelDiente() {
+    if (dientesSeleccionados.size === 0) {
+        return;
+    }
+    
+    const panel = document.getElementById('panel-diente');
+    const dientePreview = document.getElementById('diente-preview');
+    const dienteNumeroPreview = document.getElementById('diente-numero-preview');
+    const dienteNumeroHeader = document.getElementById('diente-numero-header');
+    const dientesSeleccionadosText = document.getElementById('dientes-seleccionados-text');
+    
+    // Obtener el primer diente para el preview
+    const primerDiente = Array.from(dientesSeleccionados)[0];
+    
+    // Actualizar preview del diente
+    if (dientesSeleccionados.size === 1) {
+        dienteNumeroPreview.textContent = primerDiente;
+        dienteNumeroHeader.textContent = `Diente ${primerDiente}`;
+        dientesSeleccionadosText.textContent = '';
+        
+        // Aplicar tipo de diente al preview
+        const tipo = getTipoDiente(primerDiente);
+        dientePreview.className = `diente-preview diente-${tipo}`;
+        
+        // Cargar datos existentes si hay
+        const datosExistentes = odontogramaData[primerDiente];
+        if (datosExistentes) {
+            // Cargar última cara editada si existe
+            const ultimaCara = Object.keys(datosExistentes)[0];
+            if (ultimaCara) {
+                const datosCara = datosExistentes[ultimaCara];
+                if (typeof datosCara === 'object' && datosCara.condicion) {
+                    document.getElementById('condicion-select-panel').value = datosCara.condicion;
+                } else if (typeof datosCara === 'string') {
+                    document.getElementById('condicion-select-panel').value = datosCara;
+                }
+            }
+        } else {
+            // Resetear formulario
+            document.getElementById('condicion-select-panel').value = '';
+        }
+    } else {
+        dienteNumeroPreview.textContent = dientesSeleccionados.size;
+        dienteNumeroHeader.textContent = `${dientesSeleccionados.size} Dientes`;
+        dientesSeleccionadosText.textContent = `(${Array.from(dientesSeleccionados).sort((a, b) => a - b).join(', ')})`;
+        dientePreview.className = 'diente-preview';
+        
+        // Resetear formulario para múltiples dientes
+        document.getElementById('condicion-select-panel').value = '';
+    }
+    
+    document.querySelectorAll('.cara-btn').forEach(btn => btn.classList.remove('active'));
+    caraSeleccionada = null;
+    
+    // Mostrar panel
+    panel.style.display = 'flex';
+}
+
+// Función para cerrar el panel
+function cerrarPanelDiente() {
+    const panel = document.getElementById('panel-diente');
+    panel.style.display = 'none';
+    caraSeleccionada = null;
+    // No limpiar la selección de dientes al cerrar
+}
+
+// Manejar selección de cara
+function manejarSeleccionCara(cara) {
+    caraSeleccionada = cara;
+    document.querySelectorAll('.cara-btn').forEach(btn => {
+        if (btn.dataset.cara === cara) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+// Función para aplicar los datos a todos los dientes seleccionados
+function aplicarDiente() {
+    if (dientesSeleccionados.size === 0) {
+        alert('No hay dientes seleccionados.');
+        return;
+    }
+    
+    if (!caraSeleccionada) {
+        alert('Por favor selecciona una cara del diente.');
+        return;
+    }
+    
+    const condicion = document.getElementById('condicion-select-panel').value;
+    if (!condicion) {
+        alert('Por favor selecciona una condición.');
+        return;
+    }
+    
+    // Aplicar a todos los dientes seleccionados
+    dientesSeleccionados.forEach(numeroDiente => {
+        // Inicializar datos del diente si no existen
+        if (!odontogramaData[numeroDiente]) {
+            odontogramaData[numeroDiente] = {};
+        }
+        
+        // Guardar datos de la cara
+        odontogramaData[numeroDiente][caraSeleccionada] = condicion;
+        
+        // Actualizar visualización del diente
+        const dienteContainer = document.querySelector(`[data-diente="${numeroDiente}"]`);
+        if (dienteContainer) {
+            const diente = dienteContainer.querySelector('.diente');
+            const caraElement = dienteContainer.querySelector(`[data-cara="${caraSeleccionada}"]`);
+            const tipo = getTipoDiente(numeroDiente);
+            
+            // Aplicar condición visual
+            diente.className = `diente diente-${tipo} condicion-${condicion}`;
+            if (caraElement) {
+                caraElement.className = `cara ${caraSeleccionada} condicion-${condicion}`;
+                caraElement.textContent = caraSeleccionada.charAt(0).toUpperCase();
+            }
+        }
+    });
+    
+    // Limpiar selección y cerrar panel
+    dientesSeleccionados.clear();
+    document.querySelectorAll('.diente-container').forEach(c => c.classList.remove('selected'));
+    cerrarPanelDiente();
+}
+
+// Manejar click en diente
+function manejarSeleccionDiente(dienteContainer) {
+    const numeroDiente = dienteContainer.dataset.diente;
+    
+    // Toggle selección del diente
+    if (dientesSeleccionados.has(numeroDiente)) {
+        dientesSeleccionados.delete(numeroDiente);
+        dienteContainer.classList.remove('selected');
+        
+        // Si no hay dientes seleccionados, cerrar panel
+        if (dientesSeleccionados.size === 0) {
+            cerrarPanelDiente();
+        } else {
+            // Actualizar panel si está abierto
+            abrirPanelDiente();
+        }
+    } else {
+        dientesSeleccionados.add(numeroDiente);
+        dienteContainer.classList.add('selected');
+        
+        // Abrir panel con los dientes seleccionados
+        abrirPanelDiente();
+    }
+}
+
+// Función para determinar el tipo de diente según número FDI
+function getTipoDiente(numero) {
+    const num = parseInt(numero);
+    const ultimoDigito = num % 10;
+    
+    // Incisivos: 1, 2
+    if (ultimoDigito === 1 || ultimoDigito === 2) {
+        return 'incisivo';
+    }
+    // Caninos: 3
+    else if (ultimoDigito === 3) {
+        return 'canino';
+    }
+    // Premolares: 4, 5
+    else if (ultimoDigito === 4 || ultimoDigito === 5) {
+        return 'premolar';
+    }
+    // Molares: 6, 7, 8
+    else if (ultimoDigito === 6 || ultimoDigito === 7 || ultimoDigito === 8) {
+        return 'molar';
+    }
+    // Por defecto
+    return 'premolar';
+}
+
+// Aplicar clases de tipo de diente a todos los dientes
+function aplicarFormasAnatomicas() {
+    document.querySelectorAll('.diente-container').forEach(container => {
+        const numero = container.dataset.diente;
+        const diente = container.querySelector('.diente');
+        if (diente) {
+            const tipo = getTipoDiente(numero);
+            diente.classList.add(`diente-${tipo}`);
+        }
+    });
+}
+
+// Pre-cargar desde servidor: aplica por-cara si viene JSON en observaciones
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar formas anatómicas
+    aplicarFormasAnatomicas();
+    
+    // Click handlers
+    document.querySelectorAll('.diente-container').forEach(container => {
+        container.addEventListener('click', function(e) {
+            e.stopPropagation();
+            manejarSeleccionDiente(this);
+        });
+    });
+    
+    // Handlers del panel
+    document.getElementById('cerrar-panel').addEventListener('click', cerrarPanelDiente);
+    document.getElementById('cancelar-diente').addEventListener('click', cerrarPanelDiente);
+    document.getElementById('aplicar-diente').addEventListener('click', aplicarDiente);
+    
+    // Handlers de selección de cara
+    document.querySelectorAll('.cara-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            manejarSeleccionCara(this.dataset.cara);
+        });
+    });
+    
+    // Agregar botón para limpiar selección
+    const limpiarBtn = document.createElement('button');
+    limpiarBtn.type = 'button';
+    limpiarBtn.className = 'btn';
+    limpiarBtn.style.cssText = 'background: #6b7280; color: white; font-size: 0.875rem; padding: 6px 12px; margin-left: auto;';
+    limpiarBtn.innerHTML = '<i class="fas fa-eraser"></i> Limpiar Selección';
+    limpiarBtn.addEventListener('click', function() {
+        dientesSeleccionados.clear();
+        document.querySelectorAll('.diente-container').forEach(c => c.classList.remove('selected'));
+        cerrarPanelDiente();
+    });
+    
+    // Insertar botón antes del panel
+    const instruccionesDiv = document.querySelector('.section.odontograma-section > div[style*="background: #f0f9ff"]');
+    if (instruccionesDiv && instruccionesDiv.parentNode) {
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 12px;';
+        btnContainer.appendChild(limpiarBtn);
+        instruccionesDiv.parentNode.insertBefore(btnContainer, instruccionesDiv.nextSibling);
+    }
+
+    // Inicializar datos existentes a partir de Estados guardados
+    {% for d in odontograma.dientes.all %}
+    (function() {
+        const numero = '{{ d.numero_diente }}';
+        const estado = '{{ d.estado }}';
+        const obs = `{{ d.observaciones|default:""|escapejs }}`;
+        if (!odontogramaData[numero]) { odontogramaData[numero] = {}; }
+        let parsed = null;
+        if (obs && obs.startsWith('Datos del odontograma interactivo: ')) {
+            const jsonStr = obs.replace('Datos del odontograma interactivo: ', '');
+            try { parsed = JSON.parse(jsonStr); } catch (e) { parsed = null; }
+        }
+        const cont = document.querySelector(`[data-diente="${numero}"]`);
+        if (!cont) return;
+        const dienteEl = cont.querySelector('.diente');
+        if (parsed) {
+            Object.keys(parsed).forEach(cara => {
+                const condicion = parsed[cara];
+                odontogramaData[numero][cara] = condicion;
+                const caraEl = cont.querySelector(`[data-cara="${cara}"]`);
+                if (caraEl) {
+                    caraEl.className = `cara ${cara} condicion-${condicion}`;
+                    caraEl.textContent = cara.charAt(0).toUpperCase();
+                }
+            });
+            // Opcional: marcar el diente con la última condicion aplicada
+            const anyCond = Object.values(parsed)[0];
+            const tipo = getTipoDiente(numero);
+            if (dienteEl && anyCond) dienteEl.className = `diente diente-${tipo} condicion-${anyCond}`;
+        } else {
+            // Fallback: mapear estado global a cara oclusal
+            const caraDefault = 'oclusal';
+            let condicion;
+            switch (estado) {
+                case 'cariado': condicion = 'caries'; break;
+                case 'perdido': condicion = 'ausente'; break;
+                default: condicion = estado; break;
+            }
+            odontogramaData[numero][caraDefault] = condicion;
+            const caraEl = cont.querySelector(`[data-cara="${caraDefault}"]`);
+            const tipo = getTipoDiente(numero);
+            if (dienteEl) { dienteEl.className = `diente diente-${tipo} condicion-${condicion}`; }
+            if (caraEl) {
+                caraEl.className = `cara ${caraDefault} condicion-${condicion}`;
+                caraEl.textContent = 'O';
+            }
+        }
+    })();
+    {% endfor %}
+});
+
+// Antes de enviar, serializar
+document.getElementById('odontogramaForm').addEventListener('submit', function() {
+    const input = document.getElementById('odontograma_data');
+    
+    // Convertir datos a formato compatible con el backend
+    const datosPrincipales = {};
+    const datosExtendidos = {};
+    
+    for (const [numeroDiente, carasData] of Object.entries(odontogramaData)) {
+        const carasSimplificadas = {};
+        const metadata = {};
+        
+        for (const [cara, datos] of Object.entries(carasData)) {
+            if (typeof datos === 'object' && datos.condicion) {
+                carasSimplificadas[cara] = datos.condicion;
+                if (datos.diagnostico || datos.procedimiento) {
+                    metadata[cara] = {
+                        diagnostico: datos.diagnostico || null,
+                        procedimiento: datos.procedimiento || null
+                    };
+                }
+            } else {
+                carasSimplificadas[cara] = datos;
+            }
+        }
+        
+        datosPrincipales[numeroDiente] = carasSimplificadas;
+        if (Object.keys(metadata).length > 0) {
+            datosExtendidos[numeroDiente] = metadata;
+        }
+    }
+    
+    // Guardar datos principales (compatible con backend actual)
+    input.value = JSON.stringify(datosPrincipales);
+    
+    // Guardar datos extendidos en un campo oculto adicional si existe
+    let inputExtendido = document.getElementById('odontograma_data_extended');
+    if (!inputExtendido) {
+        inputExtendido = document.createElement('input');
+        inputExtendido.type = 'hidden';
+        inputExtendido.id = 'odontograma_data_extended';
+        inputExtendido.name = 'odontograma_data_extended';
+        document.getElementById('odontogramaForm').appendChild(inputExtendido);
+    }
+    inputExtendido.value = JSON.stringify(datosExtendidos);
+});
+</script>
+
+<style>
+/* Estilos del odontograma con formas anatómicas */
+.diente-container { position: relative; display: inline-block; margin: 4px; cursor: pointer; transition: all 0.2s ease; }
+
+/* Estilos base del diente */
+.diente { 
+    border: 2px solid #d1d5db; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    background: #f9fafb; 
+    color: #6b7280; 
+    font-weight: 600; 
+    font-size: 0.75rem; 
+    position: relative; 
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Formas anatómicas según tipo de diente */
+/* Incisivos (11, 12, 21, 22, 31, 32, 41, 42) - Rectangulares verticales */
+.diente.diente-incisivo {
+    width: 28px;
+    height: 42px;
+    border-radius: 6px 6px 10px 10px;
+}
+
+/* Caninos (13, 23, 33, 43) - Forma puntiaguda */
+.diente.diente-canino {
+    width: 30px;
+    height: 40px;
+    border-radius: 50% 50% 8px 8px;
+    clip-path: polygon(20% 0%, 80% 0%, 100% 30%, 90% 70%, 50% 100%, 10% 70%, 0% 30%);
+}
+
+/* Premolares (14, 15, 24, 25, 34, 35, 44, 45) - Cuadrados redondeados */
+.diente.diente-premolar {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+}
+
+/* Molares (16, 17, 18, 26, 27, 28, 36, 37, 38, 46, 47, 48) - Más anchos y cuadrados */
+.diente.diente-molar {
+    width: 42px;
+    height: 38px;
+    border-radius: 4px;
+}
+
+/* Hover y selección */
+.diente-container:hover .diente { 
+    border-color: #3b82f6; 
+    background: #eff6ff; 
+    color: #1e40af; 
+    transform: scale(1.08);
+    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.3);
+}
+
+.diente-container.selected .diente { 
+    border-color: #10b981; 
+    background: #d1fae5; 
+    color: #065f46; 
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+    transform: scale(1.05);
+}
+
+/* Caras del diente */
+.caras { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.cara { 
+    position: absolute; 
+    width: 8px; 
+    height: 8px; 
+    border-radius: 50%; 
+    background: transparent; 
+    border: 1px solid transparent; 
+    font-size: 0.4rem; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-weight: bold; 
+    color: #6b7280; 
+    transition: all 0.2s ease;
+}
+
+.cara.oclusal { top: 2px; left: 50%; transform: translateX(-50%); }
+.cara.vestibular { top: 50%; right: 2px; transform: translateY(-50%); }
+.cara.lingual { top: 50%; left: 2px; transform: translateY(-50%); }
+.cara.mesial { bottom: 2px; left: 25%; transform: translateX(-50%); }
+.cara.distal { bottom: 2px; right: 25%; transform: translateX(50%); }
+
+/* Colores según condición */
+.condicion-sano { background: #f0fdf4; border-color: #10b981; color: #065f46; }
+.condicion-caries { background: #fef2f2; border-color: #dc2626; color: #991b1b; }
+.condicion-obturado { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.condicion-corona { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.condicion-ausente { background: #f3f4f6; border-color: #6b7280; color: #374151; text-decoration: line-through; opacity: 0.6; }
+.condicion-endodoncia { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.condicion-protesis { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.condicion-implante { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.condicion-sellante { background: #f0fdf4; border-color: #10b981; color: #065f46; }
+.condicion-fractura { background: #fef2f2; border-color: #dc2626; color: #991b1b; }
+
+/* Responsive */
+@media (max-width: 768px) { 
+    .diente.diente-incisivo { width: 24px; height: 36px; font-size: 0.65rem; }
+    .diente.diente-canino { width: 26px; height: 34px; font-size: 0.65rem; }
+    .diente.diente-premolar { width: 30px; height: 30px; font-size: 0.65rem; }
+    .diente.diente-molar { width: 36px; height: 32px; font-size: 0.65rem; }
+    .cara { width: 6px; height: 6px; font-size: 0.3rem; } 
+}
+</style>
+{% endblock %}

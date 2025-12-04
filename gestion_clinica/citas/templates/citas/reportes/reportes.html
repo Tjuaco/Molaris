@@ -1,0 +1,1585 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Reportes - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    /* Sobrescribir estilos del contenedor padre */
+    .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* Asegurar que el bloque content use todo el ancho */
+    body > .app-container > .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .reportes-container {
+        max-width: 100%;
+        margin: 0;
+        margin-top: 0;
+        padding: 0;
+        padding-top: 0;
+        display: flex;
+        gap: 0;
+        width: 100%;
+        box-sizing: border-box;
+        position: relative;
+    }
+    
+    .main-content {
+        min-width: 0;
+        margin-left: 260px !important;
+        padding: 12px 24px;
+        padding-top: 12px;
+        width: calc(100% - 260px) !important;
+        max-width: calc(100vw - 260px) !important;
+        box-sizing: border-box;
+        position: relative;
+    }
+    
+    /* Sidebar izquierdo con estilo estándar */
+    .sidebar-left {
+        width: 260px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 20px 0;
+        min-height: calc(100vh - 99px);
+        position: fixed;
+        top: 99px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 100;
+        overflow-y: auto;
+        max-height: calc(100vh - 99px);
+    }
+    
+    .sidebar-header {
+        padding: 0 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding-top: 12px;
+        background: #f0fdfa;
+        border-radius: 0;
+    }
+
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-header h3 i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+    
+    @media (max-width: 1200px) {
+        .sidebar-left {
+            display: none;
+        }
+        .main-content {
+            margin-left: 0;
+            width: 100%;
+            max-width: 100%;
+            padding: 12px;
+        }
+    }
+    
+    /* Panel Superior de Estadísticas */
+    .stats-dashboard {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 16px rgba(20, 184, 166, 0.25);
+        color: white;
+    }
+    
+    .stats-dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .stats-dashboard-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .stats-dashboard-header p {
+        margin: 0;
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    
+    .stats-grid-dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+    }
+    
+    .stat-dashboard-item {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .stat-dashboard-item:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-2px);
+    }
+    
+    .stat-dashboard-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.125rem;
+        margin-bottom: 8px;
+    }
+    
+    .stat-dashboard-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 2px 0;
+        line-height: 1.2;
+    }
+    
+    .stat-dashboard-label {
+        font-size: 0.7rem;
+        opacity: 0.9;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        line-height: 1.2;
+    }
+    
+    .stat-dashboard-change {
+        font-size: 0.65rem;
+        opacity: 0.8;
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        line-height: 1.2;
+    }
+    
+    /* Sección de Reportes */
+    .reportes-header {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        margin-bottom: 32px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .reportes-header h2 {
+        margin: 0 0 8px 0;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .reportes-header h2 i {
+        color: var(--primary-color);
+    }
+    
+    .reportes-header p {
+        margin: 0;
+        color: #64748b;
+        font-size: 1rem;
+    }
+    
+    .reportes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .reporte-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .reporte-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+    }
+    
+    .reporte-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
+        border-color: var(--primary-color);
+    }
+    
+    .reporte-card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    
+    .reporte-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.75rem;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+    
+    .reporte-info {
+        flex: 1;
+    }
+    
+    .reporte-info h3 {
+        margin: 0 0 4px 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    
+    .reporte-info p {
+        margin: 0;
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+    
+    .reporte-description {
+        color: #475569;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        flex: 1;
+    }
+    
+    .reporte-stats {
+        display: flex;
+        gap: 16px;
+        margin: 16px 0;
+        padding: 16px 0;
+        border-top: 1px solid #e5e7eb;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .reporte-stat {
+        flex: 1;
+        text-align: center;
+    }
+    
+    .reporte-stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        display: block;
+    }
+    
+    .reporte-stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 4px;
+    }
+    
+    .reporte-btn {
+        width: 100%;
+        padding: 14px 24px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        text-decoration: none;
+        margin-top: auto;
+    }
+    
+    .reporte-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+    
+    .reporte-btn i {
+        font-size: 1.1rem;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 48px 0 24px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .section-title i {
+        color: var(--primary-color);
+        font-size: 1.25rem;
+    }
+    
+    
+    /* Badges y Etiquetas */
+    .reporte-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-left: 8px;
+    }
+    
+    .badge-new {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .badge-popular {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .badge-important {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    /* Información de Formato */
+    .reporte-format-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: #f8fafc;
+        border-radius: 8px;
+        margin-top: 12px;
+        font-size: 0.8rem;
+        color: #64748b;
+        border-left: 3px solid var(--primary-color);
+    }
+    
+    .reporte-format-info i {
+        color: var(--primary-color);
+        font-size: 0.875rem;
+    }
+    
+    /* Tooltip de Ayuda */
+    .help-tooltip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: help;
+        margin-left: 6px;
+    }
+    
+    .help-tooltip i {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        transition: color 0.2s ease;
+    }
+    
+    .help-tooltip:hover i {
+        color: var(--primary-color);
+    }
+    
+    .tooltip-content {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1e293b;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        margin-bottom: 8px;
+        z-index: 1000;
+    }
+    
+    .tooltip-content::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: #1e293b;
+    }
+    
+    .help-tooltip:hover .tooltip-content {
+        opacity: 1;
+    }
+    
+    
+    /* Estado Vacío Mejorado */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #64748b;
+    }
+    
+    .empty-state-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        background: #f1f5f9;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: #94a3b8;
+    }
+    
+    .empty-state h3 {
+        margin: 0 0 8px 0;
+        color: #1e293b;
+        font-size: 1.25rem;
+    }
+    
+    .empty-state p {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    /* Mejoras Visuales Adicionales */
+    .reporte-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e5e7eb;
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    
+    .reporte-size {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .reporte-updated {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    /* Sidebars */
+    .sidebar-panel {
+        background: transparent;
+        border-radius: 0;
+        padding: 0 20px;
+        box-shadow: none;
+        margin-bottom: 20px;
+    }
+    
+    .sidebar-panel h3 {
+        margin: 0 0 12px 0;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .sidebar-panel h3 i {
+        color: var(--primary-color);
+        font-size: 0.875rem;
+    }
+    
+    /* Filtros */
+    .filter-group {
+        margin-bottom: 16px;
+    }
+    
+    .filter-group label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #475569;
+        margin-bottom: 6px;
+    }
+    
+    .filter-group input,
+    .filter-group select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+    
+    .filter-group input:focus,
+    .filter-group select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+    
+    /* Accesos Rápidos */
+    .quick-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #64748b;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        margin-bottom: 5px;
+    }
+    
+    .quick-link:hover {
+        background: #f8fafc;
+        color: var(--primary-color);
+    }
+    
+    .quick-link.active {
+        background: var(--primary-color);
+        color: white;
+    }
+    
+    .quick-link.active i {
+        color: white;
+    }
+    
+    .quick-link i {
+        width: 20px;
+        text-align: center;
+        color: #94a3b8;
+        transition: color 0.2s ease;
+        font-size: 1rem;
+    }
+    
+    .quick-link:hover i {
+        color: var(--primary-color);
+    }
+    
+    .quick-link.active i {
+        color: white;
+    }
+    
+    .quick-link.active:hover {
+        background: var(--primary-darker);
+    }
+    
+    .reporte-card {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    
+    .reporte-card.hidden {
+        display: none;
+    }
+    
+    /* Historial */
+    .history-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        font-size: 0.8rem;
+        transition: all 0.2s ease;
+    }
+    
+    .history-item:hover {
+        background: #f8fafc;
+    }
+    
+    .history-item-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+    
+    .history-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .history-item-name {
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .history-item-date {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+    
+    /* Stats Panel */
+    .stat-quick {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .stat-quick-label {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+    
+    .stat-quick-value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+    
+    /* Tips */
+    .tip-item {
+        padding: 12px;
+        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+        border-left: 3px solid var(--primary-color);
+        border-radius: 6px;
+        margin-bottom: 10px;
+        font-size: 0.8rem;
+        color: #475569;
+        line-height: 1.5;
+    }
+    
+    .tip-item strong {
+        color: #1e293b;
+    }
+    
+    /* Información adicional en tarjetas */
+    .reporte-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 12px;
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    
+    .reporte-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .reporte-meta-item i {
+        font-size: 0.7rem;
+    }
+    
+    .last-download {
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+    
+    .download-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-left: 6px;
+    }
+    
+</style>
+
+<div class="reportes-container">
+    <!-- Sidebar Izquierdo -->
+    <aside class="sidebar-left">
+        <!-- Header del Sidebar -->
+        <div class="sidebar-header">
+            <h3><i class="fas fa-file-excel"></i> Reportes</h3>
+        </div>
+        
+        <!-- Filtros por Categoría -->
+        <div class="sidebar-panel">
+            <h3><i class="fas fa-filter"></i> Filtrar por Categoría</h3>
+            <a href="#" class="quick-link filter-category active" data-categoria="all">
+                <i class="fas fa-th"></i>
+                <span>Todos los Reportes</span>
+            </a>
+            <a href="#" class="quick-link filter-category" data-categoria="citas-pacientes">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Citas y Pacientes</span>
+            </a>
+            <a href="#" class="quick-link filter-category" data-categoria="inventario">
+                <i class="fas fa-warehouse"></i>
+                <span>Inventario</span>
+            </a>
+            <a href="#" class="quick-link filter-category" data-categoria="personal-servicios">
+                <i class="fas fa-user-tie"></i>
+                <span>Personal y Servicios</span>
+            </a>
+            <a href="#" class="quick-link filter-category" data-categoria="finanzas">
+                <i class="fas fa-dollar-sign"></i>
+                <span>Finanzas</span>
+            </a>
+        </div>
+        
+        <!-- Historial de Descargas -->
+        <div class="sidebar-panel">
+            <h3><i class="fas fa-history"></i> Últimas Descargas</h3>
+            <div id="historial-descargas">
+                <div class="history-item">
+                    <div class="history-item-icon">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="history-item-info">
+                        <div class="history-item-name">Ninguna descarga aún</div>
+                        <div class="history-item-date">Las descargas aparecerán aquí</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- Contenido Principal -->
+    <main class="main-content">
+    <!-- Panel Superior de Estadísticas -->
+    <div class="stats-dashboard">
+        <div class="stats-dashboard-header">
+            <div>
+                <h1><i class="fas fa-chart-line"></i> Centro de Reportes</h1>
+                <p>Descarga información completa de tu clínica en formato Excel profesional</p>
+            </div>
+        </div>
+        
+        <div class="stats-grid-dashboard">
+            <div class="stat-dashboard-item">
+                <div class="stat-dashboard-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-dashboard-value">{{ citas_hoy|default:"0" }}</div>
+                <div class="stat-dashboard-label">Citas Hoy</div>
+                <div class="stat-dashboard-change">
+                    <i class="fas fa-calendar-alt"></i> {{ citas_semana }} esta semana
+                </div>
+            </div>
+            
+            <div class="stat-dashboard-item">
+                <div class="stat-dashboard-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="stat-dashboard-value">{{ citas_mes|default:"0" }}</div>
+                <div class="stat-dashboard-label">Citas del Mes</div>
+                <div class="stat-dashboard-change">
+                    <i class="fas fa-check-circle"></i> {{ citas_completadas_mes }} completadas
+                </div>
+            </div>
+            
+            <div class="stat-dashboard-item">
+                <div class="stat-dashboard-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-dashboard-value">{{ total_clientes|default:"0" }}</div>
+                <div class="stat-dashboard-label">Total Clientes</div>
+                <div class="stat-dashboard-change">
+                    <i class="fas fa-user-plus"></i> {{ clientes_nuevos_mes }} nuevos este mes
+                </div>
+            </div>
+            
+            <div class="stat-dashboard-item">
+                <div class="stat-dashboard-icon">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-dashboard-value">{% if ingresos_mes %}{{ ingresos_mes|pesos_chilenos }}{% else %}$0{% endif %}</div>
+                <div class="stat-dashboard-label">Ingresos del Mes</div>
+                <div class="stat-dashboard-change">
+                    <i class="fas fa-chart-line"></i> Balance: {% if balance_mes %}{{ balance_mes|pesos_chilenos }}{% else %}$0{% endif %}
+                </div>
+            </div>
+            
+            <div class="stat-dashboard-item">
+                <div class="stat-dashboard-icon">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="stat-dashboard-value">{{ insumos_bajo_stock|default:"0" }}</div>
+                <div class="stat-dashboard-label">Insumos Bajo Stock</div>
+                <div class="stat-dashboard-change">
+                    <i class="fas fa-exclamation-triangle"></i> Requieren atención
+                </div>
+            </div>
+            
+            <div class="stat-dashboard-item">
+                <div class="stat-dashboard-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="stat-dashboard-value">{{ total_planes|default:"0" }}</div>
+                <div class="stat-dashboard-label">Planes de Tratamiento</div>
+                <div class="stat-dashboard-change">
+                    <i class="fas fa-spinner"></i> {{ planes_en_progreso }} en progreso
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contenido de Reportes -->
+    <div class="reportes-grid">
+        <div class="reporte-card" id="reporte-citas" data-categoria="citas-pacientes">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Citas
+                        <span class="reporte-badge badge-popular">Popular</span>
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Incluye todas las citas del sistema con información completa</span>
+                        </span>
+                    </h3>
+                    <p>Historial completo</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Incluye todas las citas con detalles de fecha, hora, paciente, dentista asignado, estado, tipo de consulta y observaciones. Ideal para análisis de rendimiento y seguimiento.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Fecha, Hora, Tipo Consulta, Estado, Paciente, Email, Teléfono, Dentista, Notas</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_citas|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Citas</span>
+                </div>
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ citas_pendientes|default:"-" }}</span>
+                    <span class="reporte-stat-label">Pendientes</span>
+                </div>
+            </div>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="citas">~{{ total_citas|default:0|add:100 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="citas">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="citas">0</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_citas' %}" class="reporte-btn" data-reporte="citas" data-nombre="Reporte de Citas">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+        </div>
+        
+        <div class="reporte-card" id="reporte-clientes" data-categoria="citas-pacientes">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Clientes
+                        <span class="reporte-badge badge-important">Esencial</span>
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Base de datos completa de todos los clientes registrados</span>
+                        </span>
+                    </h3>
+                    <p>Base de datos completa</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Listado completo de todos los clientes con información de contacto, dentista asignado, fecha de registro, estado y estadísticas de citas. Perfecto para gestión de base de datos.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Nombre Completo, Email, Teléfono, Fecha Registro, Activo, Dentista Asignado, Total Citas, Notas</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_clientes|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Clientes</span>
+                </div>
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ clientes_activos|default:"-" }}</span>
+                    <span class="reporte-stat-label">Activos</span>
+                </div>
+            </div>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="clientes">~{{ total_clientes|default:0|add:80 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="clientes">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="clientes">0</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_clientes' %}" class="reporte-btn" data-reporte="clientes" data-nombre="Reporte de Clientes">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+        </div>
+        
+        <div class="reporte-card" data-categoria="citas-pacientes">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Planes de Tratamiento
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Información financiera y de progreso de tratamientos</span>
+                        </span>
+                    </h3>
+                    <p>Tratamientos y presupuestos</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Información detallada de todos los planes de tratamiento, incluyendo presupuestos, descuentos, precio final, estados, progreso y fechas. Esencial para control financiero.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Nombre, Cliente, Dentista, Estado, Presupuesto Total, Descuento, Precio Final, Progreso %, Fecha Creación</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_planes|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Planes</span>
+                </div>
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ planes_completados|default:"-" }}</span>
+                    <span class="reporte-stat-label">Completados</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_planes_tratamiento' %}" class="reporte-btn" data-reporte="planes" data-nombre="Reporte de Planes de Tratamiento">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="planes">~{{ total_planes|default:0|add:120 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="planes">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="planes">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-card" id="reporte-insumos" data-categoria="inventario">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Insumos
+                        <span class="reporte-badge badge-popular">Popular</span>
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Control completo de inventario y stock</span>
+                        </span>
+                    </h3>
+                    <p>Stock y precios</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Inventario completo con cantidades actuales, mínimas, precios unitarios, estados, categorías, proveedores asociados y ubicaciones. Fundamental para gestión de inventario.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Nombre, Categoría, Cantidad Actual, Cantidad Mínima, Unidad, Precio Unitario, Estado, Proveedor, Ubicación</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_insumos|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Insumos</span>
+                </div>
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value" style="color: #f59e0b;">{{ insumos_bajo_stock|default:"-" }}</span>
+                    <span class="reporte-stat-label">Bajo Stock</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_insumos' %}" class="reporte-btn" data-reporte="insumos" data-nombre="Reporte de Insumos">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="insumos">~{{ total_insumos|default:0|add:90 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="insumos">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="insumos">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-card" data-categoria="inventario">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-truck"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Proveedores
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Directorio completo de proveedores y contactos</span>
+                        </span>
+                    </h3>
+                    <p>Información de contacto</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Listado completo de proveedores con datos de contacto, RUT, direcciones, sitios web, personas de contacto y estadísticas de solicitudes realizadas.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Nombre, RUT, Email, Teléfono, Dirección, Contacto, Sitio Web, Activo, Total Solicitudes</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_proveedores|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Proveedores</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_proveedores' %}" class="reporte-btn" data-reporte="proveedores" data-nombre="Reporte de Proveedores">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="proveedores">~{{ total_proveedores|default:0|add:60 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="proveedores">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="proveedores">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-card" data-categoria="inventario">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-file-invoice"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Solicitudes
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Historial completo de pedidos a proveedores</span>
+                        </span>
+                    </h3>
+                    <p>Historial de pedidos</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Historial completo de solicitudes de insumos a proveedores con estados, fechas de solicitud y entrega esperada, cantidades, precios unitarios y montos totales.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Fecha Solicitud, Proveedor, Insumo, Cantidad, Unidad, Fecha Entrega, Estado, Precio Unitario, Monto Total</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_solicitudes|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Solicitudes</span>
+                </div>
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value" style="color: #f59e0b;">{{ solicitudes_pendientes|default:"-" }}</span>
+                    <span class="reporte-stat-label">Pendientes</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_solicitudes' %}" class="reporte-btn" data-reporte="solicitudes" data-nombre="Reporte de Solicitudes">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="solicitudes">~{{ total_solicitudes|default:0|add:70 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="solicitudes">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="solicitudes">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-card" data-categoria="personal-servicios">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-user-md"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Personal
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Información completa del equipo de trabajo</span>
+                        </span>
+                    </h3>
+                    <p>Equipo de trabajo</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Información completa del personal incluyendo roles, especialidades, contactos, fecha de ingreso, estado activo/inactivo y estadísticas de citas asignadas.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Nombre Completo, Email, Teléfono, Rol, Especialidad, Activo, Fecha Ingreso, Total Citas</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_personal|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Personal</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_personal' %}" class="reporte-btn" data-reporte="personal" data-nombre="Reporte de Personal">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="personal">~{{ total_personal|default:0|add:50 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="personal">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="personal">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-card" data-categoria="personal-servicios">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-tasks"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte de Servicios
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Catálogo completo de servicios disponibles</span>
+                        </span>
+                    </h3>
+                    <p>Catálogo de servicios</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Listado completo de servicios disponibles con categorías, descripciones, precios base, duraciones estimadas y estado activo/inactivo. Útil para gestión de catálogo.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Columnas incluidas:</strong> ID, Nombre, Categoría, Descripción, Precio Base, Duración (min), Requiere Dentista, Activo, Fecha Creación</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value">{{ total_servicios|default:"-" }}</span>
+                    <span class="reporte-stat-label">Total Servicios</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_servicios' %}" class="reporte-btn" data-reporte="servicios" data-nombre="Reporte de Servicios">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+            <div class="reporte-meta">
+                <div class="reporte-meta-item">
+                    <i class="fas fa-file"></i>
+                    <span class="reporte-size" data-reporte="servicios">~{{ total_servicios|default:0|add:40 }} KB</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="last-download" data-reporte="servicios">Nunca descargado</span>
+                </div>
+                <div class="reporte-meta-item">
+                    <i class="fas fa-download"></i>
+                    <span class="download-count" data-reporte="servicios">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-card" id="reporte-finanzas" data-categoria="finanzas">
+            <div class="reporte-card-header">
+                <div class="reporte-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <div class="reporte-info">
+                    <h3>
+                        Reporte Financiero
+                        <span class="reporte-badge badge-important">Crítico</span>
+                        <span class="help-tooltip">
+                            <i class="fas fa-question-circle"></i>
+                            <span class="tooltip-content">Reporte completo con múltiples hojas de trabajo</span>
+                        </span>
+                    </h3>
+                    <p>Ingresos y egresos</p>
+                </div>
+            </div>
+            <div class="reporte-description">
+                Resumen financiero completo con múltiples hojas: resumen general, ingresos manuales detallados y egresos manuales detallados. Incluye balances y estadísticas por período.
+            </div>
+            <div class="reporte-format-info">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>Hojas incluidas:</strong> Resumen (estadísticas generales), Ingresos (detalle completo), Egresos (detalle completo)</span>
+            </div>
+            <div class="reporte-stats">
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value" style="color: #10b981;">{% if total_ingresos %}{{ total_ingresos|pesos_chilenos }}{% else %}-{% endif %}</span>
+                    <span class="reporte-stat-label">Total Ingresos</span>
+                </div>
+                <div class="reporte-stat">
+                    <span class="reporte-stat-value" style="color: #ef4444;">{% if total_egresos %}{{ total_egresos|pesos_chilenos }}{% else %}-{% endif %}</span>
+                    <span class="reporte-stat-label">Total Egresos</span>
+                </div>
+            </div>
+            <a href="{% url 'exportar_excel_finanzas' %}" class="reporte-btn">
+                <i class="fas fa-download"></i>
+                Descargar Excel
+            </a>
+        </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Sistema de tracking de descargas usando localStorage
+    function trackDownload(reporteId, nombre) {
+        const now = new Date();
+        const downloadData = {
+            fecha: now.toISOString(),
+            nombre: nombre,
+            reporte: reporteId
+        };
+        
+        // Guardar última descarga
+        localStorage.setItem(`last_download_${reporteId}`, JSON.stringify(downloadData));
+        
+        // Incrementar contador
+        const count = parseInt(localStorage.getItem(`download_count_${reporteId}`) || '0') + 1;
+        localStorage.setItem(`download_count_${reporteId}`, count.toString());
+        
+        // Actualizar historial (últimos 5)
+        let historial = JSON.parse(localStorage.getItem('download_history') || '[]');
+        historial.unshift(downloadData);
+        historial = historial.slice(0, 5);
+        localStorage.setItem('download_history', JSON.stringify(historial));
+        
+        // Actualizar UI
+        updateDownloadInfo(reporteId);
+        updateHistorial();
+        updateStats();
+    }
+    
+    function updateDownloadInfo(reporteId) {
+        const lastDownload = localStorage.getItem(`last_download_${reporteId}`);
+        const count = parseInt(localStorage.getItem(`download_count_${reporteId}`) || '0');
+        
+        if (lastDownload) {
+            const data = JSON.parse(lastDownload);
+            const fecha = new Date(data.fecha);
+            const ahora = new Date();
+            const diffMs = ahora - fecha;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            let texto = '';
+            if (diffMins < 1) texto = 'Hace menos de 1 min';
+            else if (diffMins < 60) texto = `Hace ${diffMins} min`;
+            else if (diffHours < 24) texto = `Hace ${diffHours} h`;
+            else if (diffDays < 7) texto = `Hace ${diffDays} días`;
+            else texto = fecha.toLocaleDateString('es-CL');
+            
+            const element = document.querySelector(`.last-download[data-reporte="${reporteId}"]`);
+            if (element) element.textContent = texto;
+        }
+        
+        const countElement = document.querySelector(`.download-count[data-reporte="${reporteId}"]`);
+        if (countElement) countElement.textContent = count;
+    }
+    
+    function updateHistorial() {
+        const historial = JSON.parse(localStorage.getItem('download_history') || '[]');
+        const container = document.getElementById('historial-descargas');
+        
+        // Verificar que el contenedor existe antes de continuar
+        if (!container) {
+            return;
+        }
+        
+        if (historial.length === 0) {
+            container.innerHTML = `
+                <div class="history-item">
+                    <div class="history-item-icon">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="history-item-info">
+                        <div class="history-item-name">Ninguna descarga aún</div>
+                        <div class="history-item-date">Las descargas aparecerán aquí</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = historial.map(item => {
+            const fecha = new Date(item.fecha);
+            const ahora = new Date();
+            const diffMs = ahora - fecha;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            let texto = '';
+            if (diffMins < 1) texto = 'Hace menos de 1 min';
+            else if (diffMins < 60) texto = `Hace ${diffMins} min`;
+            else if (diffHours < 24) texto = `Hace ${diffHours} h`;
+            else if (diffDays < 7) texto = `Hace ${diffDays} días`;
+            else texto = fecha.toLocaleDateString('es-CL');
+            
+            return `
+                <div class="history-item">
+                    <div class="history-item-icon">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="history-item-info">
+                        <div class="history-item-name">${item.nombre}</div>
+                        <div class="history-item-date">${texto}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function updateStats() {
+        const historial = JSON.parse(localStorage.getItem('download_history') || '[]');
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        
+        const descargasHoy = historial.filter(item => {
+            const fecha = new Date(item.fecha);
+            fecha.setHours(0, 0, 0, 0);
+            return fecha.getTime() === hoy.getTime();
+        }).length;
+        
+        // Verificar que el elemento existe antes de acceder
+        const descargasHoyElement = document.getElementById('descargas-hoy');
+        if (descargasHoyElement) {
+            descargasHoyElement.textContent = descargasHoy;
+        }
+        
+        // Reporte más popular
+        const counts = {};
+        historial.forEach(item => {
+            counts[item.reporte] = (counts[item.reporte] || 0) + 1;
+        });
+        
+        const popular = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, null);
+        if (popular) {
+            const nombres = {
+                'citas': 'Citas',
+                'clientes': 'Clientes',
+                'planes': 'Planes',
+                'insumos': 'Insumos',
+                'proveedores': 'Proveedores',
+                'solicitudes': 'Solicitudes',
+                'personal': 'Personal',
+                'servicios': 'Servicios',
+                'finanzas': 'Finanzas'
+            };
+            const reportePopularElement = document.getElementById('reporte-popular');
+            if (reportePopularElement) {
+                reportePopularElement.textContent = nombres[popular] || popular;
+            }
+        }
+    }
+    
+    // Sistema de filtrado por categoría
+    document.addEventListener('DOMContentLoaded', function() {
+        // Filtros por categoría
+        document.querySelectorAll('.filter-category').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const categoria = this.getAttribute('data-categoria');
+                
+                // Remover clase active de todos los filtros
+                document.querySelectorAll('.filter-category').forEach(l => l.classList.remove('active'));
+                
+                // Agregar clase active al filtro clickeado
+                this.classList.add('active');
+                
+                // Filtrar reportes
+                const reportes = document.querySelectorAll('.reporte-card');
+                reportes.forEach(card => {
+                    if (categoria === 'all') {
+                        card.classList.remove('hidden');
+                        card.style.display = 'flex';
+                    } else {
+                        const cardCategoria = card.getAttribute('data-categoria');
+                        if (cardCategoria === categoria) {
+                            card.classList.remove('hidden');
+                            card.style.display = 'flex';
+                        } else {
+                            card.classList.add('hidden');
+                            card.style.display = 'none';
+                        }
+                    }
+                });
+                
+                // Scroll suave al inicio del grid si hay reportes visibles
+                const visibleCards = Array.from(reportes).filter(card => !card.classList.contains('hidden'));
+                if (visibleCards.length > 0 && categoria !== 'all') {
+                    setTimeout(() => {
+                        visibleCards[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                }
+            });
+        });
+        
+        // Tracking de clicks en botones de descarga
+        document.querySelectorAll('.reporte-btn[data-reporte]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const reporteId = this.getAttribute('data-reporte');
+                const nombre = this.getAttribute('data-nombre');
+                trackDownload(reporteId, nombre);
+            });
+        });
+        
+        // Actualizar información de descargas al cargar
+        ['citas', 'clientes', 'planes', 'insumos', 'proveedores', 'solicitudes', 'personal', 'servicios', 'finanzas'].forEach(id => {
+            updateDownloadInfo(id);
+        });
+        
+        updateHistorial();
+        updateStats();
+        
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Clínica Dental{% endblock %}</title>
+    <style>
+        /* Reset y estilos base */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #1e293b;
+            background-color: #f8fafc;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Header con color turquesa */
+        .email-header {
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: #ffffff;
+        }
+        
+        .email-header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        
+        .email-header .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        /* Contenido principal */
+        .email-body {
+            padding: 40px 30px;
+        }
+        
+        .email-body h2 {
+            color: #14b8a6;
+            font-size: 24px;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        
+        .email-body h3 {
+            color: #0d9488;
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        
+        .email-body p {
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        
+        /* Información destacada */
+        .info-box {
+            background-color: #f0fdfa;
+            border-left: 4px solid #14b8a6;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+        
+        .info-box strong {
+            color: #0d9488;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-box p {
+            margin: 5px 0;
+            color: #1e293b;
+        }
+        
+        /* Botones */
+        .email-button {
+            display: inline-block;
+            padding: 14px 28px;
+            background-color: #14b8a6;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: background-color 0.3s;
+        }
+        
+        .email-button:hover {
+            background-color: #0d9488;
+        }
+        
+        .email-button-secondary {
+            background-color: #64748b;
+        }
+        
+        .email-button-secondary:hover {
+            background-color: #475569;
+        }
+        
+        /* Lista de información */
+        .info-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        
+        .info-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+            color: #475569;
+        }
+        
+        .info-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .info-list li strong {
+            color: #0d9488;
+            display: inline-block;
+            min-width: 150px;
+        }
+        
+        /* Footer */
+        .email-footer {
+            background-color: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .email-footer p {
+            margin: 8px 0;
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .email-footer .clinic-name {
+            color: #14b8a6;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .email-footer .contact-info {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .email-footer a {
+            color: #14b8a6;
+            text-decoration: none;
+        }
+        
+        .email-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Alerta/Nota importante */
+        .alert-box {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        .alert-box strong {
+            color: #92400e;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .alert-box p {
+            color: #78350f;
+            margin: 5px 0;
+        }
+        
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            .email-body {
+                padding: 30px 20px;
+            }
+            
+            .email-header {
+                padding: 25px 15px;
+            }
+            
+            .email-header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 20px 0;">
+        <div class="email-container">
+            <!-- Header -->
+            <div class="email-header">
+                <span class="icon">🦷</span>
+                <h1>{% block header_title %}Clínica Dental{% endblock %}</h1>
+            </div>
+            
+            <!-- Body -->
+            <div class="email-body">
+                {% block content %}
+                {% endblock %}
+            </div>
+            
+            <!-- Footer -->
+            <div class="email-footer">
+                <p class="clinic-name">{% block clinic_name %}Clínica Dental{% endblock %}</p>
+                {% block footer_content %}
+                <p>Gracias por confiar en nosotros para su cuidado dental.</p>
+                <div class="contact-info">
+                    {% block contact_info %}
+                    <p>Para consultas, contáctenos a través de nuestros canales oficiales.</p>
+                    {% endblock %}
+                </div>
+                {% endblock %}
+                <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+                    Este es un correo automático, por favor no responda directamente a este mensaje.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+

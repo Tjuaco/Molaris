@@ -1,0 +1,679 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Gestión de Pedidos - Clínica Dental{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .section-container {
+        animation: fadeIn 0.4s ease;
+    }
+    
+    /* Colores turquesa */
+    :root {
+        --turquesa-primary: #14b8a6;
+        --turquesa-dark: #0d9488;
+        --turquesa-light: #5eead4;
+        --turquesa-bg: #f0fdfa;
+    }
+    
+    .header-with-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
+
+    .page-header {
+        flex: 1;
+    }
+
+    .page-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #1f2937;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-title i {
+        color: var(--turquesa-primary);
+    }
+
+    .page-subtitle {
+        font-size: 1rem;
+        color: #6b7280;
+    }
+
+    .dashboard-compact .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        transition: all 0.3s ease;
+        border-left: 4px solid var(--turquesa-primary);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.15);
+    }
+
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .stat-content {
+        flex: 1;
+    }
+
+    .stat-number {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+
+    .section {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+
+    .actions-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .search-filters {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        flex: 1;
+    }
+
+    .search-box {
+        position: relative;
+        min-width: 250px;
+        flex: 1;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 10px 12px 10px 40px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--turquesa-primary);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+
+    .filter-select {
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: var(--turquesa-primary);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .pedidos-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .pedidos-table thead {
+        background: var(--turquesa-bg);
+    }
+
+    .pedidos-table th {
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 0.875rem;
+        border-bottom: 2px solid var(--turquesa-primary);
+    }
+
+    .pedidos-table td {
+        padding: 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.875rem;
+        color: #4b5563;
+    }
+
+    .pedidos-table tbody tr {
+        transition: all 0.2s;
+    }
+
+    .pedidos-table tbody tr:hover {
+        background: var(--turquesa-bg);
+    }
+
+    .badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .badge-borrador {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .badge-pendiente {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-enviado {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .badge-confirmado {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-en_transito {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+
+    .badge-recibido {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-cancelado {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        text-decoration: none;
+    }
+
+    .btn-view {
+        background: var(--turquesa-bg);
+        color: var(--turquesa-dark);
+    }
+
+    .btn-view:hover {
+        background: var(--turquesa-primary);
+        color: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #d1d5db;
+        margin-bottom: 16px;
+    }
+</style>
+
+<div class="section-container">
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <!-- Header con Estadísticas -->
+    <div class="header-with-stats">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-shopping-cart"></i> Gestión de Pedidos</h1>
+            <p class="page-subtitle">Administra los pedidos de insumos a proveedores</p>
+        </div>
+        <div class="dashboard-compact">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.total_pedidos }}</div>
+                        <div class="stat-label">Total Pedidos</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.pedidos_pendientes }}</div>
+                        <div class="stat-label">Pendientes</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-paper-plane"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.pedidos_enviados }}</div>
+                        <div class="stat-label">Enviados</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ estadisticas.pedidos_recibidos }}</div>
+                        <div class="stat-label">Recibidos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <!-- Barra de Acciones y Filtros -->
+        <div class="actions-bar">
+            <form method="GET" class="search-filters" style="display: flex; gap: 12px; flex-wrap: wrap; flex: 1;">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" value="{{ search }}" placeholder="Buscar por número de pedido, proveedor...">
+                </div>
+                
+                <select name="estado" class="filter-select">
+                    <option value="">Todos los estados</option>
+                    {% for estado_code, estado_name in estados_pedido %}
+                    <option value="{{ estado_code }}" {% if estado == estado_code %}selected{% endif %}>{{ estado_name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select name="proveedor_id" class="filter-select">
+                    <option value="">Todos los proveedores</option>
+                    {% for prov in proveedores %}
+                    <option value="{{ prov.id }}" {% if proveedor_id == prov.id|stringformat:"s" %}selected{% endif %}>{{ prov.nombre }}</option>
+                    {% endfor %}
+                </select>
+                
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+                
+                {% if search or estado or proveedor_id %}
+                <a href="{% url 'gestor_inventario_unificado' %}?seccion=pedidos" class="btn-action" style="background: #f3f4f6; color: #6b7280;">
+                    <i class="fas fa-times"></i> Limpiar
+                </a>
+                {% endif %}
+            </form>
+            
+            <div>
+                <a href="{% url 'crear_pedido' %}" class="btn-primary">
+                    <i class="fas fa-plus"></i> Nuevo Pedido
+                </a>
+            </div>
+        </div>
+        
+        <!-- Tabla de Pedidos -->
+        {% if pedidos %}
+        <div style="overflow-x: auto;">
+            <table class="pedidos-table">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-hashtag"></i> Número</th>
+                        <th><i class="fas fa-truck"></i> Proveedor</th>
+                        <th><i class="fas fa-calendar"></i> Fecha Pedido</th>
+                        <th><i class="fas fa-calendar-check"></i> Entrega Esperada</th>
+                        <th><i class="fas fa-boxes"></i> Insumos</th>
+                        <th><i class="fas fa-dollar-sign"></i> Monto Total</th>
+                        <th><i class="fas fa-info-circle"></i> Estado</th>
+                        <th><i class="fas fa-cog"></i> Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos %}
+                    <tr>
+                        <td>
+                            <strong style="color: var(--turquesa-dark);">{{ pedido.numero_pedido }}</strong>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-truck" style="color: var(--turquesa-primary);"></i>
+                                <span>{{ pedido.proveedor.nombre }}</span>
+                            </div>
+                        </td>
+                        <td>{{ pedido.fecha_pedido|date:"d/m/Y" }}</td>
+                        <td>{{ pedido.fecha_entrega_esperada|date:"d/m/Y" }}</td>
+                        <td>
+                            <span style="color: var(--turquesa-dark); font-weight: 600;">{{ pedido.solicitudes.count }}</span> insumo(s)
+                        </td>
+                        <td>
+                            {% if pedido.monto_total %}
+                            <strong style="color: var(--turquesa-dark);">{{ pedido.monto_total|pesos_chilenos }}</strong>
+                            {% else %}
+                            <span style="color: #9ca3af;">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-{{ pedido.estado }}">
+                                <i class="fas fa-{% if pedido.estado == 'recibido' %}check-circle{% elif pedido.estado == 'enviado' %}paper-plane{% elif pedido.estado == 'cancelado' %}times-circle{% else %}clock{% endif %}"></i>
+                                {{ pedido.get_estado_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'detalle_pedido' pedido.id %}" class="btn-action btn-view">
+                                <i class="fas fa-eye"></i> Ver
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-shopping-cart"></i>
+            <h3 style="color: #374151; margin-bottom: 8px;">No hay pedidos</h3>
+            <p style="color: #6b7280; margin-bottom: 24px;">
+                {% if search or estado or proveedor_id %}
+                    No se encontraron pedidos con los filtros aplicados.
+                {% else %}
+                    Aún no se han creado pedidos. Crea tu primer pedido para comenzar.
+                {% endif %}
+            </p>
+            <a href="{% url 'crear_pedido' %}" class="btn-primary">
+                <i class="fas fa-plus"></i> Crear Primer Pedido
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Sistema de notificaciones
+    function showNotification(type, message, duration = 5000) {
+        const validTypes = ['success', 'error', 'warning', 'info'];
+        type = validTypes.includes(type) ? type : 'info';
+        
+        let container = document.getElementById('notificationContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notificationContainer';
+            container.className = 'notification-container';
+            document.body.appendChild(container);
+        }
+        
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icons = {
+            success: '<i class="fas fa-check-circle"></i>',
+            error: '<i class="fas fa-exclamation-circle"></i>',
+            warning: '<i class="fas fa-exclamation-triangle"></i>',
+            info: '<i class="fas fa-info-circle"></i>'
+        };
+        
+        notification.innerHTML = `
+            <div class="notification-icon">${icons[type]}</div>
+            <div class="notification-content">
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" onclick="this.closest('.notification').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        container.appendChild(notification);
+        
+        if (duration > 0) {
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.classList.add('hiding');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, duration);
+        }
+    }
+    
+    {% if messages %}
+        {% for message in messages %}
+            showNotification('{{ message.tags }}', '{{ message|escapejs }}');
+        {% endfor %}
+    {% endif %}
+</script>
+
+<style>
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+
+    .notification.success {
+        border-left-color: #10b981;
+    }
+
+    .notification.error {
+        border-left-color: #ef4444;
+    }
+
+    .notification.warning {
+        border-left-color: #f59e0b;
+    }
+
+    .notification.info {
+        border-left-color: var(--turquesa-primary);
+    }
+
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+        color: white;
+    }
+
+    .notification.success .notification-icon {
+        background: #10b981;
+    }
+
+    .notification.error .notification-icon {
+        background: #ef4444;
+    }
+
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+    }
+
+    .notification.info .notification-icon {
+        background: var(--turquesa-primary);
+    }
+
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+    }
+
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+</style>
+{% endblock %}

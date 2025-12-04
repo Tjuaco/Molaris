@@ -1,0 +1,343 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Movimiento de Stock - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-exchange-alt"></i> Movimiento de Stock{% endblock %}
+{% block page_subtitle %}Registra entradas, salidas o ajustes de stock para: {{ insumo.nombre }}{% endblock %}
+
+{% block content %}
+<div class="section">
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <div class="form-container">
+        <!-- Información del Insumo -->
+        <div class="insumo-info-card" style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); border-left: 4px solid var(--turquesa-primary);">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                {% if insumo.imagen %}
+                <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}" style="width: 64px; height: 64px; border-radius: 10px; object-fit: cover; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                {% else %}
+                <div style="width: 64px; height: 64px; border-radius: 10px; background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark)); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+                    <i class="fas fa-box"></i>
+                </div>
+                {% endif %}
+                <div style="flex: 1;">
+                    <h3 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">{{ insumo.nombre }}</h3>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px;">
+                        <div>
+                            <span style="font-size: 0.75rem; color: #64748b;">Stock Actual:</span>
+                            <strong style="display: block; color: #1e293b; font-size: 1.125rem; margin-top: 2px;">{{ insumo.cantidad_actual }} {{ insumo.unidad_medida }}</strong>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.75rem; color: #64748b;">Stock Mínimo:</span>
+                            <strong style="display: block; color: #f59e0b; font-size: 1.125rem; margin-top: 2px;">{{ insumo.cantidad_minima }} {{ insumo.unidad_medida }}</strong>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.75rem; color: #64748b;">Categoría:</span>
+                            <strong style="display: block; color: #1e293b; font-size: 1.125rem; margin-top: 2px;">{{ insumo.get_categoria_display }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" class="movimiento-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="tipo">Tipo de Movimiento *</label>
+                <select id="tipo" name="tipo" class="form-control" required>
+                    <option value="">Seleccionar tipo</option>
+                    {% for tipo_code, tipo_name in tipos_movimiento %}
+                    <option value="{{ tipo_code }}">{{ tipo_name }}</option>
+                    {% endfor %}
+                </select>
+                <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px; display: block;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Entrada:</strong> Agrega stock al inventario | 
+                    <strong>Salida:</strong> Reduce stock del inventario | 
+                    <strong>Ajuste:</strong> Establece el stock en un valor específico
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="cantidad">Cantidad *</label>
+                <input type="number" id="cantidad" name="cantidad" class="form-control" 
+                       min="1" required placeholder="0" step="1">
+                <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px; display: block;">
+                    <i class="fas fa-info-circle"></i> Cantidad en {{ insumo.unidad_medida }}
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="motivo">Motivo del Movimiento *</label>
+                <input type="text" id="motivo" name="motivo" class="form-control" required 
+                       placeholder="Ej: Compra, Uso en tratamiento, Ajuste de inventario, etc.">
+                <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px; display: block;">
+                    <i class="fas fa-info-circle"></i> Describe brevemente el motivo del movimiento
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="observaciones">Observaciones</label>
+                <textarea id="observaciones" name="observaciones" class="form-control" rows="3" 
+                          placeholder="Información adicional sobre el movimiento..."></textarea>
+            </div>
+
+            <div id="preview-movimiento" style="display: none; background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 4px solid var(--turquesa-primary);">
+                <h4 style="margin: 0 0 12px 0; color: #1e293b; font-size: 1rem;">Vista Previa del Movimiento</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div>
+                        <span style="font-size: 0.75rem; color: #64748b;">Stock Actual:</span>
+                        <strong style="display: block; color: #1e293b; font-size: 1rem; margin-top: 2px;" id="preview-actual">{{ insumo.cantidad_actual }} {{ insumo.unidad_medida }}</strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.75rem; color: #64748b;">Movimiento:</span>
+                        <strong style="display: block; color: var(--turquesa-primary); font-size: 1rem; margin-top: 2px;" id="preview-movimiento-text">-</strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.75rem; color: #64748b;">Nuevo Stock:</span>
+                        <strong style="display: block; color: #10b981; font-size: 1rem; margin-top: 2px;" id="preview-nuevo">-</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Registrar Movimiento
+                </button>
+                <a href="{% url 'gestor_inventario_unificado' %}?seccion=insumos" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 700px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+    }
+
+    .movimiento-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.875rem;
+    }
+
+    .form-control {
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--turquesa-primary);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 768px) {
+        .form-container {
+            margin: 0 10px;
+            padding: 20px;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tipoSelect = document.getElementById('tipo');
+        const cantidadInput = document.getElementById('cantidad');
+        const previewDiv = document.getElementById('preview-movimiento');
+        const previewMovimiento = document.getElementById('preview-movimiento-text');
+        const previewNuevo = document.getElementById('preview-nuevo');
+        const previewActual = document.getElementById('preview-actual');
+        
+        const stockActual = {{ insumo.cantidad_actual }};
+        const unidadMedida = '{{ insumo.unidad_medida }}';
+        
+        function actualizarPreview() {
+            const tipo = tipoSelect.value;
+            const cantidad = parseInt(cantidadInput.value) || 0;
+            
+            if (tipo && cantidad > 0) {
+                let nuevoStock = stockActual;
+                let movimientoTexto = '';
+                
+                if (tipo === 'entrada') {
+                    nuevoStock = stockActual + cantidad;
+                    movimientoTexto = `+${cantidad} ${unidadMedida}`;
+                } else if (tipo === 'salida') {
+                    nuevoStock = Math.max(0, stockActual - cantidad);
+                    movimientoTexto = `-${cantidad} ${unidadMedida}`;
+                } else if (tipo === 'ajuste') {
+                    nuevoStock = cantidad;
+                    movimientoTexto = `Ajuste a ${cantidad} ${unidadMedida}`;
+                }
+                
+                previewMovimiento.textContent = movimientoTexto;
+                previewNuevo.textContent = `${nuevoStock} ${unidadMedida}`;
+                previewActual.textContent = `${stockActual} ${unidadMedida}`;
+                
+                // Cambiar color según el tipo
+                if (tipo === 'entrada') {
+                    previewMovimiento.style.color = '#10b981';
+                } else if (tipo === 'salida') {
+                    previewMovimiento.style.color = '#ef4444';
+                } else {
+                    previewMovimiento.style.color = '#f59e0b';
+                }
+                
+                // Cambiar color del nuevo stock según si es bajo
+                if (nuevoStock <= {{ insumo.cantidad_minima }}) {
+                    previewNuevo.style.color = '#f59e0b';
+                } else {
+                    previewNuevo.style.color = '#10b981';
+                }
+                
+                previewDiv.style.display = 'block';
+            } else {
+                previewDiv.style.display = 'none';
+            }
+        }
+        
+        tipoSelect.addEventListener('change', actualizarPreview);
+        cantidadInput.addEventListener('input', actualizarPreview);
+        
+        // Validación del formulario
+        const form = document.querySelector('.movimiento-form');
+        form.addEventListener('submit', function(e) {
+            const tipo = tipoSelect.value;
+            const cantidad = parseInt(cantidadInput.value) || 0;
+            const motivo = document.getElementById('motivo').value.trim();
+            
+            if (!tipo) {
+                e.preventDefault();
+                alert('Por favor, selecciona un tipo de movimiento.');
+                tipoSelect.focus();
+                return false;
+            }
+            
+            if (cantidad <= 0) {
+                e.preventDefault();
+                alert('La cantidad debe ser mayor a 0.');
+                cantidadInput.focus();
+                return false;
+            }
+            
+            if (tipo === 'salida' && cantidad > stockActual) {
+                e.preventDefault();
+                alert(`No hay suficiente stock disponible. Stock actual: ${stockActual} ${unidadMedida}`);
+                cantidadInput.focus();
+                return false;
+            }
+            
+            if (!motivo) {
+                e.preventDefault();
+                alert('Por favor, ingresa un motivo para el movimiento.');
+                document.getElementById('motivo').focus();
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

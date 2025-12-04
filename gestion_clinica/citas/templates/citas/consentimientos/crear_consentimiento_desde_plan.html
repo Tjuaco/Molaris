@@ -1,0 +1,235 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Crear Consentimiento Informado - Plan de Tratamiento{% endblock %}
+
+{% block page_title %}<i class="fas fa-file-signature"></i> Crear Consentimiento Informado{% endblock %}
+{% block page_subtitle %}Crea un consentimiento informado para el plan de tratamiento: {{ plan.nombre }}{% endblock %}
+
+{% block content %}
+<div class="section">
+    <!-- Información del Plan (solo lectura) -->
+    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 12px 0; color: #0c4a6e; font-size: 1rem; font-weight: 600;">
+            <i class="fas fa-clipboard-list"></i> Plan de Tratamiento
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; color: #0c4a6e;">
+            <div>
+                <strong style="font-size: 0.75rem; color: #075985;">Plan:</strong>
+                <div style="font-weight: 600;">{{ plan.nombre }}</div>
+            </div>
+            <div>
+                <strong style="font-size: 0.75rem; color: #075985;">Cliente:</strong>
+                <div style="font-weight: 600;">{{ cliente.nombre_completo }}</div>
+            </div>
+            <div>
+                <strong style="font-size: 0.75rem; color: #075985;">Dentista:</strong>
+                <div style="font-weight: 600;">{{ dentista_plan.nombre_completo }}</div>
+            </div>
+            {% if diagnostico_plan %}
+            <div style="grid-column: 1 / -1;">
+                <strong style="font-size: 0.75rem; color: #075985;">Diagnóstico del Plan:</strong>
+                <div style="font-size: 0.875rem; margin-top: 4px;">{{ diagnostico_plan|truncatewords:30 }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <form method="post" id="formCrearConsentimiento">
+        {% csrf_token %}
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+            <!-- Tipo de Procedimiento -->
+            <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Tipo de Procedimiento <span style="color: #ef4444;">*</span>
+                </label>
+                <select name="tipo_procedimiento" required id="tipoProcedimiento" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+                    <option value="">Seleccione un tipo</option>
+                    {% for tipo_val, tipo_nombre in tipos_procedimiento %}
+                    <option value="{{ tipo_val }}">{{ tipo_nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Dentista -->
+            <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Dentista Responsable
+                </label>
+                <select name="dentista" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+                    <option value="{{ dentista_plan.id }}" selected>{{ dentista_plan.nombre_completo }} (del plan)</option>
+                    {% for dentista in dentistas %}
+                    {% if dentista.id != dentista_plan.id %}
+                    <option value="{{ dentista.id }}">{{ dentista.nombre_completo }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Fecha de Vencimiento -->
+            <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Fecha de Vencimiento (Opcional)
+                </label>
+                <input type="date" name="fecha_vencimiento" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+            </div>
+        </div>
+        
+        <!-- Título -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                Título del Consentimiento <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="text" name="titulo" id="tituloConsentimiento" required
+                   placeholder="Ej: CONSENTIMIENTO INFORMADO PARA TRATAMIENTO DE ENDODONCIA"
+                   style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+        </div>
+        
+        <!-- Sección: A. Identificación y Antecedentes (Ley 20.584) -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid var(--primary-color); margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1rem; font-weight: 600;">
+                A. Identificación y Antecedentes (Ley 20.584)
+            </h3>
+            
+            <!-- Diagnóstico -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Diagnóstico y Justificación
+                </label>
+                <textarea name="diagnostico" id="diagnosticoConsentimiento" rows="4"
+                          placeholder="Ej: Pulpopatía irreversible, necrosis pulpar o lesión periapical...{% if diagnostico_plan %} (Se prellenará con el diagnóstico del plan){% endif %}"
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;">{% if diagnostico_plan %}{{ diagnostico_plan }}{% endif %}</textarea>
+            </div>
+            
+            <!-- Justificación -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    Justificación del Tratamiento
+                </label>
+                <textarea name="justificacion" id="justificacionConsentimiento" rows="3"
+                          placeholder="Razón médica que justifica el procedimiento..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+        </div>
+        
+        <!-- Sección: B. Información Detallada del Procedimiento (Ley 20.584) -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1rem; font-weight: 600;">
+                B. Información Detallada del Procedimiento (Ley 20.584)
+            </h3>
+            
+            <!-- Naturaleza del Procedimiento -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.2. Naturaleza del Procedimiento
+                </label>
+                <textarea name="naturaleza_procedimiento" id="naturalezaConsentimiento" rows="3"
+                          placeholder="Definición clara del procedimiento (ej: procedimiento para limpiar, desinfectar y sellar el sistema de conductos radiculares)..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <!-- Objetivos del Tratamiento -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.2. Objetivos del Tratamiento
+                </label>
+                <textarea name="objetivos_tratamiento" id="objetivosConsentimiento" rows="3"
+                          placeholder="Objetivo primario (ej: mantener el diente en boca, eliminar el dolor/infección)..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <!-- Contenido General -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.3. Información General del Procedimiento
+                </label>
+                <textarea name="contenido" id="contenidoConsentimiento" rows="6"
+                          placeholder="Describa el procedimiento, sus objetivos y lo que el paciente debe saber..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+        
+            <!-- Alternativas (OBLIGATORIO - Ley 20.584) -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.4. Alternativas de Tratamiento <span style="color: #ef4444;">*</span>
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 400;">(Debe incluir exodoncia y consecuencias de no tratar)</span>
+                </label>
+                <textarea name="alternativas" id="alternativasConsentimiento" rows="5"
+                          placeholder="Opciones alternativas, incluyendo exodoncia (extracción) y las consecuencias de no realizar el tratamiento (ej: infección diseminada, absceso, pérdida de la pieza)..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <!-- Riesgos (OBLIGATORIO - Ley 20.584) -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.5. Riesgos y Complicaciones Relevantes <span style="color: #ef4444;">*</span>
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 400;">(Lista exhaustiva de riesgos comunes y graves)</span>
+                </label>
+                <textarea name="riesgos" id="riesgosConsentimiento" rows="6"
+                          placeholder="Lista exhaustiva: Dolor/inflamación postoperatoria, fracaso del tratamiento, necesidad de retratamiento, fractura de instrumental, perforación radicular, reacciones adversas a anestesia/medicamentos, necesidad de restauración protésica posterior (corona)..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <!-- Beneficios -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.6. Beneficios Esperados
+                </label>
+                <textarea name="beneficios" id="beneficiosConsentimiento" rows="4"
+                          placeholder="Beneficios del procedimiento (ej: conservación de la pieza, recuperación de la función y estética)..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <!-- Pronóstico -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.7. Pronóstico
+                </label>
+                <textarea name="pronostico" id="pronosticoConsentimiento" rows="3"
+                          placeholder="Tasa de éxito esperada (ej: Alto porcentaje de éxito con adecuada restauración) y necesidad de controles periódicos..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <!-- Cuidados Postoperatorios -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    B.8. Cuidados Postoperatorios
+                </label>
+                <textarea name="cuidados_postoperatorios" id="cuidadosConsentimiento" rows="3"
+                          placeholder="Indicaciones inmediatas post-tratamiento (medicamentos, alimentación)..."
+                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+        </div>
+        
+        <!-- Información del Profesional -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 1rem; font-weight: 600;">
+                Información del Profesional (Ley 20.584)
+            </h3>
+            
+            <div>
+                <!-- RUT Dentista -->
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">
+                    RUT Profesional Tratante
+                </label>
+                <input type="text" name="rut_dentista" 
+                       placeholder="12.345.678-9"
+                       style="width: 100%; max-width: 300px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem;">
+            </div>
+        </div>
+        
+        <!-- Botones -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 32px;">
+            <a href="{% url 'detalle_plan_tratamiento' plan.id %}" class="btn" style="background: #6b7280; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">
+                Cancelar
+            </a>
+            <button type="submit" class="btn" style="background: var(--primary-color); color: white; padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;">
+                <i class="fas fa-save"></i> Crear Consentimiento
+            </button>
+        </div>
+    </form>
+</div>
+
+
+{% endblock %}
+

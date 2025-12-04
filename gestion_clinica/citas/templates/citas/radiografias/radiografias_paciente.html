@@ -1,0 +1,2557 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Radiografías de {{ paciente.nombre_completo }} - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Navigation Mejorado -->
+<div class="breadcrumb-nav-enhanced">
+    <a href="{% url 'radiografias_listar' %}" class="breadcrumb-link-enhanced">
+        <i class="fas fa-x-ray"></i>
+        <span>Mis Radiografías</span>
+    </a>
+    <i class="fas fa-chevron-right breadcrumb-arrow"></i>
+    <span class="breadcrumb-current-enhanced">
+        <i class="fas fa-user"></i>
+        <span>{{ paciente.nombre_completo }}</span>
+    </span>
+</div>
+
+<!-- Header Mejorado -->
+<div class="patient-header-enhanced">
+    <div class="patient-header-main">
+        <div class="patient-avatar-large-enhanced">
+            <span class="avatar-initial-large">{{ paciente.nombre_completo|first|upper }}</span>
+        </div>
+        <div class="patient-header-info-enhanced">
+            <h1 class="patient-name-title">{{ paciente.nombre_completo }}</h1>
+            <p class="patient-subtitle">Historial completo de radiografías</p>
+            <div class="patient-stats-mini">
+                <div class="stat-mini-item">
+                    <i class="fas fa-images"></i>
+                    <span>{{ radiografias.count }} radiografía{{ radiografias.count|pluralize }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="header-actions-enhanced">
+        <a href="{% url 'radiografias_listar' %}" class="btn-action-secondary">
+            <i class="fas fa-arrow-left"></i>
+            <span>Volver</span>
+        </a>
+        <a href="{% url 'agregar_radiografia' paciente.id %}" class="btn-action-primary">
+            <i class="fas fa-plus"></i>
+            <span>Agregar Radiografía</span>
+        </a>
+    </div>
+</div>
+
+<!-- Información del Paciente Mejorada -->
+<div class="patient-info-section-enhanced">
+    <div class="info-card-modern">
+        <div class="info-card-header-modern">
+            <div class="info-header-icon">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <h3 class="info-header-title">Información del Paciente</h3>
+        </div>
+        <div class="info-grid-modern">
+            <div class="info-item-modern">
+                <div class="info-icon-modern">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="info-content-modern">
+                    <div class="info-label-modern">Nombre Completo</div>
+                    <div class="info-value-modern">{{ paciente.nombre_completo }}</div>
+                </div>
+            </div>
+            <div class="info-item-modern">
+                <div class="info-icon-modern">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="info-content-modern">
+                    <div class="info-label-modern">Email</div>
+                    <div class="info-value-modern">{{ paciente.email }}</div>
+                </div>
+            </div>
+            <div class="info-item-modern">
+                <div class="info-icon-modern">
+                    <i class="fas fa-phone"></i>
+                </div>
+                <div class="info-content-modern">
+                    <div class="info-label-modern">Teléfono</div>
+                    <div class="info-value-modern">{{ paciente.telefono|default:"Sin teléfono" }}</div>
+                </div>
+            </div>
+            <div class="info-item-modern highlight-info">
+                <div class="info-icon-modern highlight-icon">
+                    <i class="fas fa-x-ray"></i>
+                </div>
+                <div class="info-content-modern">
+                    <div class="info-label-modern">Total de Radiografías</div>
+                    <div class="info-value-modern highlight-value">{{ radiografias.count }} radiografía{{
+                        radiografias.count|pluralize }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ===== BREADCRUMB ENHANCED ===== */
+    .breadcrumb-nav-enhanced {
+        background: white;
+        padding: 16px 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        border: 2px solid #e0f2fe;
+    }
+
+    .breadcrumb-link-enhanced {
+        color: #14b8a6;
+        text-decoration: none;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .breadcrumb-link-enhanced:hover {
+        background: #f0fdfa;
+        color: #0d9488;
+    }
+
+    .breadcrumb-arrow {
+        color: #94a3b8;
+        font-size: 12px;
+    }
+
+    .breadcrumb-current-enhanced {
+        color: #1e293b;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #f0fdfa;
+        border-radius: 8px;
+    }
+
+    /* ===== PATIENT HEADER ENHANCED ===== */
+    .patient-header-enhanced {
+        background: linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%);
+        border-radius: 20px;
+        padding: 32px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 2px solid #e0f2fe;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 24px;
+    }
+
+    .patient-header-main {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex: 1;
+    }
+
+    .patient-avatar-large-enhanced {
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 24px rgba(20, 184, 166, 0.3);
+        flex-shrink: 0;
+    }
+
+    .avatar-initial-large {
+        font-size: 40px;
+        font-weight: 800;
+        color: white;
+    }
+
+    .patient-header-info-enhanced {
+        flex: 1;
+    }
+
+    .patient-name-title {
+        margin: 0 0 8px 0;
+        font-size: 32px;
+        font-weight: 800;
+        color: #1e293b;
+        letter-spacing: -0.5px;
+    }
+
+    .patient-subtitle {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .patient-stats-mini {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .stat-mini-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: white;
+        border-radius: 10px;
+        border: 2px solid #e0f2fe;
+        font-weight: 600;
+        color: #475569;
+        font-size: 14px;
+    }
+
+    .stat-mini-item i {
+        color: #14b8a6;
+    }
+
+    .header-actions-enhanced {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .btn-action-secondary,
+    .btn-action-primary {
+        padding: 14px 24px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 15px;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-action-secondary {
+        background: white;
+        color: #64748b;
+        border: 2px solid #e0f2fe;
+    }
+
+    .btn-action-secondary:hover {
+        background: #f8fafc;
+        border-color: #14b8a6;
+        color: #14b8a6;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-action-primary {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-action-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+    }
+
+    /* ===== PATIENT INFO SECTION ENHANCED ===== */
+    .patient-info-section-enhanced {
+        margin-bottom: 32px;
+    }
+
+    .info-card-modern {
+        background: white;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border: 2px solid #e0f2fe;
+    }
+
+    .info-card-header-modern {
+        background: linear-gradient(135deg, #f0fdfa, #e0f2fe);
+        padding: 20px 28px;
+        border-bottom: 2px solid #e0f2fe;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .info-header-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .info-header-icon i {
+        font-size: 24px;
+        color: white;
+    }
+
+    .info-header-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        color: #1e293b;
+    }
+
+    .info-grid-modern {
+        padding: 28px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+    }
+
+    .info-item-modern {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        padding: 20px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 2px solid #e0f2fe;
+        transition: all 0.2s ease;
+    }
+
+    .info-item-modern:hover {
+        background: #f0fdfa;
+        border-color: #14b8a6;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .info-item-modern.highlight-info {
+        background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+        border-color: #7dd3fc;
+    }
+
+    .info-icon-modern {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #14b8a6;
+        font-size: 20px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .info-icon-modern.highlight-icon {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+    }
+
+    .info-content-modern {
+        flex: 1;
+    }
+
+    .info-label-modern {
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+
+    .info-value-modern {
+        font-size: 16px;
+        color: #1e293b;
+        font-weight: 700;
+    }
+
+    .info-value-modern.highlight-value {
+        color: #0c4a6e;
+        font-size: 18px;
+    }
+
+    /* ===== RADIOGRAFIAS SECTION ENHANCED ===== */
+    .radiografias-section-enhanced {
+        margin-bottom: 40px;
+    }
+
+    .section-header-radiografias {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 28px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #e0f2fe;
+    }
+
+    .section-title-group-radiografias {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .section-icon-radiografias {
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .section-icon-radiografias i {
+        font-size: 24px;
+        color: white;
+    }
+
+    .section-title-radiografias {
+        margin: 0 0 6px 0;
+        font-size: 26px;
+        font-weight: 800;
+        color: #1e293b;
+        letter-spacing: -0.5px;
+    }
+
+    .section-description-radiografias {
+        margin: 0;
+        font-size: 14px;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .section-count-badge-radiografias {
+        background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+        padding: 12px 20px;
+        border-radius: 12px;
+        text-align: center;
+        border: 2px solid #7dd3fc;
+    }
+
+    .count-number-radiografias {
+        display: block;
+        font-size: 24px;
+        font-weight: 800;
+        color: #0c4a6e;
+        line-height: 1;
+    }
+
+    .count-label-radiografias {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: #0369a1;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 4px;
+    }
+
+    /* ===== RADIOGRAFIAS GRID ENHANCED ===== */
+    .radiografias-grid-enhanced {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 28px;
+    }
+
+    .radiografia-card-enhanced {
+        background: white;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border: 2px solid #e0f2fe;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .radiografia-card-enhanced:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+        border-color: #14b8a6;
+    }
+
+    .radiografia-image-wrapper {
+        position: relative;
+        width: 100%;
+        height: 300px;
+        overflow: hidden;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .radiografia-image-enhanced {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+    }
+
+    .radiografia-image-wrapper:hover .radiografia-image-enhanced {
+        transform: scale(1.05);
+    }
+
+    .radiografia-image-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .radiografia-image-wrapper:hover .radiografia-image-overlay {
+        opacity: 1;
+    }
+
+    .btn-quick-view {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .btn-quick-view:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .radiografia-badge-annotated {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+
+    .radiografia-content-enhanced {
+        padding: 24px;
+        flex: 1;
+    }
+
+    .radiografia-header-enhanced {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+        gap: 12px;
+    }
+
+    .radiografia-type {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        color: #1e293b;
+        flex: 1;
+    }
+
+    .radiografia-date-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: #f0fdfa;
+        border-radius: 8px;
+        border: 2px solid #e0f2fe;
+        font-size: 13px;
+        font-weight: 600;
+        color: #0c4a6e;
+        white-space: nowrap;
+    }
+
+    .radiografia-date-badge i {
+        color: #14b8a6;
+    }
+
+    .radiografia-meta-info {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #475569;
+        font-weight: 500;
+    }
+
+    .meta-item i {
+        color: #14b8a6;
+        width: 16px;
+        text-align: center;
+    }
+
+    .radiografia-description-enhanced {
+        padding: 12px;
+        background: #f0fdfa;
+        border-radius: 10px;
+        border-left: 4px solid #14b8a6;
+        margin-bottom: 16px;
+    }
+
+    .radiografia-description-enhanced p {
+        margin: 0;
+        font-size: 14px;
+        color: #475569;
+        line-height: 1.6;
+    }
+
+    .radiografia-actions-enhanced {
+        padding: 20px 24px;
+        background: #f8fafc;
+        border-top: 2px solid #e0f2fe;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-action-view,
+    .btn-action-edit,
+    .btn-action-delete {
+        flex: 1;
+        min-width: 100px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 14px;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-action-view {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-action-view:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-action-edit {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-action-edit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .btn-action-delete {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-action-delete:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+
+    /* ===== EMPTY STATE RADIOGRAFIAS ===== */
+    .empty-state-radiografias {
+        background: white;
+        border-radius: 20px;
+        padding: 80px 40px;
+        text-align: center;
+        border: 3px dashed #e0f2fe;
+        background: linear-gradient(135deg, #ffffff, #f0fdfa);
+    }
+
+    .empty-icon-radiografias {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 32px;
+        background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 4px solid #7dd3fc;
+        box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
+    }
+
+    .empty-icon-radiografias i {
+        font-size: 56px;
+        color: #14b8a6;
+    }
+
+    .empty-title-radiografias {
+        margin: 0 0 16px 0;
+        font-size: 28px;
+        font-weight: 800;
+        color: #1e293b;
+    }
+
+    .empty-description-radiografias {
+        margin: 0 0 32px 0;
+        font-size: 16px;
+        color: #64748b;
+        line-height: 1.6;
+    }
+
+    .btn-add-first-radiografia {
+        padding: 16px 32px;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .btn-add-first-radiografia:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .patient-header-enhanced {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .patient-header-main {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .header-actions-enhanced {
+            width: 100%;
+        }
+
+        .btn-action-secondary,
+        .btn-action-primary {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .info-grid-modern {
+            grid-template-columns: 1fr;
+        }
+
+        .section-header-radiografias {
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .radiografias-grid-enhanced {
+            grid-template-columns: 1fr;
+        }
+
+        .radiografia-actions-enhanced {
+            flex-direction: column;
+        }
+
+        .btn-action-view,
+        .btn-action-edit,
+        .btn-action-delete {
+            width: 100%;
+        }
+    }
+</style>
+
+<!-- Lista de Radiografías Mejorada -->
+<div class="radiografias-section-enhanced">
+    <div class="section-header-radiografias">
+        <div class="section-title-group-radiografias">
+            <div class="section-icon-radiografias">
+                <i class="fas fa-images"></i>
+            </div>
+            <div>
+                <h2 class="section-title-radiografias">Historial de Radiografías</h2>
+                <p class="section-description-radiografias">Visualiza y gestiona todas las radiografías del paciente</p>
+            </div>
+        </div>
+        <div class="section-count-badge-radiografias">
+            <span class="count-number-radiografias">{{ radiografias.count }}</span>
+            <span class="count-label-radiografias">radiografía{{ radiografias.count|pluralize }}</span>
+        </div>
+    </div>
+
+    {% if radiografias %}
+    <div class="radiografias-grid-enhanced">
+        {% for radiografia in radiografias %}
+        <div class="radiografia-card-enhanced">
+            <div class="radiografia-image-wrapper">
+                <div class="radiografia-image-overlay">
+                    <button class="btn-quick-view" onclick="abrirModalVisualizador({{ radiografia.id }})"
+                        title="Abrir en visualizador">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+                <img src="{{ radiografia.imagen.url }}" alt="Radiografía {{ radiografia.get_tipo_display }}"
+                    class="radiografia-image-enhanced">
+                {% if radiografia.imagen_anotada %}
+                <div class="radiografia-badge-annotated">
+                    <i class="fas fa-pencil-alt"></i>
+                    <span>Anotada</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="radiografia-content-enhanced">
+                <div class="radiografia-header-enhanced">
+                    <h3 class="radiografia-type">{{ radiografia.get_tipo_display }}</h3>
+                    <div class="radiografia-date-badge">
+                        <i class="fas fa-calendar"></i>
+                        <span>{{ radiografia.fecha_carga|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+
+                <div class="radiografia-meta-info">
+                    <div class="meta-item">
+                        <i class="fas fa-clock"></i>
+                        <span>Cargada: {{ radiografia.fecha_carga|date:"H:i" }}</span>
+                    </div>
+                    {% if radiografia.fecha_tomada %}
+                    <div class="meta-item">
+                        <i class="fas fa-camera"></i>
+                        <span>Tomada: {{ radiografia.fecha_tomada|date:"d/m/Y" }}</span>
+                    </div>
+                    {% endif %}
+                    {% if radiografia.cita %}
+                    <div class="meta-item">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Cita: {{ radiografia.cita.fecha_hora|date:"d/m/Y" }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if radiografia.descripcion %}
+                <div class="radiografia-description-enhanced">
+                    <p>{{ radiografia.descripcion|truncatewords:25 }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="radiografia-actions-enhanced">
+                <button class="btn-action-view" onclick="abrirModalVisualizador({{ radiografia.id }})"
+                    title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                    <span>Ver</span>
+                </button>
+                <a href="{% url 'editar_radiografia' radiografia.id %}" class="btn-action-edit" title="Editar">
+                    <i class="fas fa-edit"></i>
+                    <span>Editar</span>
+                </a>
+                <a href="{% url 'eliminar_radiografia' radiografia.id %}" class="btn-action-delete"
+                    onclick="return confirm('¿Estás seguro de eliminar esta radiografía?');" title="Eliminar">
+                    <i class="fas fa-trash"></i>
+                    <span>Eliminar</span>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state-radiografias">
+        <div class="empty-icon-radiografias">
+            <i class="fas fa-x-ray"></i>
+        </div>
+        <h3 class="empty-title-radiografias">No hay radiografías registradas</h3>
+        <p class="empty-description-radiografias">Este paciente aún no tiene radiografías en su historial.</p>
+        <a href="{% url 'agregar_radiografia' paciente.id %}" class="btn-add-first-radiografia">
+            <i class="fas fa-plus"></i>
+            <span>Agregar Primera Radiografía</span>
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .radiografias-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .radiografia-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .radiografia-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .radiografia-image {
+        width: 100%;
+        height: 250px;
+        overflow: hidden;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .radiografia-image img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        cursor: pointer;
+        transition: transform 0.3s;
+    }
+
+    .radiografia-image img:hover {
+        transform: scale(1.1);
+    }
+
+    .radiografia-info {
+        padding: 15px;
+    }
+
+    .radiografia-info h3 {
+        margin: 0 0 10px 0;
+        color: var(--text-primary);
+        font-size: 1.1em;
+    }
+
+    .info-row {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+
+    .info-item-small {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85em;
+        padding: 6px 10px;
+        background: var(--primary-bg);
+        border-radius: 6px;
+        border: 1px solid var(--primary-light);
+        flex-wrap: wrap;
+    }
+
+    .info-item-small i {
+        color: var(--primary-color);
+        font-size: 0.9em;
+    }
+
+    .info-label-small {
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 0.9em;
+    }
+
+    .info-value-small {
+        color: var(--primary-text);
+        font-weight: 600;
+        font-size: 0.95em;
+    }
+
+    .descripcion-text {
+        font-size: 0.9em;
+        color: var(--text-secondary);
+        margin: 10px 0 0 0;
+    }
+
+    .radiografia-actions {
+        padding: 15px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 10px;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    /* ===== MODAL DEL VISUALIZADOR MEJORADO ===== */
+    .visualizador-modal {
+        display: none;
+        position: fixed;
+        z-index: 10000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.1), rgba(13, 148, 136, 0.05));
+        backdrop-filter: blur(4px);
+        overflow: hidden;
+        animation: fadeInModal 0.3s ease;
+    }
+
+    @keyframes fadeInModal {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .visualizador-modal.active {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-content-visualizador {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        box-sizing: border-box;
+        background: transparent;
+        gap: 10px;
+    }
+
+    /* ===== HEADER DEL MODAL ===== */
+    .modal-header-visualizador {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: linear-gradient(135deg, #ffffff, #f0fdfa);
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border: 2px solid #e0f2fe;
+    }
+
+    .modal-header-visualizador .header-title-section {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-header-visualizador h2 {
+        margin: 0;
+        color: #1e293b;
+        font-size: 16px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        letter-spacing: -0.2px;
+    }
+
+    .btn-help-shortcuts {
+        padding: 5px 10px;
+        background: linear-gradient(135deg, #64748b, #475569);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.3s ease;
+        box-shadow: 0 1px 3px rgba(100, 116, 139, 0.3);
+    }
+
+    .btn-help-shortcuts:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(100, 116, 139, 0.4);
+    }
+
+    .modal-header-visualizador h2 i {
+        color: #14b8a6;
+        font-size: 18px;
+    }
+
+    .modal-close-visualizador {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        border: none;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+    }
+
+    .modal-close-visualizador:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+
+    /* ===== CONTROLES DEL MODAL ===== */
+    .modal-controls-visualizador {
+        background: white;
+        padding: 12px 16px;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        border: 2px solid #e0f2fe;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+    }
+
+    .modal-controls-visualizador .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .modal-controls-visualizador label {
+        color: #1e293b;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .modal-controls-visualizador label i {
+        color: #14b8a6;
+        font-size: 13px;
+    }
+
+    .modal-controls-visualizador .form-control,
+    .modal-controls-visualizador select {
+        background: white;
+        border: 2px solid #e0f2fe;
+        color: #1e293b;
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .modal-controls-visualizador .form-control:focus,
+    .modal-controls-visualizador select:focus {
+        outline: none;
+        border-color: #14b8a6;
+        box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.1);
+        background: #f0fdfa;
+    }
+
+    .modal-controls-visualizador .tool-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .modal-controls-visualizador .tool-btn {
+        padding: 6px 10px;
+        border: 2px solid #e0f2fe;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 600;
+        flex: 1;
+        min-width: 70px;
+    }
+
+    .modal-controls-visualizador .tool-btn:hover {
+        background: #f0fdfa;
+        border-color: #14b8a6;
+        color: #14b8a6;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+    }
+
+    .modal-controls-visualizador .tool-btn.active {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        border-color: #0d9488;
+        color: white;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .modal-controls-visualizador .tool-btn.btn-danger {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        border-color: #dc2626;
+        color: white;
+    }
+
+    .modal-controls-visualizador .tool-btn.btn-danger:hover {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+
+    /* ===== COLOR BUTTONS ===== */
+    .color-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .color-btn {
+        flex: 1;
+        min-width: 60px;
+        padding: 6px 10px;
+        border: 2px solid #e0f2fe;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .color-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .color-btn.active {
+        border-width: 3px;
+        border-color: #14b8a6;
+        box-shadow: 0 4px 16px rgba(20, 184, 166, 0.4);
+        transform: translateY(-2px);
+    }
+
+    /* ===== SLIDERS ===== */
+    .modal-controls-visualizador input[type="range"] {
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        background: #e0f2fe;
+        outline: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+    }
+
+    .modal-controls-visualizador input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+        transition: all 0.2s ease;
+    }
+
+    .modal-controls-visualizador input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .modal-controls-visualizador input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .modal-controls-visualizador input[type="range"]+label {
+        font-size: 10px;
+        color: #64748b;
+        font-weight: 600;
+        margin-top: 2px;
+    }
+
+    .modal-controls-visualizador input[type="range"]+label span {
+        color: #14b8a6;
+        font-weight: 700;
+        font-size: 11px;
+    }
+
+    /* ===== CANVAS CONTAINER ===== */
+    .modal-canvas-container {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .modal-canvas-wrapper {
+        position: relative;
+        background: #000;
+        border-radius: 16px;
+        overflow: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        border: 3px solid #e0f2fe;
+        transition: all 0.3s ease;
+    }
+
+    .modal-canvas-wrapper:hover {
+        border-color: #14b8a6;
+        box-shadow: 0 12px 40px rgba(20, 184, 166, 0.3);
+    }
+
+    .modal-canvas-wrapper canvas {
+        display: block;
+        cursor: crosshair;
+        touch-action: none;
+        max-width: none;
+        max-height: none;
+    }
+
+    .modal-canvas-info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 253, 250, 0.98));
+        backdrop-filter: blur(10px);
+        color: #1e293b;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        border: 2px solid #e0f2fe;
+        z-index: 10;
+    }
+
+    .modal-canvas-info span {
+        color: #14b8a6;
+        font-weight: 700;
+        font-size: 12px;
+    }
+
+    .modal-canvas-info .canvas-info-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .zoom-indicator {
+        font-size: 11px;
+        color: #64748b;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 2px 8px;
+        border-radius: 6px;
+        border: 1px solid #e0f2fe;
+    }
+
+    .modal-canvas-info .canvas-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .reset-zoom-btn {
+        padding: 5px 10px;
+        background: white;
+        border: 2px solid #e0f2fe;
+        color: #14b8a6;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .reset-zoom-btn:hover {
+        background: #f0fdfa;
+        border-color: #14b8a6;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(20, 184, 166, 0.2);
+    }
+
+    .btn-download {
+        padding: 5px 10px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        border: none;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 1px 4px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-download:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .modal-content-visualizador {
+            padding: 12px;
+            gap: 12px;
+        }
+
+        .modal-header-visualizador {
+            padding: 16px 20px;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .modal-header-visualizador h2 {
+            font-size: 20px;
+        }
+
+        .modal-close-visualizador {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .modal-controls-visualizador {
+            grid-template-columns: 1fr;
+            padding: 20px;
+            gap: 16px;
+        }
+
+        .modal-canvas-container {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .modal-canvas-info {
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .canvas-actions {
+            width: 100%;
+            justify-content: stretch;
+        }
+
+        .reset-zoom-btn,
+        .btn-download {
+            flex: 1;
+        }
+    }
+</style>
+
+<!-- Modal del Visualizador -->
+<div id="visualizadorModal" class="visualizador-modal">
+    <div class="modal-content-visualizador">
+        <div class="modal-header-visualizador">
+            <div class="header-title-section">
+                <h2><i class="fas fa-eye"></i> Visualizador de Radiografías - {{ paciente.nombre_completo }}</h2>
+                <button class="btn-help-shortcuts" onclick="showKeyboardShortcuts()" title="Ver atajos de teclado">
+                    <i class="fas fa-keyboard"></i> Atajos
+                </button>
+            </div>
+            <button class="modal-close-visualizador" onclick="cerrarModalVisualizador()" title="Cerrar (ESC)">
+                <i class="fas fa-times"></i> Cerrar
+            </button>
+        </div>
+
+        <div class="modal-controls-visualizador">
+            <div class="control-group">
+                <label for="modal-radio1-select">
+                    <i class="fas fa-image"></i> Radiografía 1
+                </label>
+                <select id="modal-radio1-select" class="form-control">
+                    <option value="">Seleccionar...</option>
+                    {% for radiografia in radiografias %}
+                    <option value="{{ radiografia.id }}" data-url="{{ radiografia.imagen.url }}"
+                        data-label="{% if radiografia.fecha_tomada %}{{ radiografia.fecha_tomada|date:" d/m/Y" }}{% else
+                        %}{{ radiografia.fecha_carga|date:"d/m/Y" }}{% endif %}">
+                        {{ radiografia.get_tipo_display }}
+                        {% if radiografia.fecha_tomada %}
+                        - Tomada: {{ radiografia.fecha_tomada|date:"d/m/Y" }}
+                        {% else %}
+                        - Cargada: {{ radiografia.fecha_carga|date:"d/m/Y" }}
+                        {% endif %}
+                        {% if radiografia.cita %}
+                        - Cita: {{ radiografia.cita.fecha_hora|date:"d/m/Y H:i" }}
+                        {% endif %}
+                        {% if radiografia.descripcion %}
+                        - {{ radiografia.descripcion|truncatewords:5 }}
+                        {% endif %}
+                        {% if radiografia.imagen_anotada %} (con anotaciones){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="modal-radio2-select">
+                    <i class="fas fa-image"></i> Radiografía 2
+                </label>
+                <select id="modal-radio2-select" class="form-control">
+                    <option value="">Seleccionar...</option>
+                    {% for radiografia in radiografias %}
+                    <option value="{{ radiografia.id }}" data-url="{{ radiografia.imagen.url }}"
+                        data-label="{% if radiografia.fecha_tomada %}{{ radiografia.fecha_tomada|date:" d/m/Y" }}{% else
+                        %}{{ radiografia.fecha_carga|date:"d/m/Y" }}{% endif %}"
+                        data-has-annotations="{% if radiografia.imagen_anotada %}true{% else %}false{% endif %}">
+                        {{ radiografia.get_tipo_display }}
+                        {% if radiografia.fecha_tomada %}
+                        - Tomada: {{ radiografia.fecha_tomada|date:"d/m/Y" }}
+                        {% else %}
+                        - Cargada: {{ radiografia.fecha_carga|date:"d/m/Y" }}
+                        {% endif %}
+                        {% if radiografia.cita %}
+                        - Cita: {{ radiografia.cita.fecha_hora|date:"d/m/Y H:i" }}
+                        {% endif %}
+                        {% if radiografia.descripcion %}
+                        - {{ radiografia.descripcion|truncatewords:5 }}
+                        {% endif %}
+                        {% if radiografia.imagen_anotada %} (con anotaciones){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <label>
+                    <i class="fas fa-pencil-alt"></i> Color del Lápiz
+                </label>
+                <div class="color-buttons">
+                    <button class="color-btn active" data-color="#ff0000" style="background: #ff0000; color: white;"
+                        onclick="seleccionarColorModal('#ff0000')">
+                        <i class="fas fa-circle"></i> Rojo
+                    </button>
+                    <button class="color-btn" data-color="#00ff00" style="background: #00ff00; color: #333;"
+                        onclick="seleccionarColorModal('#00ff00')">
+                        <i class="fas fa-circle"></i> Verde
+                    </button>
+                    <button class="color-btn" data-color="#0000ff" style="background: #0000ff; color: white;"
+                        onclick="seleccionarColorModal('#0000ff')">
+                        <i class="fas fa-circle"></i> Azul
+                    </button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>
+                    <i class="fas fa-sliders-h"></i> Ajustes de Imagen
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div>
+                        <label
+                            style="font-size: 10px; color: #64748b; font-weight: 600; margin-bottom: 4px; display: block;">
+                            Brillo: <span id="brightness-value" style="color: #14b8a6; font-weight: 700;">100</span>%
+                        </label>
+                        <input type="range" id="brightness-slider" min="0" max="200" value="100"
+                            oninput="adjustBrightness(this.value)">
+                    </div>
+                    <div>
+                        <label
+                            style="font-size: 10px; color: #64748b; font-weight: 600; margin-bottom: 4px; display: block;">
+                            Contraste: <span id="contrast-value" style="color: #14b8a6; font-weight: 700;">100</span>%
+                        </label>
+                        <input type="range" id="contrast-slider" min="0" max="200" value="100"
+                            oninput="adjustContrast(this.value)">
+                    </div>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>
+                    <i class="fas fa-tools"></i> Herramientas
+                </label>
+                <div class="tool-buttons">
+                    <button class="tool-btn" onclick="rotateImage(1, 90)" title="Rotar Radiografía 1 (R)">
+                        <i class="fas fa-redo"></i> Rotar 1
+                    </button>
+                    <button class="tool-btn" onclick="rotateImage(2, 90)" title="Rotar Radiografía 2">
+                        <i class="fas fa-redo"></i> Rotar 2
+                    </button>
+                    <button class="tool-btn" onclick="toggleInvertColors()" title="Invertir colores (I)"
+                        id="invert-colors-btn">
+                        <i class="fas fa-adjust"></i> Negativo
+                    </button>
+                    <button id="modal-clear-btn" class="tool-btn btn-danger" title="Limpiar todo (L)"
+                        onclick="limpiarTodoModal()">
+                        <i class="fas fa-broom"></i> Limpiar
+                    </button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>
+                    <i class="fas fa-pencil-alt"></i> Herramienta de Dibujo
+                </label>
+                <div class="tool-buttons">
+                    <button class="tool-btn active" id="tool-freehand-btn" onclick="setTool('freehand')"
+                        title="Dibujo libre (D)">
+                        <i class="fas fa-pencil-alt"></i> Dibujar
+                    </button>
+                    <button class="tool-btn" onclick="clearMeasurements()" title="Limpiar dibujos">
+                        <i class="fas fa-eraser"></i> Limpiar
+                    </button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>
+                    <i class="fas fa-expand"></i> Vista
+                </label>
+                <div class="tool-buttons">
+                    <button class="tool-btn" onclick="toggleFullscreen()" title="Pantalla completa (F11)">
+                        <i class="fas fa-expand"></i> Pantalla Completa
+                    </button>
+                    <button class="tool-btn" onclick="syncZoom()" title="Sincronizar zoom entre ambas imágenes">
+                        <i class="fas fa-link"></i> Sincronizar Zoom
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-canvas-container">
+            <div class="modal-canvas-wrapper" id="modal-canvas-container-1">
+                <canvas id="modal-canvas1"></canvas>
+                <div class="modal-canvas-info">
+                    <div class="canvas-info-left">
+                        <span id="modal-canvas1-label">Radiografía 1</span>
+                        <span class="zoom-indicator" id="zoom-indicator-1">100%</span>
+                    </div>
+                    <div class="canvas-actions">
+                        <button class="reset-zoom-btn" onclick="resetModalZoom(1)" title="Restablecer zoom (0)">
+                            <i class="fas fa-search-minus"></i> Zoom: <span id="zoom-value-1">100%</span>
+                        </button>
+                        <button class="btn-download" onclick="downloadCanvas(1)" title="Descargar imagen (Ctrl+D)">
+                            <i class="fas fa-download"></i> Descargar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-canvas-wrapper" id="modal-canvas-container-2">
+                <canvas id="modal-canvas2"></canvas>
+                <div class="modal-canvas-info">
+                    <div class="canvas-info-left">
+                        <span id="modal-canvas2-label">Radiografía 2</span>
+                        <span class="zoom-indicator" id="zoom-indicator-2">100%</span>
+                    </div>
+                    <div class="canvas-actions">
+                        <button class="reset-zoom-btn" onclick="resetModalZoom(2)" title="Restablecer zoom (0)">
+                            <i class="fas fa-search-minus"></i> Zoom: <span id="zoom-value-2">100%</span>
+                        </button>
+                        <button class="btn-download" onclick="downloadCanvas(2)" title="Descargar imagen (Ctrl+D)">
+                            <i class="fas fa-download"></i> Descargar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables globales del modal
+    let modalCanvas1, modalCtx1, modalImg1 = null;
+    let modalCanvas2, modalCtx2, modalImg2 = null;
+    let modalIsDrawing = false;
+    let modalCurrentColor = '#ff0000';
+    let modalBrushSize = 3;
+    let modalZoom1 = { scale: 1, offsetX: 0, offsetY: 0 };
+    let modalZoom2 = { scale: 1, offsetX: 0, offsetY: 0 };
+    let currentTool = 'freehand'; // Solo dibujo libre
+    let isInverted = false;
+    let isFullscreen = false;
+    let isZoomSynced = false;
+
+    // Datos de las radiografías
+    const radiografiasData = {
+    {% for radiografia in radiografias %}
+    { { radiografia.id } }: {
+        url: '{{ radiografia.imagen.url }}',
+            label: '{{ radiografia.get_tipo_display }}{% if radiografia.fecha_tomada %} - Tomada: {{ radiografia.fecha_tomada|date:"d/m/Y" }}{% else %} - Cargada: {{ radiografia.fecha_carga|date:"d/m/Y" }}{% endif %}{% if radiografia.cita %} - Cita: {{ radiografia.cita.fecha_hora|date:"d/m/Y H:i" }}{% endif %}{% if radiografia.descripcion %} - {{ radiografia.descripcion|truncatewords:5|escapejs }}{% endif %}',
+                hasAnnotations: {% if radiografia.imagen_anotada %} true{% else %} false{% endif %},
+        annotatedUrl: {% if radiografia.imagen_anotada %} '{{ radiografia.imagen_anotada.url }}'{% else %} null{% endif %}
+    },
+    {% endfor %}
+};
+
+    let modalEventListenersSetup = false;
+
+    function abrirModalVisualizador(radiografiaId) {
+        try {
+            const modal = document.getElementById('visualizadorModal');
+            if (!modal) {
+                console.error('Modal no encontrado');
+                return;
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            // Inicializar canvas
+            modalCanvas1 = document.getElementById('modal-canvas1');
+            modalCanvas2 = document.getElementById('modal-canvas2');
+
+            if (!modalCanvas1 || !modalCanvas2) {
+                console.error('Canvas no encontrado');
+                return;
+            }
+
+            modalCtx1 = modalCanvas1.getContext('2d');
+            modalCtx2 = modalCanvas2.getContext('2d');
+
+            // Resetear estado
+            isInverted = false;
+            currentTool = 'freehand';
+            updateToolButtons();
+
+            // Seleccionar la radiografía
+            const select1 = document.getElementById('modal-radio1-select');
+            if (select1 && radiografiasData[radiografiaId]) {
+                select1.value = radiografiaId;
+                loadModalImage(1, radiografiasData[radiografiaId].url, radiografiasData[radiografiaId].label, radiografiaId);
+            }
+
+            // Event listeners solo una vez
+            if (!modalEventListenersSetup) {
+                setupModalEventListeners();
+                setupKeyboardShortcuts();
+                modalEventListenersSetup = true;
+            }
+
+            // Actualizar indicadores
+            updateZoomIndicators();
+        } catch (error) {
+            console.error('Error al abrir visualizador:', error);
+            alert('Error al abrir el visualizador. Por favor, intente nuevamente.');
+        }
+    }
+
+    function cerrarModalVisualizador() {
+        try {
+            const modal = document.getElementById('visualizadorModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            document.body.style.overflow = '';
+
+            // Salir de pantalla completa si está activa
+            if (isFullscreen) {
+                exitFullscreen();
+            }
+
+            // Limpiar canvas
+            if (modalCtx1 && modalCanvas1) {
+                modalCtx1.clearRect(0, 0, modalCanvas1.width, modalCanvas1.height);
+            }
+            if (modalCtx2 && modalCanvas2) {
+                modalCtx2.clearRect(0, 0, modalCanvas2.width, modalCanvas2.height);
+            }
+
+            modalImg1 = null;
+            modalImg2 = null;
+            modalZoom1 = { scale: 1, offsetX: 0, offsetY: 0 };
+            modalZoom2 = { scale: 1, offsetX: 0, offsetY: 0 };
+            isInverted = false;
+        } catch (error) {
+            console.error('Error al cerrar visualizador:', error);
+        }
+    }
+
+    function setupModalEventListeners() {
+        // Selectores de radiografías
+        document.getElementById('modal-radio1-select').addEventListener('change', function () {
+            const radiografiaId = this.value;
+            const option = this.options[this.selectedIndex];
+            if (radiografiaId && radiografiasData[radiografiaId]) {
+                loadModalImage(1, radiografiasData[radiografiaId].url, radiografiasData[radiografiaId].label, parseInt(radiografiaId));
+            }
+        });
+
+        document.getElementById('modal-radio2-select').addEventListener('change', function () {
+            const radiografiaId = this.value;
+            const option = this.options[this.selectedIndex];
+            if (radiografiaId && radiografiasData[radiografiaId]) {
+                loadModalImage(2, radiografiasData[radiografiaId].url, radiografiasData[radiografiaId].label, parseInt(radiografiaId));
+            }
+        });
+
+
+        // Eventos de dibujo
+        setupModalDrawingCanvas(modalCanvas1, modalCtx1, 1);
+        setupModalDrawingCanvas(modalCanvas2, modalCtx2, 2);
+
+        // Zoom con rueda del mouse (mejorado)
+        setupModalZoom(modalCanvas1, 1);
+        setupModalZoom(modalCanvas2, 2);
+
+        // Actualizar indicadores iniciales
+        updateZoomIndicators();
+    }
+
+    function loadModalImage(canvasNum, url, label) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function () {
+            const canvas = canvasNum === 1 ? modalCanvas1 : modalCanvas2;
+            const ctx = canvasNum === 1 ? modalCtx1 : modalCtx2;
+            const container = canvasNum === 1 ? document.getElementById('modal-canvas-container-1') : document.getElementById('modal-canvas-container-2');
+
+            // Establecer el tamaño del canvas basado en el contenedor
+            const containerRect = container.getBoundingClientRect();
+            const maxWidth = containerRect.width - 40; // Margen
+            const maxHeight = containerRect.height - 100; // Espacio para controles
+
+            // Calcular tamaño manteniendo la proporción
+            let canvasWidth = img.width;
+            let canvasHeight = img.height;
+
+            if (canvasWidth > maxWidth) {
+                canvasHeight = (canvasHeight * maxWidth) / canvasWidth;
+                canvasWidth = maxWidth;
+            }
+            if (canvasHeight > maxHeight) {
+                canvasWidth = (canvasWidth * maxHeight) / canvasHeight;
+                canvasHeight = maxHeight;
+            }
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.style.width = canvasWidth + 'px';
+            canvas.style.height = canvasHeight + 'px';
+
+            // Guardar imagen
+            if (canvasNum === 1) modalImg1 = img;
+            else modalImg2 = img;
+
+            // Resetear zoom
+            if (canvasNum === 1) modalZoom1 = { scale: 1, offsetX: 0, offsetY: 0 };
+            else modalZoom2 = { scale: 1, offsetX: 0, offsetY: 0 };
+
+            // Actualizar label
+            if (canvasNum === 1) {
+                document.getElementById('modal-canvas1-label').textContent = label;
+            } else {
+                document.getElementById('modal-canvas2-label').textContent = label;
+            }
+
+            drawModalImageOnCanvasWithFilters(canvasNum);
+            updateZoomIndicators();
+        };
+        img.onerror = function () {
+            console.error('Error cargando imagen:', url);
+            alert('Error al cargar la imagen. Por favor, verifique que la imagen existe.');
+        };
+        img.src = url;
+    }
+
+    // Funciones drawModalImageOnCanvas, setupModalDrawingCanvas, resetModalZoom se definen más abajo en versión mejorada
+
+    function clearModalCanvas(canvasNum) {
+        const canvas = canvasNum === 1 ? modalCanvas1 : modalCanvas2;
+        const ctx = canvasNum === 1 ? modalCtx1 : modalCtx2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawModalImageOnCanvasWithFilters(canvasNum);
+    }
+
+    function seleccionarColorModal(color) {
+        modalCurrentColor = color;
+        document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.color-btn[data-color="${color}"]`).classList.add('active');
+    }
+
+    function limpiarTodoModal() {
+        if (confirm('¿Estás seguro de limpiar todos los dibujos?')) {
+            clearModalCanvas(1);
+            clearModalCanvas(2);
+        }
+    }
+
+    // Variables para ajustes de imagen
+    let brightness = 100;
+    let contrast = 100;
+    let rotation1 = 0;
+    let rotation2 = 0;
+
+    // Función para ajustar brillo
+    function adjustBrightness(value) {
+        brightness = value;
+        document.getElementById('brightness-value').textContent = value;
+        applyImageFilters();
+    }
+
+    // Función para ajustar contraste
+    function adjustContrast(value) {
+        contrast = value;
+        document.getElementById('contrast-value').textContent = value;
+        applyImageFilters();
+    }
+
+    // Aplicar filtros a ambas imágenes
+    function applyImageFilters() {
+        if (modalImg1) drawModalImageOnCanvasWithFilters(1);
+        if (modalImg2) drawModalImageOnCanvasWithFilters(2);
+    }
+
+    // Función para rotar imagen
+    function rotateImage(canvasNum, degrees) {
+        if (canvasNum === 1) {
+            rotation1 = (rotation1 + degrees) % 360;
+            drawModalImageOnCanvasWithFilters(1);
+        } else {
+            rotation2 = (rotation2 + degrees) % 360;
+            drawModalImageOnCanvasWithFilters(2);
+        }
+    }
+
+
+
+    function downloadCanvas(canvasNum) {
+        const canvas = canvasNum === 1 ? modalCanvas1 : modalCanvas2;
+        downloadCanvasElement(canvas);
+    }
+
+    function downloadCanvasElement(canvas) {
+        const link = document.createElement('a');
+        link.download = 'radiografia-' + new Date().getTime() + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+
+
+    // Función drawModalImageOnCanvasWithFilters se define más abajo en versión mejorada con mediciones
+
+
+    // ===== FUNCIONES PROFESIONALES MEJORADAS =====
+
+    // Actualizar indicadores de zoom
+    function updateZoomIndicators() {
+        try {
+            const zoom1 = Math.round(modalZoom1.scale * 100);
+            const zoom2 = Math.round(modalZoom2.scale * 100);
+
+            const indicator1 = document.getElementById('zoom-indicator-1');
+            const indicator2 = document.getElementById('zoom-indicator-2');
+            const value1 = document.getElementById('zoom-value-1');
+            const value2 = document.getElementById('zoom-value-2');
+
+            if (indicator1) indicator1.textContent = zoom1 + '%';
+            if (indicator2) indicator2.textContent = zoom2 + '%';
+            if (value1) value1.textContent = zoom1 + '%';
+            if (value2) value2.textContent = zoom2 + '%';
+        } catch (error) {
+            console.error('Error actualizando indicadores de zoom:', error);
+        }
+    }
+
+    // Establecer herramienta activa
+    function setTool(tool) {
+        currentTool = tool;
+        updateToolButtons();
+
+        // Cambiar cursor según herramienta
+        if (modalCanvas1) modalCanvas1.style.cursor = 'crosshair';
+        if (modalCanvas2) modalCanvas2.style.cursor = 'crosshair';
+    }
+
+    // Actualizar botones de herramientas
+    function updateToolButtons() {
+        try {
+            const freehandBtn = document.getElementById('tool-freehand-btn');
+            if (freehandBtn) freehandBtn.classList.toggle('active', currentTool === 'freehand');
+        } catch (error) {
+            console.error('Error actualizando botones de herramientas:', error);
+        }
+    }
+
+    // Invertir colores (negativo)
+    function toggleInvertColors() {
+        try {
+            isInverted = !isInverted;
+            const btn = document.getElementById('invert-colors-btn');
+            if (btn) {
+                btn.classList.toggle('active', isInverted);
+            }
+            applyImageFilters();
+        } catch (error) {
+            console.error('Error invirtiendo colores:', error);
+        }
+    }
+
+    // Pantalla completa
+    function toggleFullscreen() {
+        try {
+            const modal = document.getElementById('visualizadorModal');
+            if (!modal) return;
+
+            if (!isFullscreen) {
+                if (modal.requestFullscreen) {
+                    modal.requestFullscreen();
+                } else if (modal.webkitRequestFullscreen) {
+                    modal.webkitRequestFullscreen();
+                } else if (modal.msRequestFullscreen) {
+                    modal.msRequestFullscreen();
+                }
+                isFullscreen = true;
+            } else {
+                exitFullscreen();
+            }
+        } catch (error) {
+            console.error('Error en pantalla completa:', error);
+        }
+    }
+
+    function exitFullscreen() {
+        try {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            isFullscreen = false;
+        } catch (error) {
+            console.error('Error saliendo de pantalla completa:', error);
+        }
+    }
+
+    // Sincronizar zoom entre ambas imágenes
+    function syncZoom() {
+        try {
+            isZoomSynced = !isZoomSynced;
+            if (isZoomSynced) {
+                // Sincronizar zoom2 con zoom1
+                modalZoom2.scale = modalZoom1.scale;
+                modalZoom2.offsetX = modalZoom1.offsetX;
+                modalZoom2.offsetY = modalZoom1.offsetY;
+                drawModalImageOnCanvasWithFilters(2);
+                updateZoomIndicators();
+            }
+        } catch (error) {
+            console.error('Error sincronizando zoom:', error);
+        }
+    }
+
+    // Limpiar dibujos (renombrado de clearMeasurements)
+    function clearMeasurements() {
+        try {
+            if (confirm('¿Estás seguro de limpiar todos los dibujos?')) {
+                clearModalCanvas(1);
+                clearModalCanvas(2);
+            }
+        } catch (error) {
+            console.error('Error limpiando dibujos:', error);
+        }
+    }
+
+    // Atajos de teclado profesionales
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', function (e) {
+            const modal = document.getElementById('visualizadorModal');
+            if (!modal || !modal.classList.contains('active')) return;
+
+            // Prevenir acciones por defecto en algunos casos
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            try {
+                // Escape: Cerrar modal
+                if (e.key === 'Escape') {
+                    cerrarModalVisualizador();
+                    e.preventDefault();
+                }
+
+                // F11: Pantalla completa
+                if (e.key === 'F11') {
+                    e.preventDefault();
+                    toggleFullscreen();
+                }
+
+                // Ctrl+D: Descargar imagen activa
+                if (e.ctrlKey && e.key === 'd') {
+                    e.preventDefault();
+                    if (modalImg1) downloadCanvas(1);
+                }
+
+                // 0: Resetear zoom
+                if (e.key === '0') {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        resetModalZoom(2);
+                    } else {
+                        resetModalZoom(1);
+                    }
+                }
+
+                // I: Invertir colores
+                if (e.key === 'i' || e.key === 'I') {
+                    e.preventDefault();
+                    toggleInvertColors();
+                }
+
+                // L: Limpiar dibujos
+                if (e.key === 'l' || e.key === 'L') {
+                    e.preventDefault();
+                    limpiarTodoModal();
+                }
+
+                // D: Herramienta de dibujo libre
+                if (e.key === 'd' && !e.ctrlKey) {
+                    e.preventDefault();
+                    setTool('freehand');
+                }
+
+                // R: Rotar imagen 1
+                if (e.key === 'r' || e.key === 'R') {
+                    e.preventDefault();
+                    rotateImage(1, 90);
+                }
+
+                // +/-: Zoom in/out
+                if (e.key === '+' || e.key === '=') {
+                    e.preventDefault();
+                    zoomIn(1);
+                }
+                if (e.key === '-' || e.key === '_') {
+                    e.preventDefault();
+                    zoomOut(1);
+                }
+            } catch (error) {
+                console.error('Error en atajo de teclado:', error);
+            }
+        });
+    }
+
+    // Zoom in/out mejorado
+    function zoomIn(canvasNum) {
+        try {
+            const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+            zoom.scale = Math.min(zoom.scale * 1.2, 5);
+            drawModalImageOnCanvasWithFilters(canvasNum);
+            updateZoomIndicators();
+
+            if (isZoomSynced && canvasNum === 1) {
+                syncZoom();
+            }
+        } catch (error) {
+            console.error('Error en zoom in:', error);
+        }
+    }
+
+    function zoomOut(canvasNum) {
+        try {
+            const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+            zoom.scale = Math.max(zoom.scale / 1.2, 0.5);
+            drawModalImageOnCanvasWithFilters(canvasNum);
+            updateZoomIndicators();
+
+            if (isZoomSynced && canvasNum === 1) {
+                syncZoom();
+            }
+        } catch (error) {
+            console.error('Error en zoom out:', error);
+        }
+    }
+
+    // Mejorar función de zoom con rueda del mouse
+    function setupModalZoom(canvas, canvasNum) {
+        canvas.addEventListener('wheel', function (e) {
+            e.preventDefault();
+
+            try {
+                const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = Math.max(0.5, Math.min(5, zoom.scale * zoomFactor));
+
+                // Ajustar offset para mantener el punto del mouse en su posición
+                zoom.offsetX = mouseX - (mouseX - zoom.offsetX) * (newScale / zoom.scale);
+                zoom.offsetY = mouseY - (mouseY - zoom.offsetY) * (newScale / zoom.scale);
+                zoom.scale = newScale;
+
+                drawModalImageOnCanvasWithFilters(canvasNum);
+                updateZoomIndicators();
+
+                // Sincronizar si está activo
+                if (isZoomSynced && canvasNum === 1) {
+                    syncZoom();
+                }
+            } catch (error) {
+                console.error('Error en zoom con rueda:', error);
+            }
+        });
+
+        // Pan con click derecho arrastrado o Ctrl+click
+        let isPanning = false;
+        let panStart = { x: 0, y: 0 };
+
+        canvas.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('mousedown', function (e) {
+            if (e.button === 2 || e.ctrlKey) {
+                isPanning = true;
+                const rect = canvas.getBoundingClientRect();
+                panStart.x = e.clientX - rect.left;
+                panStart.y = e.clientY - rect.top;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        canvas.addEventListener('mousemove', function (e) {
+            if (isPanning) {
+                try {
+                    const rect = canvas.getBoundingClientRect();
+                    const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+
+                    zoom.offsetX += (e.clientX - rect.left) - panStart.x;
+                    zoom.offsetY += (e.clientY - rect.top) - panStart.y;
+
+                    panStart.x = e.clientX - rect.left;
+                    panStart.y = e.clientY - rect.top;
+
+                    drawModalImageOnCanvasWithFilters(canvasNum);
+                    updateZoomIndicators();
+                } catch (error) {
+                    console.error('Error en pan:', error);
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', function () {
+            if (isPanning) {
+                isPanning = false;
+                canvas.style.cursor = currentTool === 'line' ? 'crosshair' : 'crosshair';
+            }
+        });
+    }
+
+    // Mejorar función de reset zoom
+    function resetModalZoom(canvasNum) {
+        try {
+            if (canvasNum === 1) {
+                modalZoom1 = { scale: 1, offsetX: 0, offsetY: 0 };
+                drawModalImageOnCanvasWithFilters(1);
+            } else {
+                modalZoom2 = { scale: 1, offsetX: 0, offsetY: 0 };
+                drawModalImageOnCanvasWithFilters(2);
+            }
+            updateZoomIndicators();
+        } catch (error) {
+            console.error('Error reseteando zoom:', error);
+        }
+    }
+
+    // Mejorar función de dibujo con herramientas
+    function setupModalDrawingCanvas(canvas, ctx, canvasNum) {
+        let lastX, lastY;
+        let isDrawing = false;
+
+        function getCanvasCoordinates(e) {
+            try {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / canvas.offsetWidth;
+                const scaleY = canvas.height / canvas.offsetHeight;
+
+                let clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+                let clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+
+                const x = (clientX - rect.left) * scaleX;
+                const y = (clientY - rect.top) * scaleY;
+
+                const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+
+                // Ajustar por zoom y pan
+                const adjustedX = (x - zoom.offsetX * scaleX) / zoom.scale;
+                const adjustedY = (y - zoom.offsetY * scaleY) / zoom.scale;
+
+                return { x: adjustedX, y: adjustedY };
+            } catch (error) {
+                console.error('Error obteniendo coordenadas:', error);
+                return { x: 0, y: 0 };
+            }
+        }
+
+        function startDraw(e) {
+            if (e.button === 2 || e.ctrlKey) return; // No dibujar si es pan
+
+            try {
+                e.preventDefault();
+                isDrawing = true;
+
+                const coords = getCanvasCoordinates(e);
+                lastX = coords.x;
+                lastY = coords.y;
+            } catch (error) {
+                console.error('Error iniciando dibujo:', error);
+            }
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+
+            try {
+                const coords = getCanvasCoordinates(e);
+                const currentX = coords.x;
+                const currentY = coords.y;
+                const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+
+                ctx.save();
+                ctx.translate(zoom.offsetX * (canvas.width / canvas.offsetWidth), zoom.offsetY * (canvas.height / canvas.offsetHeight));
+                ctx.scale(zoom.scale, zoom.scale);
+
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(currentX, currentY);
+                ctx.lineWidth = modalBrushSize / zoom.scale;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = modalCurrentColor;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.stroke();
+
+                ctx.restore();
+
+                lastX = currentX;
+                lastY = currentY;
+            } catch (error) {
+                console.error('Error dibujando:', error);
+            }
+        }
+
+        function stopDraw() {
+            isDrawing = false;
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDraw);
+        canvas.addEventListener('mouseout', stopDraw);
+
+        // Touch events
+        canvas.addEventListener('touchstart', startDraw);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDraw);
+        canvas.addEventListener('touchcancel', stopDraw);
+    }
+
+    // Mejorar función de dibujar imagen con filtros
+    function drawModalImageOnCanvasWithFilters(canvasNum) {
+        try {
+            const canvas = canvasNum === 1 ? modalCanvas1 : modalCanvas2;
+            const ctx = canvasNum === 1 ? modalCtx1 : modalCtx2;
+            const img = canvasNum === 1 ? modalImg1 : modalImg2;
+            const zoom = canvasNum === 1 ? modalZoom1 : modalZoom2;
+            const rotation = canvasNum === 1 ? rotation1 : rotation2;
+
+            if (!img || !canvas || !ctx) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+
+            // Aplicar filtros
+            let filterString = `brightness(${brightness}%) contrast(${contrast}%)`;
+            if (isInverted) {
+                filterString += ' invert(1)';
+            }
+            ctx.filter = filterString;
+
+            // Aplicar rotación
+            if (rotation !== 0) {
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate((rotation * Math.PI) / 180);
+                ctx.translate(-canvas.width / 2, -canvas.height / 2);
+            }
+
+            // Aplicar zoom y pan
+            ctx.translate(zoom.offsetX, zoom.offsetY);
+            ctx.scale(zoom.scale, zoom.scale);
+
+            ctx.drawImage(img, 0, 0);
+            ctx.restore();
+
+            // Dibujar mediciones guardadas
+            const key = canvasNum === 1 ? 'canvas1' : 'canvas2';
+            measurements[key].forEach(measurement => {
+                ctx.save();
+                ctx.translate(zoom.offsetX * (canvas.width / canvas.offsetWidth), zoom.offsetY * (canvas.height / canvas.offsetHeight));
+                ctx.scale(zoom.scale, zoom.scale);
+                ctx.beginPath();
+                ctx.moveTo(measurement.start.x, measurement.start.y);
+                ctx.lineTo(measurement.end.x, measurement.end.y);
+                ctx.lineWidth = 2 / zoom.scale;
+                ctx.strokeStyle = measurement.color;
+                ctx.stroke();
+
+                // Dibujar distancia si es línea
+                const dx = measurement.end.x - measurement.start.x;
+                const dy = measurement.end.y - measurement.start.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const midX = (measurement.start.x + measurement.end.x) / 2;
+                const midY = (measurement.start.y + measurement.end.y) / 2;
+
+                ctx.fillStyle = measurement.color;
+                ctx.font = `${12 / zoom.scale}px Arial`;
+                ctx.fillText(Math.round(distance) + 'px', midX, midY - 5 / zoom.scale);
+                ctx.restore();
+            });
+        } catch (error) {
+            console.error('Error dibujando imagen con filtros:', error);
+        }
+    }
+
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', function (e) {
+        const modal = document.getElementById('visualizadorModal');
+        if (modal && modal.classList.contains('active') && e.key === 'Escape') {
+            cerrarModalVisualizador();
+        }
+    });
+
+    // Manejar cambios de pantalla completa
+    document.addEventListener('fullscreenchange', function () {
+        isFullscreen = !!document.fullscreenElement;
+    });
+
+    document.addEventListener('webkitfullscreenchange', function () {
+        isFullscreen = !!document.webkitFullscreenElement;
+    });
+
+    document.addEventListener('msfullscreenchange', function () {
+        isFullscreen = !!document.msFullscreenElement;
+    });
+
+    // Mostrar ayuda de atajos de teclado
+    function showKeyboardShortcuts() {
+        const shortcuts = [
+            { key: 'ESC', action: 'Cerrar visualizador' },
+            { key: 'F11', action: 'Pantalla completa' },
+            { key: 'Ctrl+D', action: 'Descargar imagen' },
+            { key: '0', action: 'Restablecer zoom' },
+            { key: '+ / -', action: 'Zoom in/out' },
+            { key: 'I', action: 'Invertir colores (negativo)' },
+            { key: 'L', action: 'Limpiar dibujos' },
+            { key: 'D', action: 'Herramienta de dibujo libre' },
+            { key: 'R', action: 'Rotar imagen 1' },
+            { key: 'Ctrl+Click / Click derecho', action: 'Mover imagen (Pan)' },
+            { key: 'Rueda del mouse', action: 'Zoom' }
+        ];
+
+        let message = 'ATAJOS DE TECLADO:\n\n';
+        shortcuts.forEach(shortcut => {
+            message += `${shortcut.key.padEnd(25)} → ${shortcut.action}\n`;
+        });
+
+        alert(message);
+    }
+
+    // Auto-abrir radiografía desde URL (ej: ?open=123)
+    document.addEventListener('DOMContentLoaded', function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const radiografiaIdAuto = urlParams.get('open');
+
+        if (radiografiaIdAuto) {
+            console.log('Detectado parámetro open:', radiografiaIdAuto);
+            // Esperar un momento para asegurar que todo el JS del visualizador esté listo
+            setTimeout(function () {
+                try {
+                    console.log('Intentando abrir radiografía:', radiografiaIdAuto);
+                    abrirModalVisualizador(parseInt(radiografiaIdAuto));
+
+                    // Limpiar la URL para que no se abra de nuevo al recargar
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                } catch (error) {
+                    console.error('Error al auto-abrir radiografía:', error);
+                }
+            }, 800);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,453 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Citas Activas - Clínica San Felipe</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 24px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.1);
+            border: 1px solid #a7f3d0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h2 {
+            color: #1e293b;
+            font-size: 1.75rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+        }
+
+        .header h2 i {
+            color: #14b8a6;
+        }
+
+        .back-btn {
+            background: white;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .back-btn:hover {
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #a7f3d0;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(20, 184, 166, 0.05);
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.15);
+            border-color: #14b8a6;
+            transform: translateY(-2px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .citas-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .cita-card {
+            background: white;
+            border: 2px solid #a7f3d0;
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.1);
+        }
+
+        .cita-card:hover {
+            box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
+            border-color: #14b8a6;
+            transform: translateY(-4px);
+        }
+
+        .cita-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #ecfdf5;
+        }
+
+        .cita-fecha {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cita-fecha i {
+            color: #14b8a6;
+            font-size: 1.5rem;
+        }
+
+        .cita-estado {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cita-estado.reservada {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .cita-estado.confirmada {
+            background: #ccfbf1;
+            color: #0f766e;
+            border: 1px solid #5eead4;
+        }
+
+        .cita-detalles {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f0fdfa 0%, #ecfdf5 100%);
+            border-radius: 12px;
+        }
+
+        .detalle-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .detalle-label {
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detalle-valor {
+            color: #1e293b;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .detalle-valor.precio {
+            color: #0f766e;
+            font-size: 1.25rem;
+        }
+
+        .no-citas {
+            text-align: center;
+            color: #64748b;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 16px;
+            border: 2px dashed #a7f3d0;
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.1);
+        }
+
+        .no-citas i {
+            font-size: 4rem;
+            color: #a7f3d0;
+            margin-bottom: 20px;
+        }
+
+        .no-citas p {
+            margin: 8px 0;
+            font-size: 1rem;
+        }
+
+        .no-citas p:first-of-type {
+            font-weight: 600;
+            color: #475569;
+            font-size: 1.25rem;
+        }
+
+        .info-banner {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border: 2px solid #14b8a6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .info-banner i {
+            color: #0f766e;
+            font-size: 2rem;
+        }
+
+        .info-banner-content h3 {
+            color: #0f766e;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .info-banner-content p {
+            color: #065f46;
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 0;
+            }
+
+            .header {
+                flex-direction: column;
+                padding: 15px;
+                align-items: flex-start;
+            }
+
+            .header h2 {
+                font-size: 1.5rem;
+            }
+
+            .back-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .cita-detalles {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .cita-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .cita-fecha {
+                font-size: 1.1rem;
+            }
+
+            .info-banner {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h2 {
+                font-size: 1.25rem;
+            }
+
+            .stat-number {
+                font-size: 2rem;
+            }
+
+            .cita-card {
+                padding: 16px;
+            }
+
+            .cita-fecha {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>
+                <i class="fas fa-calendar-check"></i>
+                Mis Citas Activas
+            </h2>
+            <a href="{% url 'panel_cliente' %}" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+                Volver al Panel
+            </a>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_citas_activas }}</div>
+                <div class="stat-label">Citas Activas</div>
+            </div>
+        </div>
+
+        {% if citas_activas %}
+            {% if total_citas_activas > 0 %}
+            <div class="info-banner">
+                <i class="fas fa-info-circle"></i>
+                <div class="info-banner-content">
+                    <h3>¡Tienes una cita activa!</h3>
+                    <p>Revisa los detalles de tu cita a continuación. Si necesitas cancelar, por favor contáctanos.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="citas-lista">
+                {% for cita in citas_activas %}
+                    <div class="cita-card">
+                        <div class="cita-header">
+                            <div class="cita-fecha">
+                                <i class="fas fa-calendar-alt"></i>
+                                {{ cita.fecha_hora|date:"l, j \d\e F \d\e Y"|capfirst }} a las {{ cita.fecha_hora|date:"H:i" }} hrs
+                            </div>
+                            <span class="cita-estado {{ cita.estado }}">
+                                {% if cita.estado == 'reservada' %}
+                                    <i class="fas fa-clock"></i> Reservada
+                                {% elif cita.estado == 'confirmada' %}
+                                    <i class="fas fa-check"></i> Confirmada
+                                {% else %}
+                                    <i class="fas fa-info-circle"></i> {{ cita.estado|title }}
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <div class="cita-detalles">
+                            <div class="detalle-item">
+                                <span class="detalle-label">Tipo de Consulta</span>
+                                <span class="detalle-valor">
+                                    {% if cita.servicio_info %}
+                                        {{ cita.servicio_info.nombre }}
+                                    {% else %}
+                                        {{ cita.tipo_consulta|default:"Consulta general" }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if cita.servicio_info %}
+                            <div class="detalle-item">
+                                <span class="detalle-label">Precio del Servicio</span>
+                                <span class="detalle-valor precio">
+                                    {% if cita.servicio_info.precio_cobrado_formateado %}
+                                        {{ cita.servicio_info.precio_cobrado_formateado }}
+                                    {% elif cita.servicio_info.precio_formateado %}
+                                        {{ cita.servicio_info.precio_formateado }}
+                                    {% else %}
+                                        Consultar precio
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% endif %}
+                            {% if cita.dentista_info %}
+                            <div class="detalle-item">
+                                <span class="detalle-label">Dentista</span>
+                                <span class="detalle-valor">Dr(a). {{ cita.dentista_info.nombre }}</span>
+                            </div>
+                            {% if cita.dentista_info.especialidad %}
+                            <div class="detalle-item">
+                                <span class="detalle-label">Especialidad</span>
+                                <span class="detalle-valor">{{ cita.dentista_info.especialidad }}</span>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <div class="detalle-item">
+                                <span class="detalle-label">Dentista</span>
+                                <span class="detalle-valor">Por asignar</span>
+                            </div>
+                            {% endif %}
+                            <div class="detalle-item">
+                                <span class="detalle-label">Paciente</span>
+                                <span class="detalle-valor">{{ cita.paciente_nombre|default:"No especificado" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-citas">
+                <i class="fas fa-calendar-times"></i>
+                <p>No tienes citas activas</p>
+                <p>Cuando reserves una cita, aparecerá aquí</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+
+
+

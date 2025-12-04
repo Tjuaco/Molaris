@@ -1,0 +1,1122 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Gestión de Pacientes - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Header con Stats a la Derecha -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-user-friends"></i> Mis Pacientes</h1>
+        <p class="page-subtitle">
+            <i class="fas fa-info-circle"></i> 
+            Muestra todos los pacientes que han tenido citas contigo
+        </p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.total_pacientes }}</div>
+                    <div class="stat-label">Total Pacientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon completed">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.citas_completadas }}</div>
+                    <div class="stat-label">Citas Completadas</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon pending">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.citas_pendientes }}</div>
+                    <div class="stat-label">Citas Pendientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon today">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.citas_hoy }}</div>
+                    <div class="stat-label">Citas Hoy</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros y Búsqueda -->
+<div class="section">
+    <div class="search-header">
+        <h2><i class="fas fa-search"></i> Buscar Pacientes</h2>
+    </div>
+    
+    <form method="get" class="search-form">
+        <div class="search-group">
+            <label>Buscar:</label>
+            <input type="text" name="search" value="{{ search }}" placeholder="Nombre, email o teléfono...">
+        </div>
+        <div class="search-group">
+            <label>Estado:</label>
+            <select name="estado">
+                <option value="">Todos</option>
+                <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+                <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivos</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i>
+            <span>Buscar</span>
+        </button>
+        <a href="{% url 'gestionar_pacientes' %}" class="btn btn-secondary">
+            <i class="fas fa-refresh"></i>
+            <span>Limpiar</span>
+        </a>
+    </form>
+</div>
+
+<!-- Lista de Pacientes Mejorada -->
+<div class="section">
+    <div class="patients-header">
+        <h2><i class="fas fa-users"></i> Mis Pacientes ({{ pacientes.count }})</h2>
+        <div class="view-controls">
+            <button class="view-btn active" onclick="toggleView('grid')">
+                <i class="fas fa-th"></i>
+            </button>
+            <button class="view-btn" onclick="toggleView('list')">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    </div>
+    
+    {% if pacientes %}
+    <!-- Vista Grid -->
+    <div id="grid-view" class="patients-grid">
+        {% for paciente in pacientes %}
+        <div class="patient-card">
+            <div class="patient-header">
+                <div class="patient-avatar">
+                    {{ paciente.nombre_completo|first|upper }}
+                </div>
+                <div class="patient-status">
+                    {% if paciente.activo %}
+                    <span class="status-badge active">
+                        <i class="fas fa-check-circle"></i> Activo
+                    </span>
+                    {% else %}
+                    <span class="status-badge inactive">
+                        <i class="fas fa-times-circle"></i> Inactivo
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="patient-info">
+                <h3 class="patient-name">{{ paciente.nombre_completo }}</h3>
+                <div class="patient-details">
+                    <div class="detail-item">
+                        <i class="fas fa-envelope"></i>
+                        <span>{{ paciente.email }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <i class="fas fa-phone"></i>
+                        <span>{{ paciente.telefono|default:"No especificado" }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <i class="fas fa-calendar-plus"></i>
+                        <span>Registro: {{ paciente.fecha_registro|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="patient-actions">
+                <button onclick="openPatientModal({{ paciente.id }}, '{{ paciente.nombre_completo }}', '{{ paciente.email }}', '{{ paciente.telefono|default:"No especificado" }}', '{{ paciente.fecha_registro|date:"d/m/Y" }}', '{{ paciente.activo }}', {{ paciente.total_citas }})" class="action-btn primary">
+                    <i class="fas fa-eye"></i>
+                    <span>Ver Detalles</span>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Vista Lista -->
+    <div id="list-view" class="patients-list" style="display: none;">
+        <div class="table-container">
+            <table class="patients-table">
+            <thead>
+                    <tr>
+                        <th>Paciente</th>
+                        <th>Contacto</th>
+                        <th>Registro</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for paciente in pacientes %}
+                    <tr>
+                        <td>
+                            <div class="patient-cell">
+                                <div class="patient-avatar-small">
+                                    {{ paciente.nombre_completo|first|upper }}
+                                </div>
+                                <div class="patient-info-cell">
+                                    <div class="patient-name-cell">{{ paciente.nombre_completo }}</div>
+                                </div>
+                            </div>
+                    </td>
+                        <td>
+                            <div class="contact-cell">
+                                <div class="contact-email">{{ paciente.email }}</div>
+                                <div class="contact-phone">{{ paciente.telefono|default:"No especificado" }}</div>
+                            </div>
+                    </td>
+                        <td class="date-cell">
+                        {{ paciente.fecha_registro|date:"d/m/Y" }}
+                    </td>
+                        <td>
+                        {% if paciente.activo %}
+                            <span class="status-badge active">
+                            <i class="fas fa-check-circle"></i> Activo
+                        </span>
+                        {% else %}
+                            <span class="status-badge inactive">
+                            <i class="fas fa-times-circle"></i> Inactivo
+                        </span>
+                        {% endif %}
+                    </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button onclick="openPatientModal({{ paciente.id }}, '{{ paciente.nombre_completo }}', '{{ paciente.email }}', '{{ paciente.telefono|default:"No especificado" }}', '{{ paciente.fecha_registro|date:"d/m/Y" }}', '{{ paciente.activo }}', {{ paciente.total_citas }})" class="action-btn primary">
+                                <i class="fas fa-eye"></i>
+                                </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-user-friends"></i>
+        <h3>No hay pacientes asignados</h3>
+        <p>No tienes pacientes asignados actualmente.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Detalles del Paciente -->
+<div id="patientModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-user"></i> Detalles del Paciente</h2>
+            <button onclick="closePatientModal()" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="patient-modal-grid">
+                <!-- Información Personal -->
+                <div class="modal-section">
+                    <h3><i class="fas fa-user"></i> Información Personal</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Nombre Completo:</label>
+                            <span id="modal-nombre"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Email:</label>
+                            <span id="modal-email"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Teléfono:</label>
+                            <span id="modal-telefono"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Fecha de Registro:</label>
+                            <span id="modal-fecha"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Estado:</label>
+                            <span id="modal-estado"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Estadísticas de Citas -->
+                <div class="modal-section">
+                    <h3><i class="fas fa-chart-bar"></i> Estadísticas de Citas</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Total de Citas:</label>
+                            <span id="modal-total-citas" style="font-weight: 600; color: var(--primary-color); font-size: 1.1rem;"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Última Cita:</label>
+                            <span id="modal-ultima-cita">Cargando...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Próxima Cita:</label>
+                            <span id="modal-proxima-cita">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <button onclick="closePatientModal()" class="btn btn-secondary">
+                <i class="fas fa-times"></i>
+                <span>Cerrar</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Dashboard Compacto */
+.dashboard-compact {
+    margin-bottom: 24px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.stat-icon.completed {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.stat-icon.pending {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.stat-icon.today {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* Búsqueda */
+.search-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.search-form {
+    display: flex;
+    gap: 16px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.search-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.search-group input,
+.search-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+/* Lista de Pacientes */
+.patients-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.view-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.view-btn {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.view-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.view-btn:hover {
+    background: #f3f4f6;
+}
+
+.view-btn.active:hover {
+    background: #2563eb;
+}
+
+/* Vista Grid */
+.patients-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.patient-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+.patient-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.patient-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.patient-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+.patient-info {
+    margin-bottom: 16px;
+}
+
+.patient-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 12px;
+}
+
+.patient-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.detail-item i {
+    width: 16px;
+    color: var(--primary-color);
+}
+
+.patient-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.action-btn.primary {
+    background: var(--primary-color);
+    color: white;
+    border: 1px solid var(--primary-color);
+}
+
+.action-btn.primary:hover {
+    background: #2563eb;
+}
+
+.action-btn.secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.action-btn.secondary:hover {
+    background: #e5e7eb;
+}
+
+.patient-notes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #f59e0b;
+    background: #fef3c7;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Vista Lista */
+.patients-list {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.patients-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.patients-table th {
+    background: #f8fafc;
+    padding: 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.patients-table td {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.patient-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.patient-avatar-small {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+.patient-info-cell {
+    flex: 1;
+}
+
+.patient-name-cell {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.patient-notes-cell {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.contact-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.contact-email {
+    color: #374151;
+    font-weight: 500;
+}
+
+.contact-phone {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.date-cell {
+    color: #6b7280;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-buttons .action-btn {
+    padding: 6px 8px;
+    min-width: auto;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-badge.active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-badge.inactive {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    margin-bottom: 8px;
+    color: #374151;
+}
+
+/* Modal de Detalles del Paciente */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    box-shadow: 0 20px 25px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.modal-body {
+    padding: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.patient-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.modal-section {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+}
+
+.modal-section h3 {
+    margin: 0 0 16px 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.info-item span {
+    color: #1f2937;
+    font-weight: 500;
+}
+
+
+.modal-footer {
+    background: #f8fafc;
+    padding: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.modal-footer .btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.modal-footer .btn-warning {
+    background: #f59e0b;
+    color: white;
+    border: 1px solid #f59e0b;
+}
+
+.modal-footer .btn-warning:hover {
+    background: #d97706;
+}
+
+.modal-footer .btn-secondary {
+    background: #6b7280;
+    color: white;
+    border: 1px solid #6b7280;
+}
+
+.modal-footer .btn-secondary:hover {
+    background: #4b5563;
+}
+
+.modal-footer .btn-success {
+    background: #10b981;
+    color: white;
+    border: 1px solid #10b981;
+}
+
+.modal-footer .btn-success:hover {
+    background: #059669;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .patients-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .search-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-group {
+        min-width: auto;
+    }
+    
+    .patients-header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: stretch;
+    }
+    
+    .view-controls {
+        justify-content: center;
+    }
+    
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+    
+    .patient-modal-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .modal-body {
+        padding: 20px;
+    }
+    
+    .modal-section {
+        padding: 16px;
+    }
+}
+</style>
+
+<script>
+function toggleView(view) {
+    const gridView = document.getElementById('grid-view');
+    const listView = document.getElementById('list-view');
+    const buttons = document.querySelectorAll('.view-btn');
+    
+    // Remover clase active de todos los botones
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    if (view === 'grid') {
+        gridView.style.display = 'grid';
+        listView.style.display = 'none';
+        buttons[0].classList.add('active');
+    } else {
+        gridView.style.display = 'none';
+        listView.style.display = 'block';
+        buttons[1].classList.add('active');
+    }
+}
+
+// Variables globales para el modal
+let currentPatientId = null;
+
+// Funciones del Modal
+function openPatientModal(id, nombre, email, telefono, fecha, activo, totalCitas) {
+    const modal = document.getElementById('patientModal');
+    currentPatientId = id;
+    
+    // Llenar los datos del modal
+    document.getElementById('modal-nombre').textContent = nombre;
+    document.getElementById('modal-email').textContent = email;
+    document.getElementById('modal-telefono').textContent = telefono;
+    document.getElementById('modal-fecha').textContent = fecha;
+    document.getElementById('modal-total-citas').textContent = totalCitas || 0;
+    
+    // Estado del paciente
+    const estadoElement = document.getElementById('modal-estado');
+    if (activo === 'True') {
+        estadoElement.innerHTML = '<span style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;"><i class="fas fa-check-circle"></i> Activo</span>';
+    } else {
+        estadoElement.innerHTML = '<span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;"><i class="fas fa-times-circle"></i> Inactivo</span>';
+    }
+    
+    // Cargar estadísticas adicionales
+    cargarEstadisticasPaciente(id);
+    
+    // Mostrar el modal
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function cargarEstadisticasPaciente(pacienteId) {
+    // Mostrar indicadores de carga
+    document.getElementById('modal-ultima-cita').textContent = 'Cargando...';
+    document.getElementById('modal-proxima-cita').textContent = 'Cargando...';
+    
+    // Hacer petición AJAX para obtener estadísticas
+    fetch(`/trabajadores/estadisticas_paciente_json/${pacienteId}/`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error('Error al cargar estadísticas');
+    })
+    .then(data => {
+        if (data.success) {
+            // Mostrar última cita
+            if (data.ultima_cita) {
+                const ultimaCita = data.ultima_cita;
+                document.getElementById('modal-ultima-cita').innerHTML = 
+                    `<strong>${ultimaCita.fecha} ${ultimaCita.hora}</strong><br>` +
+                    `<span style="color: #6b7280; font-size: 0.875rem;">${ultimaCita.servicio}</span>`;
+            } else {
+                document.getElementById('modal-ultima-cita').textContent = 'No hay citas registradas';
+            }
+            
+            // Mostrar próxima cita
+            if (data.proxima_cita) {
+                const proximaCita = data.proxima_cita;
+                document.getElementById('modal-proxima-cita').innerHTML = 
+                    `<strong>${proximaCita.fecha} ${proximaCita.hora}</strong><br>` +
+                    `<span style="color: #6b7280; font-size: 0.875rem;">${proximaCita.servicio}</span>`;
+            } else {
+                document.getElementById('modal-proxima-cita').textContent = 'No hay citas programadas';
+            }
+        } else {
+            throw new Error('Error en la respuesta del servidor');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('modal-ultima-cita').textContent = 'No disponible';
+        document.getElementById('modal-proxima-cita').textContent = 'No disponible';
+    });
+}
+
+
+function closePatientModal() {
+    const modal = document.getElementById('patientModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+    currentPatientId = null;
+}
+
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showNotification(message, type) {
+    // Crear elemento de notificación
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    // Agregar estilos
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : '#ef4444'};
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1001;
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    // Agregar al DOM
+    document.body.appendChild(notification);
+    
+    // Remover después de 3 segundos
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Cerrar modal al hacer clic fuera del contenido
+document.getElementById('patientModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePatientModal();
+    }
+});
+
+// Cerrar modal con tecla Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closePatientModal();
+    }
+});
+</script>
+{% endblock %}

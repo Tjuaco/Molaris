@@ -1,0 +1,3198 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Gestor de Clientes - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    /* Override del padding del main-content del base.html */
+    .main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+</style>
+<!-- Layout con Sidebar -->
+<div class="gestor-layout-container">
+    <!-- Sidebar Izquierdo -->
+    <nav class="gestor-sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-users"></i> Clientes</h3>
+        </div>
+        <div class="sidebar-nav">
+            <a href="{% url 'gestor_clientes' %}" class="sidebar-nav-item {% if not estado %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <span>Todos los Clientes</span>
+            </a>
+            <a href="{% url 'gestor_clientes' %}?estado=activo" class="sidebar-nav-item {% if estado == 'activo' %}active{% endif %}">
+                <i class="fas fa-check-circle"></i>
+                <span>Clientes Activos</span>
+            </a>
+            <a href="{% url 'gestor_clientes' %}?estado=inactivo" class="sidebar-nav-item {% if estado == 'inactivo' %}active{% endif %}">
+                <i class="fas fa-user-slash"></i>
+                <span>Clientes Inactivos</span>
+            </a>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-title">Exportar</div>
+            <a href="{% url 'exportar_excel_clientes' %}" class="sidebar-nav-item" target="_blank">
+                <i class="fas fa-file-excel"></i>
+                <span>Exportar a Excel</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <div class="gestor-content">
+        <!-- Contenedor de Notificaciones -->
+        <div id="notificationContainer" class="notification-container"></div>
+
+<style>
+    /* Sistema de Notificaciones */
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+    
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+    
+    .notification.success {
+        border-left-color: #10b981;
+        background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+    }
+    
+    .notification.error {
+        border-left-color: #ef4444;
+        background: linear-gradient(to right, #fef2f2 0%, white 8%);
+    }
+    
+    .notification.warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(to right, #fffbeb 0%, white 8%);
+    }
+    
+    .notification.info {
+        border-left-color: #3b82f6;
+        background: linear-gradient(to right, #eff6ff 0%, white 8%);
+    }
+    
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+    
+    .notification.success .notification-icon {
+        background: #10b981;
+        color: white;
+    }
+    
+    .notification.error .notification-icon {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+        color: white;
+    }
+    
+    .notification.info .notification-icon {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .notification-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+    
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+    }
+    
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+
+    /* Layout con Sidebar */
+    .gestor-layout-container {
+        display: flex;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        align-items: flex-start;
+        width: 100%;
+        position: relative;
+        min-height: calc(100vh - 80px);
+        overflow-x: hidden;
+    }
+
+    /* Sidebar Izquierdo */
+    .gestor-sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 20px 0;
+        min-height: calc(100vh - 99px);
+        position: fixed;
+        top: 99px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 100;
+        overflow-y: auto;
+        max-height: calc(100vh - 99px);
+    }
+
+    .sidebar-header {
+        padding: 0 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding-top: 12px;
+        background: #f0fdfa;
+        border-radius: 0;
+    }
+
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-header h3 i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 0 12px;
+        margin-top: 8px;
+    }
+
+    .sidebar-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #64748b;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+        border: none;
+        background: none;
+        width: 100%;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .sidebar-nav-item:hover {
+        background: #f8fafc;
+        color: var(--primary-color);
+    }
+
+    .sidebar-nav-item.active {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .sidebar-nav-item.active i {
+        color: white;
+    }
+
+    .sidebar-nav-item i {
+        width: 20px;
+        text-align: center;
+        color: #94a3b8;
+        transition: color 0.2s ease;
+        font-size: 1rem;
+    }
+
+    .sidebar-nav-item:hover i {
+        color: var(--primary-color);
+    }
+
+    .sidebar-nav-item.active i {
+        color: white;
+    }
+
+    .sidebar-divider {
+        height: 1px;
+        background: #e5e7eb;
+        margin: 12px 20px;
+    }
+
+    .sidebar-section-title {
+        padding: 12px 20px 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 12px;
+        margin-bottom: 4px;
+    }
+
+    .sidebar-action-btn {
+        background: none !important;
+    }
+
+    /* Contenido Principal */
+    .gestor-content {
+        flex: 1;
+        min-width: 0;
+        margin-left: 260px; /* Ancho del sidebar */
+        margin-right: 0;
+        margin-top: 0;
+        padding: 12px 24px;
+        padding-top: 12px;
+        box-sizing: border-box;
+        width: calc(100% - 260px);
+        position: relative;
+        max-width: calc(100vw - 260px);
+        overflow-x: hidden;
+    }
+
+    /* Asegurar que el contenido no se desborde */
+    .gestor-content * {
+        box-sizing: border-box;
+    }
+
+    .gestor-content .header-with-stats {
+        margin-bottom: 24px;
+        margin-top: 0;
+        width: 100%;
+    }
+
+    .gestor-content .page-header {
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .gestor-content .page-title {
+        margin-bottom: 8px;
+        font-size: 32px;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .gestor-content .page-subtitle {
+        color: #64748b;
+        font-size: 16px;
+        margin: 0;
+    }
+
+    .gestor-content .dashboard-compact {
+        flex-shrink: 0;
+    }
+
+    .gestor-content .stats-grid {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .gestor-content .stat-card {
+        min-width: 140px;
+        max-width: 180px;
+        padding: 14px 16px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .gestor-content .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: white;
+        background: var(--primary-color);
+        flex-shrink: 0;
+    }
+
+    .gestor-content .stat-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .gestor-content .stat-number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+    }
+
+    .gestor-content .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+        margin-top: 4px;
+    }
+
+    .gestor-content .actions-bar {
+        margin-bottom: 24px;
+        width: 100%;
+    }
+
+    .gestor-content .section {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        width: 100%;
+    }
+
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .gestor-sidebar {
+            display: none;
+        }
+        .gestor-content {
+            margin-left: 0;
+            margin-right: 0;
+            width: 100%;
+            max-width: 100%;
+            padding: 24px;
+        }
+    }
+</style>
+
+<!-- Header con Stats a la Derecha -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-users"></i> Gestor de Clientes</h1>
+        <p class="page-subtitle">Administra la información de todos los clientes registrados</p>
+    </div>
+    <div class="dashboard-compact">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.total_clientes }}</div>
+                    <div class="stat-label">Total Clientes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #10b981;">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.clientes_con_citas }}</div>
+                    <div class="stat-label">Clientes con Citas</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #3b82f6;">
+                    <i class="fas fa-user-plus"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.clientes_nuevos|default:0 }}</div>
+                    <div class="stat-label">Nuevos (30 días)</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #f59e0b;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ estadisticas.clientes_con_alergias|default:0 }}</div>
+                    <div class="stat-label">Con Alergias</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Barra de Acciones y Filtros -->
+<div class="actions-bar">
+    <form method="GET" class="filter-form">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" name="search" placeholder="Buscar cliente..." value="{{ search }}">
+        </div>
+
+        <select name="estado" class="filter-select">
+            <option value="">Todos los estados</option>
+            <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+            <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivos</option>
+        </select>
+        
+        <button type="submit" class="btn-filter">
+            <i class="fas fa-filter"></i> Filtrar
+        </button>
+        
+        {% if search or estado %}
+        <a href="{% url 'gestor_clientes' %}" class="btn-clear">
+            <i class="fas fa-times"></i> Limpiar
+        </a>
+        {% endif %}
+        
+        <button type="button" class="btn-add-cliente" onclick="mostrarModalCrearCliente()">
+            <i class="fas fa-user-plus"></i>
+            Crear Cliente Presencial
+        </button>
+    </form>
+</div>
+
+<!-- Lista de Clientes -->
+<div class="section">
+    
+    {% if clientes %}
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th><i class="fas fa-user"></i> Cliente</th>
+                    <th><i class="fas fa-id-card"></i> RUT</th>
+                    <th><i class="fas fa-envelope"></i> Email</th>
+                    <th><i class="fas fa-phone"></i> Teléfono</th>
+                    <th><i class="fas fa-calendar-check"></i> Citas</th>
+                    <th><i class="fas fa-tooth"></i> Fichas</th>
+                    <th><i class="fas fa-info-circle"></i> Estado</th>
+                    <th><i class="fas fa-cog"></i> Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr class="{% if not cliente.activo %}row-inactive{% endif %}" data-cliente-id="{{ cliente.id }}">
+                    <td>
+                        <div class="cliente-cell">
+                            <div class="avatar-small">{{ cliente.nombre_completo|first|upper }}</div>
+                            <div>
+                                <strong>{{ cliente.nombre_completo }}</strong>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if cliente.rut %}
+                            <span style="font-family: monospace;">{{ cliente.rut }}</span>
+                        {% else %}
+                            <span style="color: #9ca3af;">-</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 0.85rem; color: #6b7280;">{{ cliente.email }}</td>
+                    <td style="font-size: 0.85rem; color: #6b7280;">{{ cliente.telefono }}</td>
+                    <td>
+                        <span class="badge badge-info">{{ cliente.total_citas|default:0 }}</span>
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            {% if cliente.total_odontogramas %}
+                            <span class="badge" style="background: #dbeafe; color: #1e40af; font-size: 0.75rem;">
+                                <i class="fas fa-tooth"></i> {{ cliente.total_odontogramas|default:0 }} Fichas
+                            </span>
+                            {% endif %}
+                            {% if cliente.total_radiografias %}
+                            <span class="badge" style="background: #e0f2fe; color: #0c4a6e; font-size: 0.75rem;">
+                                <i class="fas fa-x-ray"></i> {{ cliente.total_radiografias|default:0 }} RX
+                            </span>
+                            {% endif %}
+                            {% if not cliente.total_odontogramas and not cliente.total_radiografias %}
+                            <span style="color: #9ca3af; font-size: 0.75rem;">-</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if cliente.activo %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Inactivo</span>
+                        {% endif %}
+                        {% if cliente.alergias and cliente.alergias|lower != 'ninguna' %}
+                        <div style="margin-top: 4px;">
+                            <span class="badge-alergia" title="{{ cliente.alergias }}">
+                                <i class="fas fa-exclamation-triangle"></i> Alergias
+                            </span>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            {% if cliente.es_de_web %}
+                                <span class="badge badge-info" style="margin-right: 8px;" title="Cliente registrado desde la web">
+                                    <i class="fas fa-globe"></i> Web
+                                </span>
+                                <button class="btn-icon btn-success" onclick="abrirModalConfirmarSincronizacion('{{ cliente.email }}', '{{ cliente.username }}')" title="Sincronizar con sistema de gestión">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                            {% else %}
+                                <a href="{% url 'perfil_cliente' cliente.id %}" class="btn-icon btn-primary" title="Ver Perfil Completo">
+                                    <i class="fas fa-user-circle"></i>
+                                </a>
+                                <button class="btn-icon btn-primary" onclick="abrirModalAccionesCliente({{ cliente.id }}, '{{ cliente.nombre_completo }}', {{ cliente.activo|yesno:"true,false" }})" title="Más opciones">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    {% if clientes.has_other_pages %}
+    <div class="pagination">
+        <div class="pagination-info">
+            Mostrando {{ clientes.start_index }} - {{ clientes.end_index }} de {{ clientes.paginator.count }} clientes
+        </div>
+        <div class="pagination-controls">
+            {% if clientes.has_previous %}
+                <a href="?page=1{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}" class="page-btn" title="Primera página">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?page={{ clientes.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}" class="page-btn" title="Anterior">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fas fa-angle-double-left"></i></span>
+                <span class="page-btn disabled"><i class="fas fa-angle-left"></i></span>
+            {% endif %}
+            
+            <span class="page-current">
+                Página {{ clientes.number }} de {{ clientes.paginator.num_pages }}
+            </span>
+            
+            {% if clientes.has_next %}
+                <a href="?page={{ clientes.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}" class="page-btn" title="Siguiente">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="?page={{ clientes.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}" class="page-btn" title="Última página">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fas fa-angle-right"></i></span>
+                <span class="page-btn disabled"><i class="fas fa-angle-double-right"></i></span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="empty-results">
+        <i class="fas fa-users"></i>
+        <h3>No se encontraron clientes</h3>
+        {% if search or estado %}
+        <p>No hay clientes que coincidan con los criterios de búsqueda.</p>
+        <p>Intenta ajustar los filtros o <a href="{% url 'gestor_clientes' %}">limpiar la búsqueda</a>.</p>
+        {% else %}
+        <p>No hay clientes registrados en el sistema.</p>
+        <p>Puedes crear un nuevo cliente usando el botón "Crear Cliente Presencial" arriba.</p>
+        {% endif %}
+        {% if estadisticas.total_clientes > 0 %}
+        <p style="margin-top: 10px; color: #6b7280; font-size: 0.9rem;">
+            <i class="fas fa-info-circle"></i> Total de clientes en el sistema: {{ estadisticas.total_clientes }}
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+    </div>
+</div>
+
+<!-- Modal Crear Cliente -->
+<div class="modal-overlay" id="modalCrearCliente" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-plus"></i> Crear Cliente Presencial</h3>
+            <button class="modal-close" onclick="cerrarModalCrearCliente()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="formCrearCliente" method="post" action="{% url 'crear_cliente_presencial' %}" onsubmit="return validarTelefonoAntesEnvio('formCrearCliente')">
+                {% csrf_token %}
+                <div class="form-group-modal">
+                    <label><i class="fas fa-user"></i> Nombre Completo *</label>
+                    <input type="text" name="nombre_completo" required class="form-control-modal" placeholder="Nombre completo del cliente">
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-envelope"></i> Email *</label>
+                    <input type="email" name="email" id="email_field" required class="form-control-modal" 
+                           placeholder="correo@ejemplo.com" onblur="validarEmail()">
+                    <small id="email_error" style="color: #ef4444; display: none; margin-top: 4px;">
+                        <i class="fas fa-exclamation-circle"></i> Este email ya está registrado en el sistema
+                    </small>
+                    <small id="email_success" style="color: #10b981; display: none; margin-top: 4px;">
+                        <i class="fas fa-check-circle"></i> Email disponible
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-id-card"></i> RUT *</label>
+                    <input type="text" name="rut" id="rut_field" required class="form-control-modal" 
+                           placeholder="12345678-9" 
+                           maxlength="12"
+                           pattern="[0-9]{7,8}-[0-9Kk]"
+                           onblur="validarRut()">
+                    <small id="rut_error" style="color: #ef4444; display: none; margin-top: 4px;">
+                        <i class="fas fa-exclamation-circle"></i> Este RUT ya está registrado en el sistema
+                    </small>
+                    <small id="rut_success" style="color: #10b981; display: none; margin-top: 4px;">
+                        <i class="fas fa-check-circle"></i> RUT disponible
+                    </small>
+                    <small style="color: #6b7280; display: block; margin-top: 4px; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Formato: 12345678-9 (obligatorio)
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-phone"></i> Teléfono Celular *</label>
+                    <input type="tel" name="telefono" id="telefono_crear" required class="form-control-modal" 
+                           placeholder="12345678" 
+                           pattern="\d{8}" 
+                           maxlength="8"
+                           inputmode="numeric"
+                           oninput="formatearTelefonoChileno(this)"
+                           onblur="validarTelefono()">
+                    <small id="telefono_error" style="color: #ef4444; display: none; margin-top: 4px;">
+                        <i class="fas fa-exclamation-circle"></i> Este teléfono ya está registrado en el sistema
+                    </small>
+                    <small id="telefono_success" style="color: #10b981; display: none; margin-top: 4px;">
+                        <i class="fas fa-check-circle"></i> Teléfono disponible
+                    </small>
+                    <small style="color: #6b7280; display: block; margin-top: 4px; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Ingrese solo los <strong>8 dígitos</strong> del celular sin el 9 inicial ni el código de país (ejemplo: <strong>20589344</strong>). 
+                        El sistema agregará automáticamente el 9 y el código de país (+56) para enviar notificaciones por WhatsApp y SMS.
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-birthday-cake"></i> Fecha de Nacimiento *</label>
+                    <input type="date" name="fecha_nacimiento" required class="form-control-modal">
+                    <small style="color: #6b7280; display: block; margin-top: 4px; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Permite calcular la edad automáticamente (obligatorio)
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-exclamation-triangle"></i> Alergias *</label>
+                    <textarea name="alergias" required rows="3" class="form-control-modal" 
+                              placeholder="Ej: Penicilina, Anestesia local, Látex, etc.&#10;Si no tiene alergias, escriba 'Ninguna'.&#10;Esta información es CRÍTICA para la seguridad del paciente."></textarea>
+                    <small style="color: #f59e0b; display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 600;">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>OBLIGATORIO:</strong> Registrar todas las alergias conocidas. Si no tiene alergias, escriba "Ninguna".
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-sticky-note"></i> Notas</label>
+                    <textarea name="notas" rows="3" class="form-control-modal" placeholder="Notas adicionales sobre el cliente..."></textarea>
+                </div>
+                
+                <!-- Opción para crear usuario en sistema de citas online -->
+                <div class="form-group-modal">
+                    <div class="checkbox-container">
+                        <input type="checkbox" name="crear_usuario_online" id="crear_usuario_online_checkbox" onchange="toggleCredencialesForm()">
+                        <label for="crear_usuario_online_checkbox" style="display: inline; margin-left: 8px; font-weight: normal; cursor: pointer;">
+                            <i class="fas fa-globe"></i> Crear usuario para citas online
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Campos de credenciales (ocultos por defecto) -->
+                <div id="credenciales_form" style="display: none;">
+                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; margin-top: 12px;">
+                        <h4 style="margin: 0 0 12px 0; color: #1f2937; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-user-lock"></i> Credenciales de Acceso Web
+                        </h4>
+                        
+                        <div class="form-group-modal" style="margin-bottom: 12px;">
+                            <label><i class="fas fa-user"></i> Nombre de Usuario *</label>
+                            <input type="text" name="username" id="username_field" class="form-control-modal" 
+                                   placeholder="Ej: juan.perez" onblur="validarUsername()">
+                            <small id="username_error" style="color: #ef4444; display: none; margin-top: 4px;">
+                                <i class="fas fa-exclamation-circle"></i> Este nombre de usuario ya existe
+                            </small>
+                            <small id="username_success" style="color: #10b981; display: none; margin-top: 4px;">
+                                <i class="fas fa-check-circle"></i> Nombre de usuario disponible
+                            </small>
+                        </div>
+                        
+                        <div class="form-group-modal" style="margin-bottom: 12px;">
+                            <label><i class="fas fa-lock"></i> Contraseña *</label>
+                            <div style="position: relative;">
+                                <input type="password" name="password" id="password_field" class="form-control-modal" 
+                                       placeholder="Mínimo 8 caracteres">
+                                <button type="button" onclick="togglePasswordVisibility()" 
+                                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #6b7280;">
+                                    <i class="fas fa-eye" id="password_toggle_icon"></i>
+                                </button>
+                            </div>
+                            <small style="color: #6b7280; display: block; margin-top: 4px;">
+                                Usa una contraseña segura. El cliente podrá cambiarla después.
+                            </small>
+                        </div>
+                        
+                        <div class="form-group-modal" style="margin-bottom: 0;">
+                            <div class="checkbox-container" style="background: var(--primary-bg); border-color: var(--primary-color);">
+                                <input type="checkbox" name="enviar_credenciales_email" id="enviar_credenciales_email">
+                                <label for="enviar_credenciales_email" style="display: inline; margin-left: 8px; font-weight: normal; cursor: pointer;">
+                                    <i class="fas fa-envelope"></i> Enviar credenciales por correo electrónico
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModalCrearCliente()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Crear Cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Cliente -->
+<div class="modal-overlay" id="modalEditarCliente" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit"></i> Editar Cliente</h3>
+            <button class="modal-close" onclick="cerrarModalEditarCliente()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="formEditarCliente" method="post" action="" onsubmit="return validarTelefonoAntesEnvio('formEditarCliente')">
+                {% csrf_token %}
+                <input type="hidden" id="edit_cliente_id" name="cliente_id">
+                
+                <div class="form-group-modal">
+                    <label><i class="fas fa-user"></i> Nombre Completo *</label>
+                    <input type="text" name="nombre_completo" id="edit_nombre_completo" required class="form-control-modal">
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-envelope"></i> Email *</label>
+                    <input type="email" name="email" id="edit_email" required class="form-control-modal">
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-id-card"></i> RUT (Opcional)</label>
+                    <input type="text" name="rut" id="edit_rut" class="form-control-modal" 
+                           placeholder="12345678-9" 
+                           maxlength="12"
+                           pattern="[0-9]{7,8}-[0-9Kk]">
+                    <small style="color: #6b7280; display: block; margin-top: 4px; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Formato: 12345678-9 (opcional pero recomendado)
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-phone"></i> Teléfono Celular *</label>
+                    <input type="tel" name="telefono" id="edit_telefono" required class="form-control-modal" 
+                           placeholder="12345678" 
+                           pattern="\d{8}" 
+                           maxlength="8"
+                           inputmode="numeric"
+                           oninput="formatearTelefonoChileno(this)">
+                    <small style="color: #6b7280; display: block; margin-top: 4px; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Ingrese solo los <strong>8 dígitos</strong> del celular sin el 9 inicial ni el código de país (ejemplo: <strong>20589344</strong>). 
+                        El sistema agregará automáticamente el 9 y el código de país (+56) para enviar notificaciones por WhatsApp y SMS.
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-birthday-cake"></i> Fecha de Nacimiento (Opcional)</label>
+                    <input type="date" name="fecha_nacimiento" id="edit_fecha_nacimiento" class="form-control-modal">
+                    <small style="color: #6b7280; display: block; margin-top: 4px; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Permite calcular la edad automáticamente
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-exclamation-triangle"></i> Alergias (Opcional pero Importante)</label>
+                    <textarea name="alergias" id="edit_alergias" rows="3" class="form-control-modal" 
+                              placeholder="Ej: Penicilina, Anestesia local, Látex, etc.&#10;Esta información es CRÍTICA para la seguridad del paciente."></textarea>
+                    <small style="color: #f59e0b; display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 600;">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>IMPORTANTE:</strong> Registrar todas las alergias conocidas (medicamentos, materiales, anestesia, etc.)
+                    </small>
+                </div>
+                <div class="form-group-modal">
+                    <label><i class="fas fa-sticky-note"></i> Notas</label>
+                    <textarea name="notas" id="edit_notas" rows="4" class="form-control-modal" placeholder="Notas adicionales sobre el cliente..."></textarea>
+                </div>
+                
+                <!-- Credenciales Web (si existen) -->
+                <div id="edit_credenciales_section" style="display: none; background: #fef3c7; padding: 16px; border-radius: 8px; border: 1px solid #f59e0b; margin-top: 12px;">
+                    <h4 style="margin: 0 0 12px 0; color: #92400e; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-user-lock"></i> Credenciales de Acceso Web
+                    </h4>
+                    
+                    <div class="form-group-modal" style="margin-bottom: 12px;">
+                        <label><i class="fas fa-user"></i> Nombre de Usuario</label>
+                        <input type="text" name="username_web" id="edit_username_web" class="form-control-modal" 
+                               placeholder="Dejar vacío para no cambiar" onblur="validarUsernameEditar()">
+                        <small id="edit_username_error" style="color: #ef4444; display: none; margin-top: 4px;">
+                            <i class="fas fa-exclamation-circle"></i> Este nombre de usuario ya existe
+                        </small>
+                        <small id="edit_username_success" style="color: #10b981; display: none; margin-top: 4px;">
+                            <i class="fas fa-check-circle"></i> Nombre de usuario disponible
+                        </small>
+                        <small style="color: #92400e; display: block; margin-top: 4px;">
+                            <i class="fas fa-info-circle"></i> Deja este campo vacío si no deseas cambiar el username
+                        </small>
+                    </div>
+                    
+                    <div class="form-group-modal" style="margin-bottom: 12px;">
+                        <label><i class="fas fa-lock"></i> Nueva Contraseña</label>
+                        <div style="position: relative;">
+                            <input type="password" name="password_web" id="edit_password_web" class="form-control-modal" 
+                                   placeholder="Dejar vacío para no cambiar (mínimo 8 caracteres)">
+                            <button type="button" onclick="toggleEditPasswordVisibility()" 
+                                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #6b7280;">
+                                <i class="fas fa-eye" id="edit_password_toggle_icon"></i>
+                            </button>
+                        </div>
+                        <small style="color: #92400e; display: block; margin-top: 4px;">
+                            <i class="fas fa-info-circle"></i> Solo completa si quieres cambiar la contraseña actual
+                        </small>
+                    </div>
+                </div>
+                
+                <div class="info-box" style="margin-top: 16px;">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Fecha de registro:</strong> <span id="edit_fecha_registro"></span>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModalEditarCliente()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ver Citas -->
+<div class="modal-overlay" id="modalVerCitas" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3><i class="fas fa-calendar-alt"></i> Citas del Cliente</h3>
+            <button class="modal-close" onclick="cerrarModalVerCitas()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="cliente-info-header">
+                <div class="cliente-info-item">
+                    <i class="fas fa-user"></i>
+                    <div>
+                        <strong>Cliente:</strong>
+                        <span id="citas_cliente_nombre"></span>
+                    </div>
+                </div>
+                <div class="cliente-info-item">
+                    <i class="fas fa-envelope"></i>
+                    <div>
+                        <strong>Email:</strong>
+                        <span id="citas_cliente_email"></span>
+                    </div>
+                </div>
+                <div class="cliente-info-item">
+                    <i class="fas fa-calendar-check"></i>
+                    <div>
+                        <strong>Total Citas:</strong>
+                        <span id="citas_total"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="listaCitas" style="margin-top: 20px;">
+                <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                    <p>Cargando citas...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Actions Bar */
+    .actions-bar {
+        background: white;
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .filter-form {
+        display: flex;
+        gap: 8px;
+        flex-wrap: nowrap;
+        align-items: center;
+    }
+
+    .search-box {
+        position: relative;
+        width: 200px;
+        flex-shrink: 0;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.85rem;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 8px 10px 8px 32px;
+        border: 2px solid #e5e7eb;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .filter-select {
+        padding: 8px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        min-width: 140px;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+    }
+
+    .btn-filter, .btn-clear {
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+
+    .btn-filter {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .btn-filter:hover {
+        background: var(--primary-dark);
+    }
+
+    .btn-clear {
+        background: #6b7280;
+        color: white;
+    }
+
+    .btn-clear:hover {
+        background: #4b5563;
+    }
+
+    .btn-add-cliente {
+        padding: 8px 16px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+
+    .btn-add-cliente:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    /* Tabla de datos - Estilo Personal */
+    .table-responsive {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        animation: fadeIn 0.4s ease;
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .data-table thead {
+        background: linear-gradient(135deg, #1f2937, #111827);
+        color: white;
+    }
+    
+    .data-table th {
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .data-table th i {
+        margin-right: 8px;
+        opacity: 0.8;
+    }
+    
+    .data-table tbody tr {
+        border-bottom: 1px solid #e5e7eb;
+        transition: all 0.2s ease;
+    }
+    
+    .data-table tbody tr:hover {
+        background: #f9fafb;
+    }
+    
+    .data-table tbody tr.row-alergias {
+        border-left: 4px solid #f59e0b;
+        background: #fffbeb;
+    }
+    
+    .data-table tbody tr.row-alergias:hover {
+        background: #fef3c7;
+    }
+    
+    .badge-alergia {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #fef3c7;
+        color: #92400e;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    
+    .badge-alergia i {
+        color: #f59e0b;
+    }
+    
+    .data-table tbody tr.row-inactive {
+        opacity: 0.6;
+        background: #f9fafb;
+    }
+    
+    .data-table td {
+        padding: 16px;
+        color: #6b7280;
+    }
+    
+    .cliente-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .cliente-cell strong {
+        display: block;
+        color: #1f2937;
+        font-size: 0.95rem;
+    }
+    
+    .avatar-small {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-darker));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    
+    .badge-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .badge-secondary {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .badge-info {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.875rem;
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+    
+    .btn-icon:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-icon.btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: white;
+    }
+    
+    .btn-icon.btn-primary:hover {
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary-darker));
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    .btn-icon.btn-info {
+        background: linear-gradient(135deg, #06b6d4, #0891b2);
+        color: white;
+    }
+    
+    .btn-icon.btn-info:hover {
+        background: linear-gradient(135deg, #0891b2, #0e7490);
+        box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+    }
+    
+    .btn-icon.btn-success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+    
+    .btn-icon.btn-success:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .btn-icon.btn-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+    
+    .btn-icon.btn-warning:hover {
+        background: linear-gradient(135deg, #d97706, #b45309);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+    
+    
+    .empty-results {
+        text-align: center;
+        padding: 48px 24px;
+        color: #6b7280;
+    }
+    
+    .empty-results i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    
+    .empty-results h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #374151;
+    }
+    
+    .empty-results p {
+        font-size: 0.875rem;
+        margin: 0;
+    }
+    
+    /* Estilos de Paginación */
+    .pagination {
+        margin-top: 30px;
+        padding: 20px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .pagination-info {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    .pagination-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    
+    .page-btn {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        background: white;
+        color: #374151;
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        font-size: 0.875rem;
+    }
+    
+    .page-btn:hover:not(.disabled) {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+    
+    .page-btn.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        background: #f9fafb;
+    }
+    
+    .page-current {
+        padding: 8px 16px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .filter-form {
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            width: 100%;
+            min-width: 200px;
+        }
+        
+        .btn-add-cliente {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .filter-form {
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            width: 100%;
+        }
+        
+        .pagination {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .pagination-info {
+            width: 100%;
+        }
+
+        .stats-horizontal {
+            flex-direction: column;
+        }
+        
+        .stat-box {
+            min-width: auto;
+        }
+        
+        .clientes-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .cliente-actions {
+            flex-direction: column;
+        }
+        
+        .action-btn {
+            justify-content: center;
+        }
+    }
+    
+    /* ========== MODALES ========== */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+    
+    .modal-large {
+        max-width: 900px;
+    }
+    
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        color: #1f2937;
+        font-size: 1.25rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .modal-close {
+        background: #ef4444;
+        color: white;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    
+    .modal-close:hover {
+        background: #dc2626;
+        transform: scale(1.1);
+    }
+    
+    .modal-body {
+        padding: 24px;
+    }
+    
+    .form-group-modal {
+        margin-bottom: 20px;
+    }
+    
+    .form-group-modal label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .form-control-modal {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control-modal:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .info-box {
+        background: #eff6ff;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border-left: 4px solid var(--primary-color);
+        font-size: 0.875rem;
+        color: #1e40af;
+    }
+    
+    /* Cliente Info Header en Modal */
+    .cliente-info-header {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        padding: 20px;
+        border-radius: 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .cliente-info-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .cliente-info-item i {
+        font-size: 1.5rem;
+        color: var(--primary-color);
+        width: 40px;
+        height: 40px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .cliente-info-item strong {
+        display: block;
+        color: #6b7280;
+        font-size: 0.75rem;
+        margin-bottom: 2px;
+    }
+    
+    .cliente-info-item span {
+        color: #1f2937;
+        font-weight: 600;
+    }
+    
+    /* Lista de Citas */
+    .cita-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+    }
+    
+    .cita-item:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+    
+    .cita-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+    
+    .cita-fecha {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #1f2937;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    
+    .cita-fecha i {
+        color: var(--primary-color);
+    }
+    
+    .cita-estado {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .cita-estado.disponible {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .cita-estado.reservada {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .cita-estado.completada {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .cita-estado.cancelada {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .cita-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .cita-detail {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .cita-detail i {
+        color: #9ca3af;
+    }
+    
+    .empty-citas {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+    
+    .empty-citas i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    
+    /* Checkbox personalizado */
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .checkbox-container input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        accent-color: var(--primary-color);
+    }
+    
+    .info-box-small {
+        background: #eff6ff;
+        padding: 10px 12px;
+        border-radius: 6px;
+        border-left: 3px solid #3b82f6;
+        font-size: 0.8rem;
+        color: #1e40af;
+        line-height: 1.4;
+    }
+    
+    .info-box-small i {
+        margin-right: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ========== MODAL CREAR CLIENTE ==========
+function mostrarModalCrearCliente() {
+    document.getElementById('modalCrearCliente').style.display = 'flex';
+    document.getElementById('credenciales_form').style.display = 'none';
+    document.getElementById('username_error').style.display = 'none';
+    document.getElementById('username_success').style.display = 'none';
+}
+
+function cerrarModalCrearCliente() {
+    document.getElementById('modalCrearCliente').style.display = 'none';
+    document.getElementById('formCrearCliente').reset();
+    document.getElementById('credenciales_form').style.display = 'none';
+}
+
+// Mostrar/ocultar campos de credenciales
+function toggleCredencialesForm() {
+    const checkbox = document.getElementById('crear_usuario_online_checkbox');
+    const form = document.getElementById('credenciales_form');
+    const usernameField = document.getElementById('username_field');
+    const passwordField = document.getElementById('password_field');
+    
+    if (checkbox.checked) {
+        form.style.display = 'block';
+        usernameField.required = true;
+        passwordField.required = true;
+    } else {
+        form.style.display = 'none';
+        usernameField.required = false;
+        passwordField.required = false;
+    }
+}
+
+// Validar username en tiempo real
+async function validarUsername() {
+    const usernameField = document.getElementById('username_field');
+    const username = usernameField.value.trim();
+    const errorMsg = document.getElementById('username_error');
+    const successMsg = document.getElementById('username_success');
+    
+    if (!username || username.length < 3) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/validar-username/?username=${encodeURIComponent(username)}`);
+        const data = await response.json();
+        
+        if (data.existe) {
+            errorMsg.style.display = 'block';
+            successMsg.style.display = 'none';
+            usernameField.style.borderColor = '#ef4444';
+        } else {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'block';
+            usernameField.style.borderColor = '#10b981';
+        }
+    } catch (error) {
+        console.error('Error al validar username:', error);
+    }
+}
+
+// Validar email en tiempo real
+async function validarEmail() {
+    const emailField = document.getElementById('email_field');
+    const email = emailField.value.trim().toLowerCase();
+    const errorMsg = document.getElementById('email_error');
+    const successMsg = document.getElementById('email_success');
+    
+    if (!email) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        emailField.style.borderColor = '';
+        return;
+    }
+    
+    // Validar formato básico de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        emailField.style.borderColor = '';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/validar-email/?email=${encodeURIComponent(email)}`);
+        const data = await response.json();
+        
+        if (data.existe) {
+            errorMsg.style.display = 'block';
+            successMsg.style.display = 'none';
+            emailField.style.borderColor = '#ef4444';
+        } else {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'block';
+            emailField.style.borderColor = '#10b981';
+        }
+    } catch (error) {
+        console.error('Error al validar email:', error);
+    }
+}
+
+// Validar RUT en tiempo real
+async function validarRut() {
+    const rutField = document.getElementById('rut_field');
+    const rut = rutField.value.trim();
+    const errorMsg = document.getElementById('rut_error');
+    const successMsg = document.getElementById('rut_success');
+    
+    if (!rut) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        rutField.style.borderColor = '';
+        return;
+    }
+    
+    // Validar formato básico de RUT
+    const rutRegex = /^[0-9]{7,8}-[0-9Kk]$/;
+    if (!rutRegex.test(rut)) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        rutField.style.borderColor = '';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/validar-rut/?rut=${encodeURIComponent(rut)}`);
+        const data = await response.json();
+        
+        if (data.invalido) {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+            rutField.style.borderColor = '';
+            return;
+        }
+        
+        if (data.existe) {
+            errorMsg.style.display = 'block';
+            successMsg.style.display = 'none';
+            rutField.style.borderColor = '#ef4444';
+        } else {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'block';
+            rutField.style.borderColor = '#10b981';
+        }
+    } catch (error) {
+        console.error('Error al validar RUT:', error);
+    }
+}
+
+// Validar teléfono en tiempo real
+async function validarTelefono() {
+    const telefonoField = document.getElementById('telefono_crear');
+    const telefono = telefonoField.value.trim();
+    const errorMsg = document.getElementById('telefono_error');
+    const successMsg = document.getElementById('telefono_success');
+    
+    if (!telefono) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        telefonoField.style.borderColor = '';
+        return;
+    }
+    
+    // Validar que sean solo 8 dígitos
+    if (!/^\d{8}$/.test(telefono)) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        telefonoField.style.borderColor = '';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/validar-telefono/?telefono=${encodeURIComponent(telefono)}`);
+        const data = await response.json();
+        
+        if (data.invalido) {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+            telefonoField.style.borderColor = '';
+            return;
+        }
+        
+        if (data.existe) {
+            errorMsg.style.display = 'block';
+            successMsg.style.display = 'none';
+            telefonoField.style.borderColor = '#ef4444';
+        } else {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'block';
+            telefonoField.style.borderColor = '#10b981';
+        }
+    } catch (error) {
+        console.error('Error al validar teléfono:', error);
+    }
+}
+
+// Mostrar/ocultar contraseña
+function togglePasswordVisibility() {
+    const passwordField = document.getElementById('password_field');
+    const icon = document.getElementById('password_toggle_icon');
+    
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordField.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// ========== MODAL EDITAR CLIENTE ==========
+async function editarCliente(clienteId) {
+    try {
+        const response = await fetch(`/trabajadores/clientes/${clienteId}/obtener/`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const cliente = data.cliente;
+            
+            // Llenar el formulario
+            document.getElementById('edit_cliente_id').value = cliente.id;
+            document.getElementById('edit_nombre_completo').value = cliente.nombre_completo;
+            document.getElementById('edit_email').value = cliente.email;
+            
+            // RUT
+            document.getElementById('edit_rut').value = cliente.rut || '';
+            
+            // Extraer solo los 8 últimos dígitos del teléfono para mostrar en el campo
+            // Si viene como +56912345678, mostrar solo 12345678
+            let telefonoDisplay = cliente.telefono || '';
+            // Eliminar espacios, guiones, paréntesis y otros caracteres
+            telefonoDisplay = telefonoDisplay.replace(/[\s\-\(\)\.\+]/g, '');
+            // Si tiene más de 8 dígitos, tomar solo los últimos 8
+            if (telefonoDisplay.length >= 8) {
+                telefonoDisplay = telefonoDisplay.substring(telefonoDisplay.length - 8);
+            }
+            document.getElementById('edit_telefono').value = telefonoDisplay;
+            
+            // Fecha de nacimiento
+            if (cliente.fecha_nacimiento) {
+                document.getElementById('edit_fecha_nacimiento').value = cliente.fecha_nacimiento;
+            } else {
+                document.getElementById('edit_fecha_nacimiento').value = '';
+            }
+            
+            // Alergias
+            document.getElementById('edit_alergias').value = cliente.alergias || '';
+            
+            document.getElementById('edit_notas').value = cliente.notas || '';
+            document.getElementById('edit_fecha_registro').textContent = cliente.fecha_registro;
+            
+            // Mostrar/ocultar sección de credenciales web
+            const credencialesSection = document.getElementById('edit_credenciales_section');
+            if (cliente.tiene_usuario_web) {
+                credencialesSection.style.display = 'block';
+                document.getElementById('edit_username_web').value = cliente.username_web;
+                document.getElementById('edit_username_web').placeholder = `Actual: ${cliente.username_web}`;
+                // Limpiar el campo de password
+                document.getElementById('edit_password_web').value = '';
+            } else {
+                credencialesSection.style.display = 'none';
+            }
+            
+            // Limpiar mensajes de validación
+            document.getElementById('edit_username_error').style.display = 'none';
+            document.getElementById('edit_username_success').style.display = 'none';
+            
+            // Actualizar action del formulario
+            document.getElementById('formEditarCliente').action = `/trabajadores/clientes/${clienteId}/editar/`;
+            
+            // Mostrar modal
+            document.getElementById('modalEditarCliente').style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar los datos del cliente');
+    }
+}
+
+// Validar username en edición
+async function validarUsernameEditar() {
+    const usernameField = document.getElementById('edit_username_web');
+    const username = usernameField.value.trim();
+    const errorMsg = document.getElementById('edit_username_error');
+    const successMsg = document.getElementById('edit_username_success');
+    
+    // Si está vacío, no validar (significa que no se cambiará)
+    if (!username || username.length < 3) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        usernameField.style.borderColor = '';
+        return;
+    }
+    
+    // No validar si es el mismo username actual
+    if (username === usernameField.placeholder.replace('Actual: ', '')) {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+        usernameField.style.borderColor = '';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/validar-username/?username=${encodeURIComponent(username)}`);
+        const data = await response.json();
+        
+        if (data.existe) {
+            errorMsg.style.display = 'block';
+            successMsg.style.display = 'none';
+            usernameField.style.borderColor = '#ef4444';
+        } else {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'block';
+            usernameField.style.borderColor = '#10b981';
+        }
+    } catch (error) {
+        console.error('Error al validar username:', error);
+    }
+}
+
+// Mostrar/ocultar contraseña en edición
+function toggleEditPasswordVisibility() {
+    const passwordField = document.getElementById('edit_password_web');
+    const icon = document.getElementById('edit_password_toggle_icon');
+    
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordField.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// ========== FORMATEO Y VALIDACIÓN DE TELÉFONOS CHILENOS ==========
+function formatearTelefonoChileno(input) {
+    // Obtener el valor sin espacios ni caracteres especiales
+    let valor = input.value.replace(/[\s\-\(\)\.\+]/g, '');
+    
+    // Si el usuario está escribiendo, solo permitir dígitos y limitar a 8
+    if (valor && !/^\d*$/.test(valor)) {
+        // Si contiene caracteres inválidos, limpiar
+        valor = valor.replace(/[^\d]/g, '');
+    }
+    
+    // Limitar a 8 dígitos (formato preferido)
+    if (valor.length > 8) {
+        valor = valor.substring(0, 8);
+    }
+    
+    // Actualizar el valor del input
+    input.value = valor;
+    
+    // Validar visualmente mientras escribe
+    let esValido = false;
+    
+    // FORMATO PREFERIDO: 8 dígitos (solo los últimos 8 del número celular)
+    if (valor.length === 8 && /^\d{8}$/.test(valor)) {
+        esValido = true; // 8 dígitos válidos
+    } else if (valor.length > 0 && valor.length < 8) {
+        esValido = null; // En proceso de escribir
+    } else if (valor.length === 0) {
+        esValido = false; // Vacío
+    }
+    
+    // Cambiar color del borde según validación
+    if (esValido === true) {
+        input.style.borderColor = '#10b981'; // Verde - válido (8 dígitos)
+    } else if (esValido === false && valor.length > 0) {
+        input.style.borderColor = '#ef4444'; // Rojo - inválido
+    } else {
+        input.style.borderColor = ''; // Color por defecto (escribiendo)
+    }
+}
+
+// Validar teléfono antes de enviar el formulario
+function validarTelefonoAntesEnvio(formId) {
+    const form = document.getElementById(formId);
+    const telefonoInput = form.querySelector('input[name="telefono"]');
+    
+    if (telefonoInput) {
+        const valor = telefonoInput.value.replace(/[\s\-\(\)\.\+]/g, '');
+        
+        // FORMATO PREFERIDO: Validar que sean exactamente 8 dígitos
+        if (valor.length === 8 && /^\d{8}$/.test(valor)) {
+            return true; // 8 dígitos válidos
+        } else if (valor.length > 0) {
+            alert('El número de teléfono no es válido.\n\nIngrese solo los 8 dígitos del celular (ejemplo: 12345678).\nEl sistema agregará automáticamente el 9 y el código de país (+56) para gestionar SMS.');
+            telefonoInput.focus();
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+function cerrarModalEditarCliente() {
+    document.getElementById('modalEditarCliente').style.display = 'none';
+    document.getElementById('formEditarCliente').reset();
+    document.getElementById('edit_credenciales_section').style.display = 'none';
+}
+
+// ========== MODAL VER CITAS ==========
+async function verCitas(clienteId) {
+    try {
+        // Mostrar modal con loading
+        document.getElementById('modalVerCitas').style.display = 'flex';
+        document.getElementById('listaCitas').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                <p>Cargando citas...</p>
+            </div>
+        `;
+        
+        const response = await fetch(`/trabajadores/clientes/${clienteId}/citas/`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Actualizar información del cliente
+            document.getElementById('citas_cliente_nombre').textContent = data.cliente.nombre;
+            document.getElementById('citas_cliente_email').textContent = data.cliente.email;
+            document.getElementById('citas_total').textContent = data.total_citas;
+            
+            // Mostrar citas
+            const listaCitas = document.getElementById('listaCitas');
+            if (data.citas.length === 0) {
+                listaCitas.innerHTML = `
+                    <div class="empty-citas">
+                        <i class="fas fa-calendar-times"></i>
+                        <h4>No hay citas registradas</h4>
+                        <p>Este cliente aún no tiene citas programadas.</p>
+                    </div>
+                `;
+            } else {
+                let html = '';
+                data.citas.forEach(cita => {
+                    html += `
+                        <div class="cita-item">
+                            <div class="cita-header">
+                                <div class="cita-fecha">
+                                    <i class="fas fa-calendar"></i>
+                                    ${cita.fecha_hora}
+                                </div>
+                                <span class="cita-estado ${cita.estado_class}">${cita.estado}</span>
+                            </div>
+                            <div class="cita-details">
+                                <div class="cita-detail">
+                                    <i class="fas fa-notes-medical"></i>
+                                    <span>${cita.tipo_consulta}</span>
+                                </div>
+                                <div class="cita-detail">
+                                    <i class="fas fa-user-md"></i>
+                                    <span>${cita.dentista}</span>
+                                </div>
+                            </div>
+                            ${cita.notas ? `
+                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 0.875rem; color: #6b7280;">
+                                    <i class="fas fa-sticky-note"></i> <strong>Notas:</strong> ${cita.notas}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                listaCitas.innerHTML = html;
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('listaCitas').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #ef4444;">
+                <i class="fas fa-exclamation-circle" style="font-size: 2rem;"></i>
+                <p>Error al cargar las citas</p>
+            </div>
+        `;
+    }
+}
+
+function cerrarModalVerCitas() {
+    document.getElementById('modalVerCitas').style.display = 'none';
+}
+
+// ========== TOGGLE ESTADO CLIENTE ==========
+async function toggleEstadoCliente(clienteId, activar) {
+    const accion = activar ? 'activar' : 'desactivar';
+    if (!confirm(`¿Estás seguro de que quieres ${accion} este cliente?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/${clienteId}/toggle-estado/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al actualizar el estado del cliente');
+    }
+}
+
+// ========== ELIMINAR CLIENTE ==========
+async function eliminarCliente(clienteId, nombreCliente) {
+    // Primera confirmación con advertencia detallada
+    const confirmacion = confirm(
+        `⚠️ ADVERTENCIA: Esta acción es PERMANENTE\n\n` +
+        `¿Estás seguro de que deseas ELIMINAR completamente a "${nombreCliente}"?\n\n` +
+        `Esto eliminará:\n` +
+        `• El registro del cliente en la clínica\n` +
+        `• Su cuenta de usuario web (si existe)\n` +
+        `• Sus citas NO se eliminarán (quedarán sin cliente)\n\n` +
+        `Esta acción NO se puede deshacer.`
+    );
+    
+    if (!confirmacion) {
+        return;
+    }
+    
+    // Segunda confirmación para estar absolutamente seguro
+    const confirmacionFinal = confirm(
+        `¿REALMENTE deseas eliminar a "${nombreCliente}"?\n\n` +
+        `Esta es tu última oportunidad para cancelar.`
+    );
+    
+    if (!confirmacionFinal) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/${clienteId}/eliminar/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al eliminar el cliente');
+    }
+}
+
+// Sincronizar cliente de web con sistema de gestión
+async function sincronizarClienteWeb(email, username) {
+    if (!confirm(`¿Deseas sincronizar este cliente de la web con el sistema de gestión?\n\nEsto creará un registro de Cliente en el sistema de gestión basado en los datos del usuario web.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/trabajadores/clientes/sincronizar-web/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                email: email,
+                username: username
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Cliente sincronizado exitosamente con el sistema de gestión.');
+            location.reload();
+        } else {
+            alert('❌ Error: ' + (data.error || 'No se pudo sincronizar el cliente'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al sincronizar el cliente');
+    }
+}
+
+// Función auxiliar para obtener cookie CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Cerrar modales con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalCrearCliente();
+        cerrarModalEditarCliente();
+        cerrarModalVerCitas();
+    }
+});
+
+// ========== SISTEMA DE NOTIFICACIONES ==========
+function showNotification(type, message, duration = 5000) {
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(notification);
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+
+// ========== MODAL DE ACCIONES DEL CLIENTE ==========
+function abrirModalAccionesCliente(clienteId, nombreCliente, activo) {
+    window.currentClienteId = clienteId;
+    window.currentClienteNombre = nombreCliente;
+    window.currentClienteActivo = activo;
+    
+    // Actualizar información del modal
+    const avatar = document.getElementById('modalAccionesAvatar');
+    const nombre = document.getElementById('modalAccionesNombre');
+    const estado = document.getElementById('modalAccionesEstado');
+    const accionEstado = document.getElementById('accionEstado');
+    const accionEstadoIcon = document.getElementById('accionEstadoIcon');
+    const accionEstadoTitle = document.getElementById('accionEstadoTitle');
+    const accionEstadoDesc = document.getElementById('accionEstadoDesc');
+    const accionVerPerfil = document.getElementById('accionVerPerfil');
+    
+    // Avatar con inicial
+    if (nombreCliente) {
+        avatar.textContent = nombreCliente.charAt(0).toUpperCase();
+    }
+    
+    // Nombre
+    nombre.textContent = nombreCliente;
+    
+    // Estado
+    if (activo) {
+        estado.innerHTML = '<span style="color: #10b981;"><i class="fas fa-check-circle"></i> Activo</span>';
+        accionEstadoTitle.textContent = 'Desactivar Cliente';
+        accionEstadoDesc.textContent = 'Desactivar el acceso del cliente';
+        accionEstadoIcon.innerHTML = '<i class="fas fa-user-times"></i>';
+        accionEstadoIcon.style.background = '#f59e0b';
+    } else {
+        estado.innerHTML = '<span style="color: #ef4444;"><i class="fas fa-times-circle"></i> Inactivo</span>';
+        accionEstadoTitle.textContent = 'Activar Cliente';
+        accionEstadoDesc.textContent = 'Activar el acceso del cliente';
+        accionEstadoIcon.innerHTML = '<i class="fas fa-user-check"></i>';
+        accionEstadoIcon.style.background = '#10b981';
+    }
+    
+    // Mostrar modal
+    const modal = document.getElementById('modalAccionesCliente');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalAccionesCliente() {
+    const modal = document.getElementById('modalAccionesCliente');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+// ========== MODALES DE CONFIRMACIÓN ==========
+// Eliminar Cliente
+function abrirModalConfirmarEliminacion(clienteId, nombreCliente) {
+    document.getElementById('clienteIdParaEliminar').value = clienteId;
+    document.getElementById('clienteNombreParaEliminar').value = nombreCliente;
+    
+    const modal = document.getElementById('modalConfirmarEliminacion');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminacion() {
+    const modal = document.getElementById('modalConfirmarEliminacion');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function confirmarEliminarCliente() {
+    const clienteId = document.getElementById('clienteIdParaEliminar').value;
+    const btnConfirmar = document.getElementById('btnConfirmarEliminacion');
+    
+    if (!clienteId) {
+        showNotification('error', 'Error: No se pudo obtener la información del cliente.');
+        return;
+    }
+    
+    if (btnConfirmar) {
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
+    }
+    
+    fetch(`/trabajadores/clientes/${clienteId}/eliminar/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Cliente eliminado exitosamente.');
+            cerrarModalConfirmarEliminacion();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Error al eliminar el cliente.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', error.message || 'Error al eliminar el cliente.');
+        if (btnConfirmar) {
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerHTML = '<i class="fas fa-trash-alt"></i> Sí, eliminar cliente';
+        }
+    });
+}
+
+// Cambiar Estado
+function abrirModalConfirmarEstado(clienteId, activar, nombreCliente) {
+    document.getElementById('clienteIdParaEstado').value = clienteId;
+    document.getElementById('clienteAccionEstado').value = activar ? 'activar' : 'desactivar';
+    document.getElementById('nombreClienteEstado').textContent = nombreCliente;
+    document.getElementById('accionEstado').textContent = activar ? 'activar' : 'desactivar';
+    
+    const modal = document.getElementById('modalConfirmarEstado');
+    const header = document.getElementById('modalEstadoHeader');
+    
+    if (activar) {
+        header.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+    } else {
+        header.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEstado() {
+    const modal = document.getElementById('modalConfirmarEstado');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function confirmarCambiarEstado() {
+    const clienteId = document.getElementById('clienteIdParaEstado').value;
+    const accion = document.getElementById('clienteAccionEstado').value;
+    const activar = accion === 'activar';
+    const btnConfirmar = document.getElementById('btnConfirmarEstado');
+    
+    if (btnConfirmar) {
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    }
+    
+    fetch(`/trabajadores/clientes/${clienteId}/toggle-estado/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || `Cliente ${activar ? 'activado' : 'desactivado'} exitosamente.`);
+            cerrarModalConfirmarEstado();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Error al cambiar el estado del cliente.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', error.message || 'Error al cambiar el estado del cliente.');
+        if (btnConfirmar) {
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerHTML = '<i class="fas fa-check"></i> Confirmar';
+        }
+    });
+}
+
+// Sincronizar Cliente Web
+function abrirModalConfirmarSincronizacion(email, username) {
+    document.getElementById('clienteEmailSincronizar').value = email;
+    document.getElementById('clienteUsernameSincronizar').value = username;
+    
+    const modal = document.getElementById('modalConfirmarSincronizacion');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarSincronizacion() {
+    const modal = document.getElementById('modalConfirmarSincronizacion');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function confirmarSincronizarCliente() {
+    const email = document.getElementById('clienteEmailSincronizar').value;
+    const username = document.getElementById('clienteUsernameSincronizar').value;
+    const btnConfirmar = document.getElementById('btnConfirmarSincronizacion');
+    
+    if (btnConfirmar) {
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+    }
+    
+    fetch('/trabajadores/clientes/sincronizar-web/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            email: email,
+            username: username
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Cliente sincronizado exitosamente con el sistema de gestión.');
+            cerrarModalConfirmarSincronizacion();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'No se pudo sincronizar el cliente.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', error.message || 'Error al sincronizar el cliente.');
+        if (btnConfirmar) {
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerHTML = '<i class="fas fa-sync"></i> Sí, sincronizar';
+        }
+    });
+}
+
+// ========== REEMPLAZAR FUNCIONES ANTIGUAS ==========
+// Reemplazar toggleEstadoCliente
+async function toggleEstadoCliente(clienteId, activar) {
+    // Obtener nombre del cliente desde la fila de la tabla
+    const fila = document.querySelector(`tr[data-cliente-id="${clienteId}"]`);
+    
+    let nombre = 'el cliente';
+    if (fila) {
+        const nombreElement = fila.querySelector('strong');
+        if (nombreElement) {
+            nombre = nombreElement.textContent.trim();
+        }
+    }
+    
+    abrirModalConfirmarEstado(clienteId, activar, nombre);
+}
+
+// Reemplazar eliminarCliente
+async function eliminarCliente(clienteId, nombreCliente) {
+    abrirModalConfirmarEliminacion(clienteId, nombreCliente);
+}
+
+// Reemplazar sincronizarClienteWeb
+async function sincronizarClienteWeb(email, username) {
+    abrirModalConfirmarSincronizacion(email, username);
+}
+
+// Reemplazar alert en validarTelefonoAntesEnvio
+function validarTelefonoAntesEnvio(formId) {
+    const form = document.getElementById(formId);
+    const telefonoInput = form.querySelector('input[name="telefono"]');
+    
+    if (telefonoInput) {
+        const valor = telefonoInput.value.replace(/[\s\-\(\)\.\+]/g, '');
+        
+        if (valor.length === 8 && /^\d{8}$/.test(valor)) {
+            return true;
+        } else if (valor.length > 0) {
+            showNotification('error', 'El número de teléfono no es válido.\n\nIngrese solo los 8 dígitos del celular (ejemplo: 12345678).\nEl sistema agregará automáticamente el 9 y el código de país (+56) para gestionar SMS.');
+            telefonoInput.focus();
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Reemplazar alert en editarCliente
+async function editarCliente(clienteId) {
+    try {
+        const response = await fetch(`/trabajadores/clientes/${clienteId}/obtener/`);
+        if (!response.ok) {
+            throw new Error('Error al cargar los datos del cliente');
+        }
+        const data = await response.json();
+        
+        if (data.success) {
+            const cliente = data.cliente;
+            
+            // Llenar formulario
+            document.getElementById('edit_cliente_id').value = cliente.id;
+            document.getElementById('edit_nombre_completo').value = cliente.nombre_completo || '';
+            document.getElementById('edit_email').value = cliente.email || '';
+            document.getElementById('edit_rut').value = cliente.rut || '';
+            // Fecha de nacimiento
+            if (cliente.fecha_nacimiento) {
+                document.getElementById('edit_fecha_nacimiento').value = cliente.fecha_nacimiento;
+            } else {
+                document.getElementById('edit_fecha_nacimiento').value = '';
+            }
+            document.getElementById('edit_alergias').value = cliente.alergias || '';
+            document.getElementById('edit_notas').value = cliente.notas || '';
+            document.getElementById('edit_fecha_registro').textContent = cliente.fecha_registro || 'N/A';
+            
+            // Mostrar sección de credenciales si tiene usuario web
+            if (cliente.tiene_usuario_web) {
+                document.getElementById('edit_credenciales_section').style.display = 'block';
+                if (cliente.username_web) {
+                    document.getElementById('edit_username_web').placeholder = `Actual: ${cliente.username_web}`;
+                }
+            } else {
+                document.getElementById('edit_credenciales_section').style.display = 'none';
+            }
+            
+            // Actualizar action del formulario
+            document.getElementById('formEditarCliente').action = `/trabajadores/clientes/${clienteId}/editar/`;
+            
+            // Mostrar modal
+            document.getElementById('modalEditarCliente').style.display = 'flex';
+        } else {
+            throw new Error(data.error || 'Error al cargar los datos del cliente');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('error', 'Error al cargar los datos del cliente');
+    }
+}
+
+// Cerrar modales con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalCrearCliente();
+        cerrarModalEditarCliente();
+        cerrarModalVerCitas();
+        cerrarModalConfirmarEliminacion();
+        cerrarModalConfirmarEstado();
+        cerrarModalConfirmarSincronizacion();
+        cerrarModalAccionesCliente();
+    }
+});
+</script>
+
+<!-- Modal de Confirmación de Eliminación -->
+<div id="modalConfirmarEliminacion" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-container-simple">
+        <div class="modal-header" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+            <h3><i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación</h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarEliminacion()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div style="text-align: center; padding: 20px 0;">
+                <div style="width: 64px; height: 64px; margin: 0 auto 20px; background: #fef2f2; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: #ef4444;"></i>
+                </div>
+                <h3 style="margin: 0 0 12px 0; color: #1e293b; font-size: 1.25rem;">¿Estás seguro de eliminar este cliente?</h3>
+                <p style="margin: 0 0 16px 0; color: #64748b; line-height: 1.6;">
+                    Esta acción es <strong>PERMANENTE</strong> y eliminará:
+                </p>
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; text-align: left; margin: 16px 0;">
+                    <ul style="margin: 0; padding-left: 20px; color: #374151;">
+                        <li>El registro del cliente en la clínica</li>
+                        <li>Su cuenta de usuario web (si existe)</li>
+                        <li>Sus citas NO se eliminarán (quedarán sin cliente)</li>
+                    </ul>
+                </div>
+                <p style="margin: 16px 0 0 0; color: #ef4444; font-weight: 600;">
+                    Esta acción NO se puede deshacer.
+                </p>
+                <input type="hidden" id="clienteIdParaEliminar" value="">
+                <input type="hidden" id="clienteNombreParaEliminar" value="">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="cerrarModalConfirmarEliminacion()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-delete-edit" id="btnConfirmarEliminacion" onclick="confirmarEliminarCliente()">
+                <i class="fas fa-trash-alt"></i> Sí, eliminar cliente
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación de Estado -->
+<div id="modalConfirmarEstado" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-container-simple">
+        <div class="modal-header" id="modalEstadoHeader">
+            <h3><i class="fas fa-info-circle"></i> Confirmar Cambio de Estado</h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarEstado()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 1rem; color: #374151; margin-bottom: 20px; text-align: center;">
+                ¿Estás seguro de que deseas <strong id="accionEstado"></strong> al cliente <strong id="nombreClienteEstado"></strong>?
+            </p>
+            <input type="hidden" id="clienteIdParaEstado" value="">
+            <input type="hidden" id="clienteAccionEstado" value="">
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="cerrarModalConfirmarEstado()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-primary" id="btnConfirmarEstado" onclick="confirmarCambiarEstado()">
+                <i class="fas fa-check"></i> Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación de Sincronización -->
+<div id="modalConfirmarSincronizacion" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-container-simple">
+        <div class="modal-header" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <h3><i class="fas fa-sync"></i> Sincronizar Cliente</h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarSincronizacion()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 1rem; color: #374151; margin-bottom: 20px; text-align: center;">
+                ¿Deseas sincronizar este cliente de la web con el sistema de gestión?
+            </p>
+            <p style="font-size: 0.875rem; color: #64748b; text-align: center;">
+                Esto creará un registro de Cliente en el sistema de gestión basado en los datos del usuario web.
+            </p>
+            <input type="hidden" id="clienteEmailSincronizar" value="">
+            <input type="hidden" id="clienteUsernameSincronizar" value="">
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="cerrarModalConfirmarSincronizacion()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-primary" id="btnConfirmarSincronizacion" onclick="confirmarSincronizarCliente()" style="background: #10b981; border-color: #10b981;">
+                <i class="fas fa-sync"></i> Sí, sincronizar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Acciones del Cliente -->
+<div id="modalAccionesCliente" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-container-simple" style="max-width: 500px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3><i class="fas fa-cog"></i> Acciones del Cliente</h3>
+            <button class="modal-close" onclick="cerrarModalAccionesCliente()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0;">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1.25rem;" id="modalAccionesAvatar">
+                        C
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; color: #1e293b; font-size: 1.125rem;" id="modalAccionesNombre">Cliente</h4>
+                        <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.875rem;" id="modalAccionesEstado">Estado</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="padding: 16px;">
+                <div class="acciones-lista">
+                    <button class="accion-item" id="accionEditar" onclick="cerrarModalAccionesCliente(); editarCliente(window.currentClienteId);">
+                        <div class="accion-icon" style="background: #10b981;">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <div class="accion-content">
+                            <div class="accion-title">Editar Cliente</div>
+                            <div class="accion-desc">Modificar información del cliente</div>
+                        </div>
+                        <i class="fas fa-chevron-right accion-arrow"></i>
+                    </button>
+                    
+                    <button class="accion-item" id="accionEstado" onclick="cerrarModalAccionesCliente(); abrirModalConfirmarEstado(window.currentClienteId, !window.currentClienteActivo, window.currentClienteNombre);">
+                        <div class="accion-icon" id="accionEstadoIcon" style="background: #f59e0b;">
+                            <i class="fas fa-user-times"></i>
+                        </div>
+                        <div class="accion-content">
+                            <div class="accion-title" id="accionEstadoTitle">Desactivar Cliente</div>
+                            <div class="accion-desc" id="accionEstadoDesc">Desactivar el acceso del cliente</div>
+                        </div>
+                        <i class="fas fa-chevron-right accion-arrow"></i>
+                    </button>
+                    
+                    <div style="height: 1px; background: #e5e7eb; margin: 12px 0;"></div>
+                    
+                    <button class="accion-item accion-item-danger" onclick="cerrarModalAccionesCliente(); abrirModalConfirmarEliminacion(window.currentClienteId, window.currentClienteNombre);">
+                        <div class="accion-icon" style="background: #ef4444;">
+                            <i class="fas fa-trash-alt"></i>
+                        </div>
+                        <div class="accion-content">
+                            <div class="accion-title">Eliminar Cliente</div>
+                            <div class="accion-desc">Eliminar permanentemente del sistema</div>
+                        </div>
+                        <i class="fas fa-chevron-right accion-arrow"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="cerrarModalAccionesCliente()" style="width: 100%;">
+                <i class="fas fa-times"></i> Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-container-simple {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+        width: min(90vw, 500px);
+        max-width: 500px;
+        overflow: hidden;
+        animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-close {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: none;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 2px solid #e2e8f0;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-secondary:hover {
+        background: #e2e8f0;
+        border-color: #cbd5e1;
+    }
+
+    .btn-primary {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-delete-edit {
+        background: #ef4444;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-delete-edit:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+    
+    /* Estilos para Modal de Acciones */
+    .acciones-lista {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .accion-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: inherit;
+        width: 100%;
+        text-align: left;
+    }
+    
+    .accion-item:hover {
+        background: #f8fafc;
+        border-color: var(--primary-color);
+        transform: translateX(4px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    
+    .accion-item-danger {
+        border-color: #fee2e2;
+    }
+    
+    .accion-item-danger:hover {
+        background: #fef2f2;
+        border-color: #ef4444;
+    }
+    
+    .accion-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    
+    .accion-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .accion-title {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .accion-desc {
+        font-size: 0.8125rem;
+        color: #64748b;
+        line-height: 1.4;
+    }
+    
+    .accion-arrow {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        flex-shrink: 0;
+    }
+    
+    .accion-item:hover .accion-arrow {
+        color: var(--primary-color);
+    }
+</style>
+</div>
+{% endblock %}

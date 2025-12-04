@@ -1,0 +1,814 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Agregar Insumo - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-plus-circle"></i> Agregar Nuevo Insumo{% endblock %}
+{% block page_subtitle %}Registra un nuevo insumo en el inventario de la clínica{% endblock %}
+
+{% block content %}
+<div class="section">
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+    
+    <div class="form-container">
+        <form method="post" class="insumo-form" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nombre">Nombre del Insumo *</label>
+                    <input type="text" id="nombre" name="nombre" class="form-control" required 
+                           value="{{ form_data.nombre|default:'' }}"
+                           placeholder="Ej: Gasas estériles, Anestesia local, etc.">
+                </div>
+                
+                <div class="form-group">
+                    <label for="categoria">Categoría *</label>
+                    <select id="categoria" name="categoria" class="form-control" required>
+                        <option value="">Seleccionar categoría</option>
+                        <option value="materiales" {% if form_data.categoria == "materiales" %}selected{% endif %}>Materiales Dentales</option>
+                        <option value="instrumentos" {% if form_data.categoria == "instrumentos" %}selected{% endif %}>Instrumentos</option>
+                        <option value="medicamentos" {% if form_data.categoria == "medicamentos" %}selected{% endif %}>Medicamentos</option>
+                        <option value="equipos" {% if form_data.categoria == "equipos" %}selected{% endif %}>Equipos</option>
+                        <option value="consumibles" {% if form_data.categoria == "consumibles" %}selected{% endif %}>Consumibles</option>
+                        <option value="otros" {% if form_data.categoria == "otros" %}selected{% endif %}>Otros</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="descripcion">Descripción</label>
+                <textarea id="descripcion" name="descripcion" class="form-control" rows="3" 
+                          placeholder="Descripción detallada del insumo...">{{ form_data.descripcion|default:"" }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="imagen">Imagen del Insumo</label>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="imagen" name="imagen" accept="image/*" class="file-input">
+                    <label for="imagen" class="file-upload-label">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span class="file-upload-text">Haz clic para seleccionar o arrastra una imagen aquí</span>
+                        <span class="file-upload-hint">Formatos: JPG, PNG, GIF | Máximo: 5MB</span>
+                    </label>
+                </div>
+                <div id="image-preview" class="image-preview-container" style="display: none;">
+                    <img id="preview-img" src="" alt="Vista previa" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 12px;">
+                    <button type="button" id="remove-image" class="btn-remove-image" style="margin-top: 8px; padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        <i class="fas fa-times"></i> Eliminar imagen
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cantidad_actual">Cantidad Actual *</label>
+                    <input type="number" id="cantidad_actual" name="cantidad_actual" class="form-control" 
+                           min="0" required placeholder="0" value="{{ form_data.cantidad_actual|default:'' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="cantidad_minima">Cantidad Mínima *</label>
+                    <input type="number" id="cantidad_minima" name="cantidad_minima" class="form-control" 
+                           min="1" required placeholder="1" value="{{ form_data.cantidad_minima|default:'' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="unidad_medida">Unidad de Medida *</label>
+                    <select id="unidad_medida" name="unidad_medida" class="form-control" required>
+                        <option value="unidad" {% if form_data.unidad_medida == "unidad" or not form_data.unidad_medida %}selected{% endif %}>Unidad</option>
+                        <option value="caja" {% if form_data.unidad_medida == "caja" %}selected{% endif %}>Caja</option>
+                        <option value="paquete" {% if form_data.unidad_medida == "paquete" %}selected{% endif %}>Paquete</option>
+                        <option value="ml" {% if form_data.unidad_medida == "ml" %}selected{% endif %}>Mililitros (ml)</option>
+                        <option value="mg" {% if form_data.unidad_medida == "mg" %}selected{% endif %}>Miligramos (mg)</option>
+                        <option value="g" {% if form_data.unidad_medida == "g" %}selected{% endif %}>Gramos (g)</option>
+                        <option value="kg" {% if form_data.unidad_medida == "kg" %}selected{% endif %}>Kilogramos (kg)</option>
+                        <option value="litro" {% if form_data.unidad_medida == "litro" %}selected{% endif %}>Litros</option>
+                        <option value="metro" {% if form_data.unidad_medida == "metro" %}selected{% endif %}>Metros</option>
+                        <option value="cm" {% if form_data.unidad_medida == "cm" %}selected{% endif %}>Centímetros</option>
+                        <option value="par" {% if form_data.unidad_medida == "par" %}selected{% endif %}>Par</option>
+                        <option value="juego" {% if form_data.unidad_medida == "juego" %}selected{% endif %}>Juego</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="precio_unitario">Precio Unitario</label>
+                    <input type="text" id="precio_unitario" name="precio_unitario" class="form-control" 
+                           min="0" placeholder="0" value="{% if form_data.precio_unitario %}{{ form_data.precio_unitario|floatformat:0 }}{% endif %}"
+                           inputmode="numeric" pattern="[0-9.]*">
+                    <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Precio en pesos chilenos (se formatea automáticamente)
+                    </small>
+                    <input type="hidden" id="precio_unitario_raw" name="precio_unitario">
+                </div>
+                
+                <div class="form-group">
+                    <label for="proveedor_principal">Proveedor Principal</label>
+                    <select id="proveedor_principal" name="proveedor_principal" class="form-control">
+                        <option value="">-- Seleccionar proveedor (opcional) --</option>
+                        {% for proveedor in proveedores %}
+                        <option value="{{ proveedor.id }}" {% if form_data.proveedor_principal == proveedor.id|stringformat:"s" %}selected{% endif %}>
+                            {{ proveedor.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Selecciona el proveedor principal para este insumo
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha_vencimiento">Fecha de Vencimiento</label>
+                    <input type="date" id="fecha_vencimiento" name="fecha_vencimiento" class="form-control" value="{{ form_data.fecha_vencimiento|default:'' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ubicacion">Ubicación</label>
+                    <input type="text" id="ubicacion" name="ubicacion" class="form-control" 
+                           placeholder="Ej: Estante A, Refrigerador, etc." value="{{ form_data.ubicacion|default:'' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="notas">Notas Adicionales</label>
+                <textarea id="notas" name="notas" class="form-control" rows="2" 
+                          placeholder="Información adicional, instrucciones especiales, etc.">{{ form_data.notas|default:"" }}</textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar Insumo
+                </button>
+                <a href="{% url 'gestor_inventario_unificado' %}?seccion=insumos" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+    }
+
+    .insumo-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.875rem;
+    }
+
+    .form-control {
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-control::placeholder {
+        color: #9ca3af;
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    select.form-control {
+        cursor: pointer;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        color: white;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+        transform: translateY(-1px);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .form-container {
+            margin: 0 10px;
+            padding: 20px;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    /* Validación visual */
+    .form-control:invalid {
+        border-color: #ef4444;
+    }
+
+    .form-control:valid {
+        border-color: #10b981;
+    }
+
+    /* File upload styles */
+    .file-upload-wrapper {
+        position: relative;
+        margin-top: 8px;
+    }
+
+    .file-input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .file-upload-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        border: 2px dashed #d1d5db;
+        border-radius: 8px;
+        background: #f9fafb;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .file-upload-label:hover {
+        border-color: var(--turquesa-primary);
+        background: #f0fdfa;
+    }
+
+    .file-upload-label i {
+        font-size: 2rem;
+        color: var(--turquesa-primary);
+        margin-bottom: 8px;
+    }
+
+    .file-upload-text {
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 4px;
+    }
+
+    .file-upload-hint {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .image-preview-container {
+        margin-top: 12px;
+        text-align: center;
+    }
+
+    .image-preview-container img {
+        max-width: 200px;
+        max-height: 200px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-remove-image {
+        margin-top: 8px;
+        padding: 6px 12px;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .btn-remove-image:hover {
+        background: #dc2626;
+    }
+
+    /* Loading state */
+    .btn-primary.loading,
+    .btn-secondary.loading {
+        opacity: 0.7;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .btn-primary.loading i,
+    .btn-secondary.loading i {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('.insumo-form');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        // Formatear precio unitario con puntos decimales
+        const precioUnitarioInput = document.getElementById('precio_unitario');
+        const precioUnitarioRaw = document.getElementById('precio_unitario_raw');
+        
+        if (precioUnitarioInput) {
+            // Formatear valor inicial si existe
+            if (precioUnitarioInput.value) {
+                const valorNumerico = precioUnitarioInput.value.replace(/\./g, '');
+                precioUnitarioInput.value = formatearNumero(valorNumerico);
+                precioUnitarioRaw.value = valorNumerico;
+            }
+            
+            precioUnitarioInput.addEventListener('input', function(e) {
+                // Obtener solo números
+                let valor = e.target.value.replace(/[^\d]/g, '');
+                
+                // Formatear con puntos
+                e.target.value = formatearNumero(valor);
+                
+                // Guardar valor sin formato para envío
+                precioUnitarioRaw.value = valor;
+            });
+            
+            precioUnitarioInput.addEventListener('blur', function(e) {
+                // Asegurar que el valor esté formateado
+                let valor = e.target.value.replace(/[^\d]/g, '');
+                if (valor) {
+                    e.target.value = formatearNumero(valor);
+                    precioUnitarioRaw.value = valor;
+                }
+            });
+        }
+        
+        function formatearNumero(numero) {
+            if (!numero) return '';
+            // Convertir a string y agregar puntos cada 3 dígitos desde la derecha
+            return numero.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+        
+        // Validación en tiempo real
+        const requiredFields = form.querySelectorAll('input[required], select[required]');
+        
+        requiredFields.forEach(field => {
+            field.addEventListener('blur', validateField);
+            field.addEventListener('input', validateField);
+        });
+        
+        function validateField(e) {
+            const field = e.target;
+            const value = field.value.trim();
+            
+            if (field.hasAttribute('required') && !value) {
+                field.style.borderColor = '#ef4444';
+                showFieldError(field, 'Este campo es obligatorio');
+            } else {
+                field.style.borderColor = '#10b981';
+                hideFieldError(field);
+            }
+        }
+        
+        function showFieldError(field, message) {
+            hideFieldError(field);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'field-error';
+            errorDiv.textContent = message;
+            errorDiv.style.color = '#ef4444';
+            errorDiv.style.fontSize = '0.75rem';
+            errorDiv.style.marginTop = '4px';
+            field.parentNode.appendChild(errorDiv);
+        }
+        
+        function hideFieldError(field) {
+            const existingError = field.parentNode.querySelector('.field-error');
+            if (existingError) {
+                existingError.remove();
+            }
+        }
+        
+        // Vista previa de imagen
+        const imagenInput = document.getElementById('imagen');
+        const imagePreview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-img');
+        const removeImageBtn = document.getElementById('remove-image');
+        
+        if (imagenInput) {
+            imagenInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // Validar tipo de archivo
+                    if (!file.type.startsWith('image/')) {
+                        alert('Por favor, selecciona un archivo de imagen válido.');
+                        e.target.value = '';
+                        return;
+                    }
+                    
+                    // Validar tamaño (5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('La imagen es demasiado grande. El tamaño máximo permitido es 5MB.');
+                        e.target.value = '';
+                        return;
+                    }
+                    
+                    // Mostrar vista previa
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImg.src = e.target.result;
+                        imagePreview.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            // Eliminar imagen
+            if (removeImageBtn) {
+                removeImageBtn.addEventListener('click', function() {
+                    imagenInput.value = '';
+                    previewImg.src = '';
+                    imagePreview.style.display = 'none';
+                });
+            }
+        }
+        
+        // Manejo del envío del formulario
+        form.addEventListener('submit', function(e) {
+            let isValid = true;
+            
+            // Asegurar que el precio unitario tenga el valor sin formato
+            if (precioUnitarioInput && precioUnitarioRaw) {
+                const valorFormateado = precioUnitarioInput.value.replace(/\./g, '');
+                precioUnitarioRaw.value = valorFormateado;
+                // Reemplazar el valor del input visible con el valor sin formato para el envío
+                precioUnitarioInput.value = valorFormateado;
+            }
+            
+            // Validar campos requeridos
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.style.borderColor = '#ef4444';
+                    showFieldError(field, 'Este campo es obligatorio');
+                    isValid = false;
+                }
+            });
+            
+            // Validar cantidad mínima
+            const cantidadActual = document.getElementById('cantidad_actual');
+            const cantidadMinima = document.getElementById('cantidad_minima');
+            
+            if (cantidadActual.value && cantidadMinima.value) {
+                if (parseInt(cantidadActual.value) < parseInt(cantidadMinima.value)) {
+                    cantidadActual.style.borderColor = '#ef4444';
+                    showFieldError(cantidadActual, 'La cantidad actual no puede ser menor que la cantidad mínima');
+                    isValid = false;
+                }
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+                return;
+            }
+            
+            // Mostrar estado de carga
+            submitBtn.classList.add('loading');
+            submitBtn.innerHTML = '<i class="fas fa-spinner"></i> Guardando...';
+            submitBtn.disabled = true;
+        });
+        
+        // Auto-completar unidad de medida basada en categoría
+        const categoriaSelect = document.getElementById('categoria');
+        const unidadSelect = document.getElementById('unidad_medida');
+        
+        categoriaSelect.addEventListener('change', function() {
+            const categoria = this.value;
+            let defaultUnit = 'unidad';
+            
+            switch(categoria) {
+                case 'medicamentos':
+                    defaultUnit = 'ml';
+                    break;
+                case 'materiales':
+                    defaultUnit = 'unidad';
+                    break;
+                case 'instrumentos':
+                    defaultUnit = 'unidad';
+                    break;
+                case 'equipos':
+                    defaultUnit = 'unidad';
+                    break;
+                case 'consumibles':
+                    defaultUnit = 'paquete';
+                    break;
+            }
+            
+            unidadSelect.value = defaultUnit;
+        });
+    });
+    
+    // ========== SISTEMA DE NOTIFICACIONES ==========
+    function showNotification(type, message, duration = 5000) {
+        const validTypes = ['success', 'error', 'warning', 'info'];
+        type = validTypes.includes(type) ? type : 'info';
+        
+        let container = document.getElementById('notificationContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notificationContainer';
+            container.className = 'notification-container';
+            document.body.appendChild(container);
+        }
+        
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icons = {
+            success: '<i class="fas fa-check-circle"></i>',
+            error: '<i class="fas fa-exclamation-circle"></i>',
+            warning: '<i class="fas fa-exclamation-triangle"></i>',
+            info: '<i class="fas fa-info-circle"></i>'
+        };
+        
+        const titles = {
+            success: 'Éxito',
+            error: 'Error',
+            warning: 'Advertencia',
+            info: 'Información'
+        };
+        
+        notification.innerHTML = `
+            <div class="notification-icon">${icons[type]}</div>
+            <div class="notification-content">
+                <div class="notification-title">${titles[type]}</div>
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" onclick="this.closest('.notification').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        container.appendChild(notification);
+        
+        if (duration > 0) {
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.classList.add('hiding');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, duration);
+        }
+        
+        return notification;
+    }
+    
+    // Mostrar notificaciones de Django messages
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.tags == 'error' %}
+                showNotification('error', '{{ message|escapejs }}');
+            {% elif message.tags == 'warning' %}
+                showNotification('warning', '{{ message|escapejs }}');
+            {% elif message.tags == 'success' %}
+                showNotification('success', '{{ message|escapejs }}');
+            {% else %}
+                showNotification('info', '{{ message|escapejs }}');
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</script>
+
+<style>
+/* Sistema de Notificaciones */
+.notification-container {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.notification {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    animation: slideInRight 0.3s ease-out;
+    pointer-events: auto;
+    border-left: 4px solid;
+    min-width: 320px;
+    max-width: 400px;
+}
+
+.notification.success {
+    border-left-color: #10b981;
+    background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+}
+
+.notification.error {
+    border-left-color: #ef4444;
+    background: linear-gradient(to right, #fef2f2 0%, white 8%);
+}
+
+.notification.warning {
+    border-left-color: #f59e0b;
+    background: linear-gradient(to right, #fffbeb 0%, white 8%);
+}
+
+.notification.info {
+    border-left-color: #3b82f6;
+    background: linear-gradient(to right, #eff6ff 0%, white 8%);
+}
+
+.notification-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.notification.success .notification-icon {
+    background: #10b981;
+    color: white;
+}
+
+.notification.error .notification-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.notification.warning .notification-icon {
+    background: #f59e0b;
+    color: white;
+}
+
+.notification.info .notification-icon {
+    background: #3b82f6;
+    color: white;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.notification-message {
+    font-size: 0.875rem;
+    color: #64748b;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.notification-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.notification-close:hover {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification.hiding {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+</style>
+{% endblock %}

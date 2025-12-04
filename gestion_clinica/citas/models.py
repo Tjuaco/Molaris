@@ -2,15 +2,22 @@ from django.db import models
 from pacientes.models import Cliente
 from personal.models import Perfil
 
+# Importar modelo de auditoría
+from .models_auditoria import AuditoriaLog, registrar_auditoria
+
 
 # Citas disponibles o tomadas
 class Cita(models.Model):
     ESTADO_CHOICES = (
         ('disponible', 'Disponible'),
         ('reservada', 'Reservada'),
+        ('en_espera', 'En Espera'),
+        ('listo_para_atender', 'Listo para Atender'),
+        ('en_progreso', 'En Progreso'),
+        ('finalizada', 'Finalizada'),
         ('cancelada', 'Cancelada'),
         ('completada', 'Completada'),
-        ('no_show', 'No se presentó'),
+        ('no_show', 'No Llegó'),
     )
     
     fecha_hora = models.DateTimeField(unique=True)
@@ -48,13 +55,77 @@ class Cita(models.Model):
     notas = models.TextField(blank=True, null=True)
     notas_paciente = models.TextField(blank=True, null=True, verbose_name="Notas del Paciente")
     
+    # Campo para registrar hora de llegada del paciente
+    hora_llegada = models.DateTimeField(blank=True, null=True, verbose_name="Hora de Llegada")
+    
+    # Campo para registrar motivo de no asistencia
+    motivo_no_asistencia = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Motivo de No Asistencia",
+        help_text="Razón por la cual el paciente no asistió a la cita"
+    )
+    
+    # Campos de finalización y pago
+    METODO_PAGO_CHOICES = (
+        ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia'),
+        ('tarjeta', 'Tarjeta'),
+    )
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=METODO_PAGO_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name="Método de Pago"
+    )
+    motivo_ajuste_precio = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Motivo del Ajuste de Precio",
+        help_text="Justificación si el precio difiere del precio base del servicio"
+    )
+    notas_finalizacion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Notas de Finalización",
+        help_text="Observaciones adicionales al completar la cita"
+    )
+    
     # Campos de auditoría
     creada_el = models.DateTimeField(auto_now_add=True)
     actualizada_el = models.DateTimeField(auto_now=True)
     creada_por = models.ForeignKey(Perfil, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_creadas')
+    completada_por = models.ForeignKey(
+        Perfil,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='citas_completadas',
+        verbose_name="Completada por"
+    )
+    fecha_completada = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de Finalización")
     
     # Relación con dentista (si es una cita reservada)
     dentista = models.ForeignKey(Perfil, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_asignadas')
+    
+    # Relación con Plan de Tratamiento
+    plan_tratamiento = models.ForeignKey(
+        'historial_clinico.PlanTratamiento',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='citas',
+        verbose_name="Plan de Tratamiento"
+    )
+    fase_tratamiento = models.ForeignKey(
+        'historial_clinico.FaseTratamiento',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='citas',
+        verbose_name="Fase del Tratamiento"
+    )
     
     @property
     def disponible(self):
@@ -107,11 +178,22 @@ class Cita(models.Model):
         """Cancela una cita"""
         if self.estado == 'reservada':
             self.estado = 'cancelada'
+            # Preservar información del paciente para el historial
+            # Asegurar que los datos de respaldo estén guardados antes de eliminar la relación
+            if self.cliente:
+                # Si tiene cliente, asegurar que los datos de respaldo estén guardados
+                if not self.paciente_nombre or self.paciente_nombre != self.cliente.nombre_completo:
+                    self.paciente_nombre = self.cliente.nombre_completo
+                if not self.paciente_email or self.paciente_email != self.cliente.email:
+                    self.paciente_email = self.cliente.email
+                if not self.paciente_telefono or (self.cliente.telefono and self.paciente_telefono != self.cliente.telefono):
+                    self.paciente_telefono = self.cliente.telefono or self.paciente_telefono
+            # Si no tiene cliente pero tiene paciente_nombre, mantenerlo
+            # Eliminar solo la relación con cliente, pero mantener dentista y datos de respaldo
+            # El dentista se mantiene porque es información histórica importante
             self.cliente = None
-            self.paciente_nombre = None
-            self.paciente_email = None
-            self.paciente_telefono = None
-            self.dentista = None
+            # NO eliminamos el dentista para preservar el historial
+            # self.dentista = None  # Comentado para preservar información histórica
             self.save()
             return True
         return False
@@ -122,6 +204,25 @@ class Cita(models.Model):
             self.estado = 'completada'
             self.save()
             return True
+        return False
+    
+    def requiere_atencion(self):
+        """
+        Verifica si la cita requiere atención del administrador.
+        Retorna True si:
+        - La fecha y hora ya pasó
+        - El estado es 'disponible' (no fue tomada) o 'reservada' (no fue iniciada)
+        - No está en estados finales (completada, cancelada, no_show)
+        """
+        from django.utils import timezone
+        
+        # Si la fecha/hora ya pasó
+        if self.fecha_hora < timezone.now():
+            # Estados que requieren atención si la cita ya pasó
+            estados_requieren_atencion = ['disponible', 'reservada', 'confirmada']
+            if self.estado in estados_requieren_atencion:
+                return True
+        
         return False
     
     def __str__(self):

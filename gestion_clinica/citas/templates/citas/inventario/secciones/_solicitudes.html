@@ -1,0 +1,86 @@
+<!-- Header con Estadísticas -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-file-invoice"></i> Solicitudes</h1>
+        <p class="page-subtitle">Historial de solicitudes de insumos a proveedores</p>
+    </div>
+</div>
+
+<!-- Lista de Solicitudes -->
+<div class="section">
+    <div class="actions-bar">
+        <div></div>
+        <div>
+            <button onclick="mostrarModalSolicitud()" class="btn btn-success">
+                <i class="fas fa-paper-plane"></i> Nueva Solicitud
+            </button>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th><i class="fas fa-hashtag"></i> ID</th>
+                    <th><i class="fas fa-calendar"></i> Fecha</th>
+                    <th><i class="fas fa-truck"></i> Proveedor</th>
+                    <th><i class="fas fa-box"></i> Insumo</th>
+                    <th><i class="fas fa-sort-numeric-up"></i> Cantidad</th>
+                    <th><i class="fas fa-calendar-check"></i> Entrega</th>
+                    <th><i class="fas fa-info-circle"></i> Estado</th>
+                    <th><i class="fas fa-cog"></i> Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if solicitudes_recientes %}
+                {% for solicitud in solicitudes_recientes %}
+                <tr>
+                    <td><strong style="color: #1e293b; font-size: 14px; font-weight: 600;">#{{ solicitud.id }}</strong></td>
+                    <td style="font-size: 14px;">{{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                            <i class="fas fa-truck" style="color: var(--turquesa-primary); width: 16px;"></i>
+                            <span>{{ solicitud.proveedor.nombre }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <strong style="display: block; color: #1e293b; font-size: 14px; font-weight: 600; margin-bottom: 2px;">{{ solicitud.insumo.nombre }}</strong>
+                        <span style="font-size: 12px; color: #64748b;">{{ solicitud.insumo.get_categoria_display }}</span>
+                    </td>
+                    <td>
+                        <strong style="color: #1e293b; font-size: 14px; font-weight: 600;">{{ solicitud.cantidad_solicitada }}</strong>
+                        <span style="color: #64748b; font-size: 12px; margin-left: 4px;">{{ solicitud.insumo.unidad_medida }}</span>
+                    </td>
+                    <td style="font-size: 14px;">{{ solicitud.fecha_entrega_esperada|date:"d/m/Y" }}</td>
+                    <td>
+                        <span style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: {% if solicitud.estado == 'enviada' or solicitud.estado == 'recibida' %}#d1fae5; color: #065f46;{% elif solicitud.estado == 'cancelada' %}#fee2e2; color: #991b1b;{% else %}#fef3c7; color: #92400e;{% endif %};">
+                            <i class="fas fa-{% if solicitud.estado == 'enviada' %}paper-plane{% elif solicitud.estado == 'recibida' %}check{% elif solicitud.estado == 'cancelada' %}times{% else %}clock{% endif %}" style="font-size: 10px;"></i>
+                            {{ solicitud.get_estado_display }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if solicitud.estado != 'recibida' and solicitud.estado != 'cancelada' %}
+                        <button onclick="marcarSolicitudRecibida({{ solicitud.id|default:'0' }}, this)" class="btn-action btn-success" title="Marcar como recibida" style="font-size: 0.75rem; padding: 8px 12px; width: auto;">
+                            <i class="fas fa-check-circle"></i> Recibida
+                        </button>
+                        {% else %}
+                        <span style="color: #9ca3af; font-size: 12px;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 60px 20px;">
+                        <div class="empty-state">
+                            <i class="fas fa-file-invoice"></i>
+                            <h3>No hay solicitudes</h3>
+                            <p>No se han realizado solicitudes de insumos</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

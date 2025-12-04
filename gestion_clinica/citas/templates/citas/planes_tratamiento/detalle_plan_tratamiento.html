@@ -1,0 +1,2788 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+{# 
+  NOTA PARA EL LINTER: Este archivo contiene código Django template dentro de atributos CSS y JavaScript.
+  Los errores del linter son falsos positivos - el código funciona correctamente cuando Django procesa el template.
+  Los estilos dinámicos con etiquetas condicionales dentro de atributos style son válidos en Django templates.
+#}
+{% block title %}{{ plan.nombre }} - Plan de Tratamiento{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    .main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Layout con Sidebar */
+    .tratamiento-layout-container {
+        display: flex;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        align-items: flex-start;
+        width: 100%;
+        position: relative;
+        min-height: calc(100vh - 80px);
+        overflow-x: hidden;
+    }
+
+    /* Sidebar Izquierdo - Panel de Opciones */
+    .tratamiento-sidebar {
+        width: 300px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 20px 0;
+        min-height: calc(100vh - 64px);
+        position: fixed;
+        top: 64px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 998;
+        overflow-y: auto;
+        max-height: calc(100vh - 64px);
+    }
+
+    .sidebar-header {
+        padding: 0 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding-top: 12px;
+    }
+
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-header h3 i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+
+    .sidebar-section {
+        padding: 0 12px;
+        margin-bottom: 24px;
+    }
+
+    .sidebar-section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+        padding: 0 4px;
+    }
+
+    .sidebar-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #64748b;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+        margin-bottom: 4px;
+        border: 1px solid transparent;
+        cursor: pointer;
+    }
+
+    .sidebar-option:hover {
+        background: #f8fafc;
+        color: var(--primary-color);
+        border-color: #e5e7eb;
+    }
+
+    .sidebar-option i {
+        width: 20px;
+        text-align: center;
+        color: #94a3b8;
+        transition: color 0.2s ease;
+        font-size: 0.95rem;
+    }
+
+    .sidebar-option:hover i {
+        color: var(--primary-color);
+    }
+
+    .sidebar-option.danger {
+        color: #ef4444;
+    }
+
+    .sidebar-option.danger:hover {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .sidebar-option.danger i {
+        color: #ef4444;
+    }
+
+    .sidebar-option.success {
+        color: #10b981;
+    }
+
+    .sidebar-option.success:hover {
+        background: #f0fdf4;
+        color: #059669;
+    }
+
+    .sidebar-option.success i {
+        color: #10b981;
+    }
+
+    .sidebar-status-card {
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        border: 2px solid;
+    }
+
+    .sidebar-status-card.presupuesto {
+        background: {% if presupuesto_aceptado %}#f0fdf4{% else %}#fef2f2{% endif %};
+        border-color: {% if presupuesto_aceptado %}#10b981{% else %}#ef4444{% endif %};
+    }
+
+    .status-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+
+    .status-card-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1rem;
+    }
+
+    .status-card-icon.presupuesto {
+        background: {% if presupuesto_aceptado %}#10b981{% else %}#ef4444{% endif %};
+    }
+
+    .status-card-title {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.9rem;
+    }
+
+    .status-card-text {
+        font-size: 0.75rem;
+        color: {% if presupuesto_aceptado %}#059669{% else %}#dc2626{% endif %};
+        margin-bottom: 8px;
+    }
+
+    .consentimiento-item {
+        padding: 10px;
+        background: #f8fafc;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        border-left: 3px solid;
+    }
+
+    .consentimiento-item.pendiente {
+        border-left-color: #3b82f6;
+    }
+
+    .consentimiento-item.firmado {
+        border-left-color: #10b981;
+    }
+
+    .consentimiento-item.rechazado {
+        border-left-color: #ef4444;
+    }
+
+    .consentimiento-item.vencido {
+        border-left-color: #f59e0b;
+    }
+
+    .consentimiento-item-title {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+    }
+
+    .consentimiento-item-actions {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+    }
+
+    .consentimiento-item-action {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Contenido Principal */
+    .tratamiento-content {
+        flex: 1;
+        min-width: 0;
+        margin-left: 316px; /* 300px (sidebar) + 16px (gap) */
+        margin-right: 0;
+        padding: 24px 24px 24px 0;
+        padding-top: 24px;
+        box-sizing: border-box;
+        width: calc(100% - 316px);
+        max-width: calc(100vw - 316px - 80px);
+        position: relative;
+    }
+
+    .content-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .content-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .content-title h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .content-title .badge {
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    @media (max-width: 1024px) {
+        .tratamiento-sidebar {
+            width: 260px;
+        }
+        .tratamiento-content {
+            margin-left: 276px;
+            width: calc(100% - 276px);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .tratamiento-sidebar {
+            position: relative;
+            width: 100%;
+            min-height: auto;
+            max-height: none;
+        }
+        .tratamiento-content {
+            margin-left: 0;
+            width: 100%;
+            padding: 16px;
+        }
+    }
+
+    /* Sistema de Notificaciones Moderno */
+    .notification-container {
+        position: fixed;
+        top: 90px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 400px;
+        pointer-events: none;
+    }
+    
+    .notification {
+        background: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid;
+        min-width: 320px;
+        max-width: 400px;
+    }
+    
+    .notification.success {
+        border-left-color: #10b981;
+        background: linear-gradient(to right, #f0fdf4 0%, white 8%);
+    }
+    
+    .notification.error {
+        border-left-color: #ef4444;
+        background: linear-gradient(to right, #fef2f2 0%, white 8%);
+    }
+    
+    .notification.warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(to right, #fffbeb 0%, white 8%);
+    }
+    
+    .notification.info {
+        border-left-color: var(--primary-color);
+        background: linear-gradient(to right, #eff6ff 0%, white 8%);
+    }
+    
+    .notification-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+    
+    .notification.success .notification-icon {
+        background: #10b981;
+        color: white;
+    }
+    
+    .notification.error .notification-icon {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .notification.warning .notification-icon {
+        background: #f59e0b;
+        color: white;
+    }
+    
+    .notification.info .notification-icon {
+        background: var(--primary-color);
+        color: white;
+    }
+    
+    .notification-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .notification-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    
+    .notification-message {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+    
+    .notification-close {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+    }
+    
+    .notification-close:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .notification.hiding {
+        animation: slideOutRight 0.3s ease-out forwards;
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+</style>
+
+<!-- Layout con Sidebar Lateral -->
+<div class="tratamiento-layout-container">
+    <!-- Sidebar - Panel de Opciones -->
+    <aside class="tratamiento-sidebar">
+        <!-- Header del Sidebar -->
+        <div class="sidebar-header">
+            <h3><i class="fas fa-cog"></i> Configuraciones del Tratamiento</h3>
+        </div>
+
+        <!-- Sección: Opciones del Tratamiento -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Tratamiento</div>
+            {# La funcionalidad de editar ha sido deshabilitada. Si necesita cambios, cancele y elimine el plan. #}
+            {% if puede_cancelar %}
+            <button onclick="abrirModalCancelarPlan({{ plan.id }})" class="sidebar-option danger" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
+                <i class="fas fa-times-circle"></i>
+                <span>Cancelar Plan</span>
+            </button>
+            {% endif %}
+            {% if puede_editar or es_admin %}
+            <button onclick="enviarDocumentosTratamiento({{ plan.id }})" class="sidebar-option success" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
+                <i class="fas fa-envelope"></i>
+                <span>Enviar Documentos por Correo</span>
+            </button>
+            {% endif %}
+            {% if puede_finalizar %}
+            <button onclick="abrirModalFinalizarTratamiento({{ plan.id }})" class="sidebar-option success" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
+                <i class="fas fa-check-circle"></i>
+                <span>Finalizar Tratamiento</span>
+            </button>
+            {% endif %}
+    </div>
+    
+        <!-- Sección: Presupuesto -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Presupuesto del Tratamiento</div>
+            <div class="sidebar-status-card presupuesto">
+                <div class="status-card-header">
+                    <div class="status-card-icon presupuesto">
+                        {% if presupuesto_aceptado %}<i class="fas fa-check-circle"></i>{% else %}<i class="fas fa-exclamation-circle"></i>{% endif %}
+            </div>
+                    <div style="flex: 1;">
+                        <div class="status-card-title">Estado del Presupuesto</div>
+                        <div class="status-card-text">
+                            {% if presupuesto_aceptado %}
+                                Aceptado el {{ plan.fecha_aceptacion_presupuesto|date:"d/m/Y" }}
+                            {% else %}
+                                Pendiente de aceptación
+            {% endif %}
+        </div>
+            </div>
+            </div>
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid {% if presupuesto_aceptado %}#10b981{% else %}#ef4444{% endif %};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.75rem; color: #64748b;">Precio Final:</span>
+                        <span style="font-size: 0.875rem; font-weight: 600; color: #1e293b;">{{ plan.precio_final|pesos_chilenos }}</span>
+                    </div>
+                    <button type="button"
+                            class="sidebar-option"
+                            style="width: 100%; margin-top: 4px; padding: 8px 12px; font-size: 0.85rem; justify-content: center; border: none; cursor: pointer;"
+                            onclick="abrirMenuOpcionesPresupuesto({{ plan.id }}, '{{ plan.nombre|escapejs }}', '{% url 'exportar_presupuesto_pdf' plan.id %}', {% if not presupuesto_aceptado and puede_editar %}true{% else %}false{% endif %});">
+                        <i class="fas fa-ellipsis-h"></i>
+                        <span>Opciones de Presupuesto</span>
+                    </button>
+                </div>
+        </div>
+    </div>
+    
+        <!-- Sección: Consentimientos Informados -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Consentimientos Informados</div>
+            
+            {% if consentimientos %}
+            <div style="margin-bottom: 12px;">
+                {% for consentimiento in consentimientos %}
+                <div class="consentimiento-item {{ consentimiento.estado }}" style="margin-bottom: 12px;">
+                    <div style="display: flex; align-items: start; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="flex: 1;">
+                            <div class="consentimiento-item-title">{{ consentimiento.titulo|truncatewords:8 }}</div>
+                            <div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;">
+                                <span style="display: inline-block; padding: 2px 8px; border-radius: 12px; background: {% if consentimiento.estado == 'firmado' %}#d1fae5{% elif consentimiento.estado == 'rechazado' %}#fee2e2{% elif consentimiento.estado == 'vencido' %}#fef3c7{% else %}#dbeafe{% endif %}; color: {% if consentimiento.estado == 'firmado' %}#059669{% elif consentimiento.estado == 'rechazado' %}#dc2626{% elif consentimiento.estado == 'vencido' %}#92400e{% else %}#1e40af{% endif %}; font-weight: 600;">
+                                    {{ consentimiento.get_estado_display }}
+                </span>
+            </div>
+                            {% if consentimiento.fecha_creacion %}
+                            <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px;">
+                                <i class="fas fa-calendar"></i> {{ consentimiento.fecha_creacion|date:"d/m/Y" }}
+            </div>
+                {% endif %}
+                            {% if consentimiento.documento_firmado_fisico %}
+                            <div style="font-size: 0.65rem; color: #059669; margin-top: 4px;">
+                                <i class="fas fa-file-check"></i> Documento firmado subido
+            </div>
+                {% endif %}
+            </div>
+            </div>
+                    <div class="consentimiento-item-actions" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        <button type="button"
+                                class="consentimiento-item-action"
+                                style="background: #0f766e; color: white; flex: 1; min-width: 80px; justify-content: center; border: none; cursor: pointer;"
+                                onclick="abrirMenuAccionesConsentimiento({{ consentimiento.id }}, '{{ consentimiento.titulo|escapejs }}', '{% url 'exportar_consentimiento_pdf' consentimiento.id %}', {% if consentimiento.estado == 'pendiente' and puede_editar %}'{% url 'editar_consentimiento' consentimiento.id %}'{% else %}null{% endif %}, '{{ consentimiento.estado }}', '{{ plan.cliente.rut|default:"" }}', '{{ plan.cliente.nombre_completo|escapejs }}', {% if consentimiento.documento_firmado_fisico %}'{% url 'descargar_documento_firmado_consentimiento' consentimiento.id %}'{% else %}null{% endif %});">
+                            <i class="fas fa-ellipsis-h"></i> Opciones
+                        </button>
+            </div>
+            </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            {% if puede_editar or es_admin %}
+            {% if not consentimientos %}
+            <a href="{% url 'crear_consentimiento_desde_plan' plan.id %}" class="sidebar-option" style="width: 100%; justify-content: center; margin-top: 8px;">
+                <i class="fas fa-plus"></i>
+                <span>Crear Consentimiento</span>
+            </a>
+            {% elif not tiene_consentimiento_firmado %}
+            <div style="padding: 10px; background: #fef3c7; border-radius: 6px; border-left: 3px solid #f59e0b; margin-top: 8px;">
+                <div style="font-size: 0.7rem; color: #92400e; margin-bottom: 6px;">
+                    <i class="fas fa-info-circle"></i> Puedes crear consentimientos adicionales si es necesario
+            </div>
+                <a href="{% url 'crear_consentimiento_desde_plan' plan.id %}" class="sidebar-option" style="width: 100%; justify-content: center; margin: 0; padding: 6px 10px; font-size: 0.8rem;">
+                    <i class="fas fa-plus"></i>
+                    <span>Crear Otro</span>
+                </a>
+        </div>
+            {% else %}
+            <div style="padding: 10px; background: #f0fdf4; border-radius: 6px; border-left: 3px solid #10b981; margin-top: 8px;">
+                <div style="font-size: 0.7rem; color: #059669; margin-bottom: 4px;">
+                    <i class="fas fa-check-circle"></i> Consentimiento firmado
+    </div>
+                <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 6px;">
+                    Puedes crear consentimientos adicionales si el tratamiento requiere otros procedimientos
+            </div>
+                <a href="{% url 'crear_consentimiento_desde_plan' plan.id %}" class="sidebar-option success" style="width: 100%; justify-content: center; margin: 0; padding: 6px 10px; font-size: 0.8rem;">
+                    <i class="fas fa-plus"></i>
+                    <span>Crear Adicional</span>
+                </a>
+                </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    
+        <!-- Sección: Estado y Requisitos -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Estado del Tratamiento</div>
+            
+            <!-- Resumen de Requisitos -->
+            <div style="padding: 12px; background: {% if puede_crear_citas %}#f0fdf4{% else %}#fef3c7{% endif %}; border-radius: 8px; border-left: 3px solid {% if puede_crear_citas %}#10b981{% else %}#f59e0b{% endif %}; margin-bottom: 12px;">
+                <div style="font-size: 0.75rem; color: {% if puede_crear_citas %}#059669{% else %}#92400e{% endif %}; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    {% if puede_crear_citas %}
+                    <i class="fas fa-check-circle"></i> Listo para Gestionar Citas
+                {% else %}
+                    <i class="fas fa-lock"></i> Requisitos Pendientes
+                {% endif %}
+            </div>
+                <div style="font-size: 0.7rem; color: {% if puede_crear_citas %}#047857{% else %}#78350f{% endif %}; line-height: 1.5;">
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                        {% if presupuesto_aceptado %}
+                        <i class="fas fa-check" style="color: #10b981;"></i>
+                        {% else %}
+                        <i class="fas fa-times" style="color: #ef4444;"></i>
+                        {% endif %}
+                        <span>Presupuesto {% if presupuesto_aceptado %}aceptado{% else %}pendiente{% endif %}</span>
+            </div>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                {% if tiene_consentimiento_firmado %}
+                        <i class="fas fa-check" style="color: #10b981;"></i>
+                {% else %}
+                        <i class="fas fa-times" style="color: #ef4444;"></i>
+                {% endif %}
+                        <span>Consentimiento {% if tiene_consentimiento_firmado %}firmado{% else %}pendiente{% endif %}</span>
+        </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        {% if plan.estado == 'aprobado' or plan.estado == 'en_progreso' %}
+                        <i class="fas fa-check" style="color: #10b981;"></i>
+                        {% else %}
+                        <i class="fas fa-times" style="color: #ef4444;"></i>
+        {% endif %}
+                        <span>Tratamiento {% if plan.estado == 'aprobado' or plan.estado == 'en_progreso' %}aprobado{% else %}pendiente{% endif %}</span>
+            </div>
+        </div>
+    </div>
+    
+            {% if puede_aprobar %}
+            <button onclick="abrirModalAprobarTratamiento({{ plan.id }})" class="sidebar-option" style="width: 100%; justify-content: center; background: #10b981; color: white; margin-top: 8px; font-weight: 600;">
+                <i class="fas fa-check-double"></i>
+                <span>Aprobar y Habilitar Citas</span>
+            </button>
+            {% endif %}
+        </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="tratamiento-content">
+        <!-- Header del Contenido -->
+        <div class="content-header">
+            <div class="content-title">
+                <h1>{{ plan.nombre }}</h1>
+                <span class="badge" style="background: {% if plan.estado == 'aprobado' %}#10b981{% elif plan.estado == 'en_progreso' %}#10b981{% elif plan.estado == 'completado' %}#3b82f6{% elif plan.estado == 'cancelado' %}#ef4444{% else %}#6b7280{% endif %}; color: white;">
+                    {{ plan.get_estado_display }}
+                </span>
+            </div>
+            <a href="{% url 'listar_planes_tratamiento' %}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 500; transition: all 0.2s ease;">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver a Lista</span>
+            </a>
+        </div>
+        
+        <!-- Información General -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Cliente</div>
+                <div style="color: #1e293b; font-size: 0.95rem; font-weight: 600;">{{ plan.cliente.nombre_completo }}</div>
+            </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Dentista</div>
+                <div style="color: #1e293b; font-size: 0.95rem; font-weight: 600;">{{ plan.dentista.nombre_completo }}</div>
+            </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Precio Final</div>
+                <div style="color: #10b981; font-size: 1.1rem; font-weight: 700;">{{ plan.precio_final|pesos_chilenos }}</div>
+            </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Total en Citas</div>
+                <div style="color: #3b82f6; font-size: 0.95rem; font-weight: 600;">{{ total_precios_citas|pesos_chilenos|default:"$0" }}</div>
+                <div style="color: #94a3b8; font-size: 0.7rem; margin-top: 2px;">({{ total_citas }} citas)</div>
+        </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Saldo Disponible</div>
+                <div style="color: {% if saldo_disponible_citas >= 0 %}#10b981{% else %}#ef4444{% endif %}; font-size: 0.95rem; font-weight: 600;">{{ saldo_disponible_citas|pesos_chilenos|default:"$0" }}</div>
+    </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Creado</div>
+                <div style="color: #1e293b; font-size: 0.875rem;">{{ plan.creado_el|date:"d/m/Y" }}</div>
+            </div>
+            </div>
+        
+        <!-- Descripción, Diagnóstico y Objetivo en una sola línea compacta -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Descripción</div>
+                <div style="color: #1e293b; font-size: 0.875rem; line-height: 1.4;">{{ plan.descripcion|default:"Sin descripción"|truncatewords:15 }}</div>
+        </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Diagnóstico</div>
+                <div style="color: #1e293b; font-size: 0.875rem; line-height: 1.4;">{{ plan.diagnostico|default:"Sin diagnóstico"|truncatewords:15 }}</div>
+            </div>
+            <div>
+                <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Objetivo</div>
+                <div style="color: #1e293b; font-size: 0.875rem; line-height: 1.4;">{{ plan.objetivo|default:"Sin objetivo"|truncatewords:15 }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gestión de Citas (Solo si puede crear citas) -->
+    {% if puede_crear_citas %}
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-calendar-check"></i> Gestión de Citas
+            </h3>
+            <button onclick="abrirModalCrearCita()" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.875rem;">
+                <i class="fas fa-calendar-plus"></i> Crear Cita
+            </button>
+        </div>
+        
+        <!-- Resumen de Precios de Citas -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 2px solid var(--primary-color);">
+                <div style="font-size: 1.75rem; font-weight: 700; color: var(--primary-color);">{{ plan.total_citas }}</div>
+                <div style="font-size: 0.875rem; color: #64748b;">Total Citas</div>
+            </div>
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 2px solid #10b981;">
+                <div style="font-size: 1.75rem; font-weight: 700; color: #10b981;">{{ plan.citas_completadas }}</div>
+                <div style="font-size: 0.875rem; color: #64748b;">Completadas</div>
+            </div>
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 2px solid #3b82f6;">
+                <div style="font-size: 1.75rem; font-weight: 700; color: #3b82f6;">{{ total_precios_citas|pesos_chilenos|default:"$0" }}</div>
+                <div style="font-size: 0.875rem; color: #64748b;">Total Precios Citas</div>
+            </div>
+            <div style="text-align: center; padding: 16px; background: {% if saldo_disponible_citas >= 0 %}#f0fdf4{% else %}#fef2f2{% endif %}; border-radius: 8px; border: 2px solid {% if saldo_disponible_citas >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+                <div style="font-size: 1.75rem; font-weight: 700; color: {% if saldo_disponible_citas >= 0 %}#10b981{% else %}#ef4444{% endif %};">{{ saldo_disponible_citas|pesos_chilenos|default:"$0" }}</div>
+                <div style="font-size: 0.875rem; color: #64748b;">Saldo Disponible</div>
+            </div>
+        </div>
+        
+        <!-- Barra de progreso de precios -->
+        <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.875rem; color: #64748b; font-weight: 500;">Distribución de Precios</span>
+                <span style="font-size: 0.875rem; color: #1e293b; font-weight: 600;">{{ total_precios_citas|pesos_chilenos|default:"$0" }} / {{ plan.precio_final|pesos_chilenos }}</span>
+                        </div>
+            <div style="width: 100%; height: 12px; background: #e5e7eb; border-radius: 6px; overflow: hidden; position: relative;">
+                {% widthratio total_precios_citas plan.precio_final 100 as porcentaje_precios %}
+                <div style="width: {% if porcentaje_precios > 100 %}100{% else %}{{ porcentaje_precios }}{% endif %}%; height: 100%; background: {% if porcentaje_precios > 100 %}#ef4444{% else %}var(--primary-color){% endif %}; transition: width 0.3s;"></div>
+                        </div>
+            {% if saldo_disponible_citas < 0 %}
+            <div style="margin-top: 8px; padding: 8px; background: #fef2f2; border-radius: 6px; border-left: 3px solid #ef4444;">
+                <div style="color: #dc2626; font-size: 0.75rem;">
+                    <i class="fas fa-exclamation-triangle"></i> El total de precios de citas excede el precio final del tratamiento en {% widthratio saldo_disponible_citas -1 1 as exceso_absoluto %}{{ exceso_absoluto|pesos_chilenos }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+        </div>
+        {% endif %}
+    
+        <!-- Progreso del Plan -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-chart-line"></i> Progreso del Plan
+            </h3>
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 1rem; color: #64748b; font-weight: 500;">Progreso General</span>
+                    <span style="font-size: 1.25rem; color: #1e293b; font-weight: 700;">{{ plan.progreso_porcentaje }}%</span>
+        </div>
+                <div style="width: 100%; height: 12px; background: #e5e7eb; border-radius: 6px; overflow: hidden;">
+                    <div style="width: {{ plan.progreso_porcentaje }}%; height: 100%; background: var(--primary-color); transition: width 0.3s;"></div>
+                        </div>
+                        </div>
+            
+            {% if puede_aprobar %}
+            <!-- Sección de Aprobación -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-top: 24px; text-align: center;">
+                <div style="margin-bottom: 16px;">
+                    <div style="width: 40px; height: 40px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                        <i class="fas fa-check-circle" style="color: white; font-size: 1.25rem;"></i>
+                        </div>
+                    <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 1rem; font-weight: 600;">
+                        Tratamiento Listo para Aprobar
+                    </h4>
+                    <p style="margin: 0; color: #64748b; font-size: 0.875rem; line-height: 1.5; max-width: 600px; margin: 0 auto;">
+                        Todos los requisitos han sido cumplidos. Al aprobar este tratamiento se habilitará la creación de citas y el tratamiento comenzará oficialmente.
+                    </p>
+                </div>
+                
+                <div style="background: white; border-radius: 6px; padding: 16px; margin-bottom: 20px; border: 1px solid #e5e7eb; max-width: 500px; margin-left: auto; margin-right: auto;">
+                    <div style="color: #374151; font-size: 0.8rem; font-weight: 500; margin-bottom: 10px; text-align: left;">
+                        Al aprobar este tratamiento:
+                                </div>
+                    <div style="display: grid; gap: 8px; text-align: left;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-check" style="color: #10b981; font-size: 0.75rem;"></i>
+                            <span style="color: #475569; font-size: 0.8rem;">Se desbloqueará la creación de citas</span>
+                                </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-check" style="color: #10b981; font-size: 0.75rem;"></i>
+                            <span style="color: #475569; font-size: 0.8rem;">El estado cambiará a "Aprobado" y luego a "En Progreso"</span>
+                            </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-check" style="color: #10b981; font-size: 0.75rem;"></i>
+                            <span style="color: #475569; font-size: 0.8rem;">El tratamiento quedará activo en el sistema</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="abrirModalAprobarTratamiento({{ plan.id }})" 
+                        class="btn" 
+                        style="max-width: 400px; margin: 0 auto; display: block; background: var(--primary-color); color: white; padding: 12px 24px; font-size: 0.95rem; font-weight: 500; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+                    <i class="fas fa-check-double" style="margin-right: 8px;"></i>
+                    Aprobar Tratamiento y Habilitar Citas
+                </button>
+                                </div>
+            {% elif not puede_crear_citas %}
+            <!-- Mensaje cuando no se puede aprobar -->
+            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 16px; margin-top: 20px; text-align: center; max-width: 500px; margin-left: auto; margin-right: auto;">
+                <div style="margin-bottom: 8px;">
+                    <i class="fas fa-info-circle" style="color: #d97706; font-size: 1.1rem;"></i>
+                            </div>
+                <div style="color: #92400e; font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
+                    Requisitos pendientes para aprobar
+                        </div>
+                <div style="color: #78350f; font-size: 0.85rem; line-height: 1.5; text-align: left; display: inline-block;">
+                    Para poder aprobar este tratamiento y habilitar la creación de citas, se deben cumplir:
+                    <ul style="margin: 8px 0 0 20px; padding: 0; text-align: left;">
+                        <li>Consentimiento informado firmado</li>
+                        <li>Presupuesto aceptado por el paciente</li>
+                    </ul>
+                    </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Citas del Tratamiento -->
+    {% if citas %}
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+            <i class="fas fa-calendar"></i> Citas Vinculadas
+        </h3>
+        <div style="display: grid; gap: 12px;">
+            {% for cita in citas %}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <div>
+                    <div style="color: #1e293b; font-weight: 600; margin-bottom: 4px;">
+                        {{ cita.fecha_hora|date:"d/m/Y H:i" }}
+                    </div>
+                    <div style="color: #64748b; font-size: 0.875rem;">
+                        {% if cita.tipo_servicio %}{{ cita.tipo_servicio.nombre }}{% else %}{{ cita.tipo_consulta|default:"Sin servicio" }}{% endif %}
+                    </div>
+                </div>
+                <div>
+                    <span class="badge" style="background: {% if cita.estado == 'completada' %}#10b981{% elif cita.estado == 'cancelada' %}#ef4444{% else %}#6b7280{% endif %}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">
+                        {{ cita.get_estado_display }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+        <p style="color: #64748b; margin: 0;">No hay citas vinculadas a este plan de tratamiento.</p>
+    </div>
+    {% endif %}
+    
+        <!-- Citas del Tratamiento -->
+        {% if citas %}
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">
+                <i class="fas fa-calendar-check"></i> Citas del Tratamiento ({{ citas|length }})
+            </h3>
+        <div style="display: grid; gap: 12px;">
+                {% for cita in citas %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 4px solid {% if cita.estado == 'completada' %}#10b981{% elif cita.estado == 'cancelada' %}#ef4444{% elif cita.estado == 'en_progreso' %}#8b5cf6{% else %}var(--primary-color){% endif %};">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <div style="color: #1e293b; font-weight: 600; font-size: 1rem;">
+                                <i class="fas fa-calendar-alt"></i> {{ cita.fecha_hora|date:"d/m/Y" }}
+                    </div>
+                            <div style="color: var(--primary-color); font-weight: 600; font-size: 1rem;">
+                                <i class="fas fa-clock"></i> {{ cita.fecha_hora|date:"H:i" }}
+                    </div>
+                    </div>
+                        <div style="color: #64748b; font-size: 0.875rem; margin-bottom: 4px;">
+                            <i class="fas fa-tooth"></i> {% if cita.tipo_servicio %}{{ cita.tipo_servicio.nombre }}{% else %}{{ cita.tipo_consulta|default:"Sin servicio" }}{% endif %}
+                </div>
+                        {% if cita.precio_cobrado %}
+                        <div style="color: #10b981; font-size: 0.875rem; font-weight: 600; margin-top: 4px;">
+                            <i class="fas fa-dollar-sign"></i> {{ cita.precio_cobrado|pesos_chilenos }}
+                        </div>
+                    {% endif %}
+                </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="badge" style="background: {% if cita.estado == 'completada' %}#10b981{% elif cita.estado == 'cancelada' %}#ef4444{% elif cita.estado == 'en_progreso' %}#8b5cf6{% else %}#6b7280{% endif %}; color: white; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                            {{ cita.get_estado_display }}
+                        </span>
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px; text-align: center; margin-bottom: 24px;">
+            <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 16px; opacity: 0.3; color: #64748b;"></i>
+            <p style="color: #64748b; margin: 0; font-size: 1rem;">No hay citas creadas para este tratamiento.</p>
+            {% if puede_crear_citas %}
+            <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 0.875rem;">Usa el botón "Crear Cita" para agregar la primera cita.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </main>
+</div>
+
+<!-- Modal para Crear Cita desde Plan de Tratamiento -->
+<div id="modalCrearCitaPlan" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation();">
+        <div class="modal-header">
+            <h3><i class="fas fa-calendar-plus"></i> Crear Cita para Tratamiento</h3>
+            <button class="modal-close" onclick="cerrarModalCrearCita()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="formCrearCitaPlan" method="POST" action="{% url 'crear_cita_desde_plan' plan.id %}">
+                {% csrf_token %}
+                
+                <!-- Información del Plan (solo lectura) -->
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="color: #64748b; font-size: 0.875rem; margin-bottom: 8px;">Plan de Tratamiento</div>
+                    <div style="color: #1e293b; font-weight: 600; font-size: 1.125rem;">{{ plan.nombre }}</div>
+                    <div style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">
+                        Cliente: {{ plan.cliente.nombre_completo }} | Dentista: {{ plan.dentista.nombre_completo }}
+                    </div>
+                </div>
+                
+                <!-- Fecha y Hora -->
+                <div class="form-group-modal">
+                    <label class="form-label">
+                        <i class="fas fa-calendar-day"></i> Fecha y Hora
+                        <span class="required-badge">*</span>
+                    </label>
+                    <input type="datetime-local" name="fecha_hora" id="fechaHoraCitaPlan" required class="form-control-modal" min="">
+                </div>
+                
+                <!-- Tipo de Servicio -->
+                <div class="form-group-modal">
+                    <label class="form-label">
+                        <i class="fas fa-tooth"></i> Tipo de Servicio (Opcional)
+                    </label>
+                    <select name="tipo_servicio" id="tipoServicioCitaPlan" class="form-control-modal" onchange="actualizarPrecioServicio()">
+                        <option value="">-- Seleccionar servicio --</option>
+                        {% for servicio in servicios_activos %}
+                        <option value="{{ servicio.id }}" data-precio="{{ servicio.precio_base|default:0 }}">{{ servicio.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Precio de la Cita -->
+                <div class="form-group-modal">
+                    <label class="form-label">
+                        <i class="fas fa-dollar-sign"></i> Precio de la Cita
+                        <span class="required-badge">*</span>
+                    </label>
+                    <input type="text" name="precio_cobrado" id="precioCitaPlan" required class="form-control-modal" value="" oninput="formatearPrecioCita(this)" onkeypress="return soloNumeros(event)" placeholder="0">
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+                        Saldo disponible: <span id="saldoDisponibleTexto">{{ saldo_disponible_citas|pesos_chilenos|default:"$0" }}</span>
+                        <span id="saldoDisponible" style="display: none;">{{ saldo_disponible_citas|floatformat:0|default:"0" }}</span>
+                    </div>
+                    <div id="mensajePrecio" style="display: none; margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 0.875rem;"></div>
+                </div>
+                
+                <!-- Notas -->
+                <div class="form-group-modal">
+                    <label class="form-label">
+                        <i class="fas fa-sticky-note"></i> Notas (Opcional)
+                    </label>
+                    <textarea name="notas" id="notasCitaPlan" rows="3" class="form-control-modal" placeholder="Notas adicionales sobre la cita..."></textarea>
+                </div>
+                
+                <!-- Mensaje de error/success -->
+                <div id="mensajeCitaPlan" style="display: none; margin-top: 16px; padding: 12px; border-radius: 6px;"></div>
+                
+                <!-- Botones -->
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                    <button type="button" onclick="cerrarModalCrearCita()" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Crear Cita
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    color: #64748b;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: #f3f4f6;
+    color: #1e293b;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.form-group-modal {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.form-control-modal {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.form-control-modal:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.required-badge {
+    color: #ef4444;
+    margin-left: 4px;
+}
+</style>
+
+<script>
+// ==========================================
+// SISTEMA DE NOTIFICACIONES
+// ==========================================
+function showNotification(type, message, duration = 5000) {
+    // Tipos válidos: success, error, warning, info
+    const validTypes = ['success', 'error', 'warning', 'info'];
+    type = validTypes.includes(type) ? type : 'info';
+    
+    // Obtener o crear contenedor
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+    
+    // Crear notificación
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    // Iconos según tipo
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        error: '<i class="fas fa-exclamation-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
+    
+    // Títulos según tipo
+    const titles = {
+        success: 'Éxito',
+        error: 'Error',
+        warning: 'Advertencia',
+        info: 'Información'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-icon">${icons[type]}</div>
+        <div class="notification-content">
+            <div class="notification-title">${titles[type]}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close" onclick="this.closest('.notification').remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Agregar al contenedor
+    container.appendChild(notification);
+    
+    // Auto-remover después de la duración
+    if (duration > 0) {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('hiding');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+    
+    return notification;
+}
+
+// Variables globales para el modal
+var tiposServicioDisponibles = [];
+
+// Abrir modal
+function abrirModalCrearCita() {
+    var modal = document.getElementById('modalCrearCitaPlan');
+    if (!modal) return;
+    
+    // Establecer fecha mínima como hoy
+    var ahora = new Date();
+    ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+    var fechaMinima = ahora.toISOString().slice(0, 16);
+    document.getElementById('fechaHoraCitaPlan').min = fechaMinima;
+    
+    // Cargar datos del plan
+    cargarDatosPlan();
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+// Cerrar modal
+function cerrarModalCrearCita() {
+    var modal = document.getElementById('modalCrearCitaPlan');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+// El modal NO se cierra al hacer clic fuera (removido intencionalmente)
+
+// Cargar datos del plan (tipos de servicio y fases)
+function cargarDatosPlan() {
+    fetch('{% url "crear_cita_desde_plan" plan.id %}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                tiposServicioDisponibles = data.tipos_servicio || [];
+                
+                // Llenar select de tipos de servicio
+                var selectServicio = document.getElementById('tipoServicioCitaPlan');
+                if (selectServicio) {
+                    selectServicio.innerHTML = '<option value="">-- Seleccionar servicio --</option>';
+                    tiposServicioDisponibles.forEach(function(servicio) {
+                        var option = document.createElement('option');
+                        option.value = servicio.id;
+                        option.textContent = servicio.nombre;
+                        option.setAttribute('data-precio', servicio.precio || 0);
+                        selectServicio.appendChild(option);
+                    });
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar datos del plan:', error);
+        });
+}
+
+// Función para solo permitir números
+function soloNumeros(event) {
+    var char = String.fromCharCode(event.which);
+    if (!/[0-9]/.test(char)) {
+        event.preventDefault();
+        return false;
+    }
+    return true;
+}
+
+// Función para formatear precio con puntos como separadores de miles
+function formatearPrecioCita(input) {
+    // Obtener solo números
+    var valor = input.value.replace(/[^0-9]/g, '');
+    
+    // Formatear con puntos
+    if (valor) {
+        valor = parseInt(valor, 10).toLocaleString('es-CL');
+        input.value = valor;
+    } else {
+        input.value = '';
+    }
+    
+    // Validar precio después de formatear
+    validarPrecioCita();
+}
+
+// Función para obtener el valor numérico del precio (sin puntos)
+function obtenerValorNumericoPrecio() {
+    var precioInput = document.getElementById('precioCitaPlan');
+    if (!precioInput) return 0;
+    var valorFormateado = precioInput.value.replace(/\./g, '');
+    return parseFloat(valorFormateado) || 0;
+}
+
+// Actualizar precio cuando se selecciona un servicio
+function actualizarPrecioServicio() {
+    var selectServicio = document.getElementById('tipoServicioCitaPlan');
+    var precioInput = document.getElementById('precioCitaPlan');
+    var selectedOption = selectServicio.options[selectServicio.selectedIndex];
+    
+    if (selectedOption && selectedOption.value) {
+        var precio = parseFloat(selectedOption.getAttribute('data-precio')) || 0;
+        // Formatear el precio con puntos
+        if (precio > 0) {
+            precioInput.value = precio.toLocaleString('es-CL');
+        } else {
+            precioInput.value = '';
+        }
+        validarPrecioCita();
+    }
+}
+
+// Validar que el precio no exceda el saldo disponible (solo como guía, no restricción)
+function validarPrecioCita() {
+    var precioInput = document.getElementById('precioCitaPlan');
+    var mensajePrecio = document.getElementById('mensajePrecio');
+    var saldoDisponible = parseFloat(document.getElementById('saldoDisponible').textContent.replace(/[^0-9.-]/g, '')) || 0;
+    var precio = obtenerValorNumericoPrecio();
+    
+    mensajePrecio.style.display = 'none';
+    precioInput.style.borderColor = '#d1d5db';
+    
+    if (precio > 0) {
+        if (precio > saldoDisponible) {
+            var exceso = precio - saldoDisponible;
+            mensajePrecio.style.display = 'block';
+            mensajePrecio.style.background = '#fef3c7';
+            mensajePrecio.style.color = '#92400e';
+            mensajePrecio.style.border = '1px solid #f59e0b';
+            mensajePrecio.innerHTML = '<i class="fas fa-info-circle"></i> <strong>Guía de presupuesto:</strong> El precio excede el saldo disponible en $' + exceso.toLocaleString('es-CL', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '. Esto es solo una referencia - el presupuesto puede variar según lo que realmente se cobre.';
+            precioInput.style.borderColor = '#f59e0b';
+            return true; // Permitir continuar aunque exceda
+            } else {
+            var saldoRestante = saldoDisponible - precio;
+            mensajePrecio.style.display = 'block';
+            mensajePrecio.style.background = '#f0fdf4';
+            mensajePrecio.style.color = '#059669';
+            mensajePrecio.style.border = '1px solid #10b981';
+            mensajePrecio.innerHTML = '<i class="fas fa-info-circle"></i> <strong>Guía de presupuesto:</strong> Saldo estimado restante después de esta cita: $' + saldoRestante.toLocaleString('es-CL', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '. Esto es solo una referencia - el presupuesto puede variar según lo que realmente se cobre.';
+            precioInput.style.borderColor = '#10b981';
+            return true;
+        }
+    }
+    return true;
+}
+
+// Manejar envío del formulario
+document.getElementById('formCrearCitaPlan').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Validar que el precio sea válido (mayor a 0)
+    var precio = obtenerValorNumericoPrecio();
+    
+    if (precio <= 0) {
+        var mensajeDiv = document.getElementById('mensajeCitaPlan');
+        mensajeDiv.style.display = 'block';
+        mensajeDiv.style.background = '#fef2f2';
+        mensajeDiv.style.color = '#dc2626';
+        mensajeDiv.style.border = '1px solid #ef4444';
+        mensajeDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Por favor, ingrese un precio válido mayor a $0.';
+        return;
+    }
+    
+    var form = this;
+    
+    // Actualizar el valor del input con el número sin formato antes de crear FormData
+    var precioInput = document.getElementById('precioCitaPlan');
+    precioInput.value = precio.toString();
+    
+    // Crear FormData después de actualizar el valor
+    var formData = new FormData(form);
+    
+    // Asegurarse de que el precio se envíe sin formato
+    formData.set('precio_cobrado', precio.toString());
+    
+    console.log('Precio a enviar:', precio.toString());
+    console.log('FormData precio_cobrado:', formData.get('precio_cobrado'));
+    
+    var mensajeDiv = document.getElementById('mensajeCitaPlan');
+    
+    // Mostrar loading
+    var submitBtn = form.querySelector('button[type="submit"]');
+    var originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+    mensajeDiv.style.display = 'none';
+    
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+        }
+    })
+    .then(response => {
+        // Verificar si la respuesta es JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                console.error('Error: La respuesta no es JSON:', text);
+                throw new Error('El servidor devolvió un error. Por favor, verifica la consola para más detalles.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            mensajeDiv.style.display = 'block';
+            mensajeDiv.style.background = '#d1fae5';
+            mensajeDiv.style.color = '#065f46';
+            mensajeDiv.style.border = '1px solid #10b981';
+            mensajeDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + data.message;
+            
+            // Recargar la página después de 1.5 segundos
+            setTimeout(function() {
+                window.location.reload();
+            }, 1500);
+        } else {
+            mensajeDiv.style.display = 'block';
+            mensajeDiv.style.background = '#fee2e2';
+            mensajeDiv.style.color = '#991b1b';
+            mensajeDiv.style.border = '1px solid #ef4444';
+            mensajeDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (data.error || 'Error al crear la cita');
+            
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        mensajeDiv.style.display = 'block';
+        mensajeDiv.style.background = '#fee2e2';
+        mensajeDiv.style.color = '#991b1b';
+        mensajeDiv.style.border = '1px solid #ef4444';
+        mensajeDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al crear la cita. Por favor, intenta nuevamente.';
+        
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+
+// ==========================================
+// GESTIÓN DE APROBACIÓN DE TRATAMIENTO
+// ==========================================
+
+function aceptarPresupuesto(planId) {
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "aceptar_presupuesto_tratamiento" 0 %}'.replace('0', planId), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+            showNotification('success', data.message);
+            setTimeout(() => {
+            window.location.reload();
+            }, 1500);
+            } else {
+            showNotification('error', data.error || 'Error al aceptar el presupuesto');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        showNotification('error', 'Error al aceptar el presupuesto');
+    });
+}
+
+function abrirModalAprobarTratamiento(planId) {
+    // Verificar condiciones antes de mostrar confirmación
+    var tieneConsentimiento = {{ tiene_consentimiento_firmado|yesno:"true,false" }};
+    var presupuestoAceptado = {{ presupuesto_aceptado|yesno:"true,false" }};
+    
+    if (!tieneConsentimiento || !presupuestoAceptado) {
+        showNotification('warning', 'No se puede aprobar el tratamiento. Debe cumplir todas las condiciones: consentimiento firmado y presupuesto aceptado.');
+        return;
+    }
+    
+    var modal = document.getElementById('modalConfirmarAprobarTratamiento');
+    if (!modal) return;
+    
+    // Actualizar información del modal
+    var consentimientoStatus = document.getElementById('aprobarConsentimientoStatus');
+    var presupuestoStatus = document.getElementById('aprobarPresupuestoStatus');
+    
+    if (consentimientoStatus) {
+        consentimientoStatus.innerHTML = tieneConsentimiento 
+            ? '<i class="fas fa-check-circle" style="color: #10b981;"></i> <span style="color: #047857;">Consentimiento informado firmado</span>'
+            : '<i class="fas fa-times-circle" style="color: #ef4444;"></i> <span style="color: #dc2626;">Consentimiento informado pendiente</span>';
+    }
+    
+    if (presupuestoStatus) {
+        presupuestoStatus.innerHTML = presupuestoAceptado
+            ? '<i class="fas fa-check-circle" style="color: #10b981;"></i> <span style="color: #047857;">Presupuesto aceptado</span>'
+            : '<i class="fas fa-times-circle" style="color: #ef4444;"></i> <span style="color: #dc2626;">Presupuesto pendiente</span>';
+    }
+    
+    document.getElementById('planIdAprobar').value = planId;
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalAprobarTratamiento() {
+    var modal = document.getElementById('modalConfirmarAprobarTratamiento');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarAprobarTratamiento() {
+    var planId = document.getElementById('planIdAprobar').value;
+    if (!planId) {
+        showNotification('error', 'Error: No se pudo identificar el plan.', 3000);
+        return;
+    }
+    
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    // Mostrar indicador de carga
+    var btnAprobar = event.target;
+    var textoOriginal = btnAprobar.innerHTML;
+    btnAprobar.disabled = true;
+    btnAprobar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aprobando...';
+    
+    fetch('{% url "aprobar_tratamiento" plan.id %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btnAprobar.disabled = false;
+        btnAprobar.innerHTML = textoOriginal;
+        
+        if (data.success) {
+            showNotification('success', data.message || 'Tratamiento aprobado exitosamente. La creación de citas ha sido habilitada.', 4000);
+            cerrarModalAprobarTratamiento();
+            setTimeout(() => {
+            window.location.reload();
+            }, 1500);
+        } else {
+            showNotification('error', data.error || 'Error al aprobar el tratamiento.', 3000);
+        }
+    })
+    .catch(error => {
+        btnAprobar.disabled = false;
+        btnAprobar.innerHTML = textoOriginal;
+        console.error('Error:', error);
+        showNotification('error', 'Error al aprobar el tratamiento. Por favor, intenta nuevamente.', 3000);
+    });
+}
+
+// Función para enviar documentos por correo
+function enviarDocumentosTratamiento(planId) {
+    var modal = document.getElementById('modalConfirmarEnvioDocumentos');
+    if (!modal) return;
+    
+    // Mostrar el modal
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Guardar el planId para usar después
+    document.getElementById('planIdEnviarDocumentos').value = planId;
+}
+
+function cerrarModalConfirmarEnvioDocumentos() {
+    var modal = document.getElementById('modalConfirmarEnvioDocumentos');
+    if (modal) {
+        modal.style.display = 'none';
+    document.body.style.overflow = '';
+    }
+}
+
+function confirmarEnviarDocumentos() {
+    var planId = document.getElementById('planIdEnviarDocumentos').value;
+    
+    // Cerrar el modal
+    cerrarModalConfirmarEnvioDocumentos();
+    
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    // Obtener el botón original que inició la acción
+    var btn = document.querySelector('.sidebar-option[onclick*="enviarDocumentosTratamiento"]') || 
+              document.querySelector('button[onclick*="enviarDocumentosTratamiento"]');
+    var originalText = btn ? btn.innerHTML : '';
+    
+    // Mostrar loading en el botón
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    }
+    
+    // Mostrar notificación de carga
+    var loadingNotification = showNotification('info', 'Enviando documentos por correo...', 0);
+    
+    fetch('{% url "enviar_documentos_tratamiento" plan.id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+    .then(response => response.json())
+    .then(data => {
+        // Remover notificación de carga
+        if (loadingNotification && loadingNotification.parentNode) {
+            loadingNotification.remove();
+        }
+        
+        if (data.success) {
+            showNotification('success', data.message);
+        } else {
+            showNotification('error', data.error || 'No se pudieron enviar los documentos');
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        
+        // Remover notificación de carga
+        if (loadingNotification && loadingNotification.parentNode) {
+            loadingNotification.remove();
+        }
+        
+        showNotification('error', 'Error al enviar los documentos. Por favor, intenta nuevamente.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+}
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (DETALLE PLAN)
+// =========================
+var consentimientoAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+    estado: null,
+    clienteRut: '',
+    clienteNombre: '',
+    documentoFirmadoUrl: null,
+};
+
+function abrirMenuAccionesConsentimiento(id, titulo, pdfUrl, editUrl, estado, clienteRut, clienteNombre, documentoFirmadoUrl) {
+    consentimientoAcciones.id = id;
+    consentimientoAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoAcciones.pdfUrl = pdfUrl;
+    consentimientoAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    consentimientoAcciones.estado = estado || 'pendiente';
+    consentimientoAcciones.clienteRut = clienteRut || '';
+    consentimientoAcciones.clienteNombre = clienteNombre || '';
+    consentimientoAcciones.documentoFirmadoUrl = documentoFirmadoUrl && documentoFirmadoUrl !== 'null' ? documentoFirmadoUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimiento');
+    if (!modal) return;
+    
+    // Actualizar título
+    var tituloSpan = document.getElementById('accionesConsentimientoTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoAcciones.titulo;
+    }
+    
+    // Mostrar / ocultar botón Editar según corresponda
+    var btnEditar = document.getElementById('btnAccionEditarConsentimiento');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    // Mostrar / ocultar botón Firmar según corresponda (solo si está pendiente y es admin)
+    var btnFirmar = document.getElementById('btnAccionFirmarConsentimiento');
+    if (btnFirmar) {
+        btnFirmar.style.display = (consentimientoAcciones.estado === 'pendiente' && {{ es_admin|yesno:"true,false" }}) ? 'flex' : 'none';
+    }
+    
+    // Mostrar / ocultar botón Descargar Documento Firmado según corresponda
+    var btnDescargarFirmado = document.getElementById('btnAccionDescargarDocumentoFirmado');
+    if (btnDescargarFirmado) {
+        btnDescargarFirmado.style.display = consentimientoAcciones.documentoFirmadoUrl ? 'flex' : 'none';
+    }
+    
+    // Actualizar texto del botón de firmar según si ya hay documento
+    var textoBotonFirmar = document.getElementById('textoBotonFirmarConsentimiento');
+    if (textoBotonFirmar) {
+        textoBotonFirmar.textContent = consentimientoAcciones.documentoFirmadoUrl ? 'Reemplazar Documento Firmado' : 'Subir Documento Firmado';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimiento() {
+    var modal = document.getElementById('modalAccionesConsentimiento');
+    if (modal) {
+        modal.style.display = 'none';
+    document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimiento() {
+    if (consentimientoAcciones.pdfUrl) {
+        showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+        window.open(consentimientoAcciones.pdfUrl, '_blank');
+    }
+}
+
+function accionEditarConsentimiento() {
+    if (consentimientoAcciones.editUrl) {
+        window.location.href = consentimientoAcciones.editUrl;
+    }
+}
+
+function accionDescargarDocumentoFirmado() {
+    if (consentimientoAcciones.documentoFirmadoUrl) {
+        window.open(consentimientoAcciones.documentoFirmadoUrl, '_blank');
+    }
+}
+
+function accionEliminarConsentimiento() {
+    if (!consentimientoAcciones.id) return;
+    
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimiento();
+    });
+}
+
+// Confirmaciones visuales para descargar / eliminar (detalle plan)
+function abrirModalConfirmarDescargaConsentimiento() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimiento');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimiento() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimiento');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimiento() {
+    cerrarModalConfirmarDescargaConsentimiento();
+    accionDescargarConsentimiento();
+}
+
+function abrirModalConfirmarEliminarConsentimiento() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimiento');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimiento() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimiento');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimiento() {
+    cerrarModalConfirmarEliminarConsentimiento();
+    accionEliminarConsentimiento();
+}
+
+function abrirModalFirmarConsentimientoRecepcion() {
+    if (!consentimientoAcciones.id) return;
+    
+    var modal = document.getElementById('modalFirmarConsentimientoRecepcion');
+    if (!modal) return;
+    
+    // Cerrar el modal de opciones primero
+    cerrarMenuAccionesConsentimiento();
+    
+    // Llenar los campos del formulario
+    document.getElementById('firmarConsentimientoId').value = consentimientoAcciones.id;
+    document.getElementById('firmarConsentimientoTitulo').value = consentimientoAcciones.titulo;
+    document.getElementById('firmarConsentimientoClienteNombre').value = consentimientoAcciones.clienteNombre;
+    
+    // Limpiar campo de archivo
+    var archivoInput = document.getElementById('firmarConsentimientoArchivo');
+    if (archivoInput) {
+        archivoInput.value = '';
+    }
+    
+    // Ocultar nombre del archivo
+    var nombreArchivoDiv = document.getElementById('nombreArchivoSeleccionado');
+    if (nombreArchivoDiv) {
+        nombreArchivoDiv.style.display = 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function mostrarNombreArchivo(input) {
+    if (input.files && input.files[0]) {
+        var nombreArchivo = input.files[0].name;
+        var tamañoArchivo = input.files[0].size;
+        var tamañoMB = (tamañoArchivo / (1024 * 1024)).toFixed(2);
+        
+        // Validar tamaño (máx 10MB)
+        if (tamañoArchivo > 10 * 1024 * 1024) {
+            showNotification('error', 'El archivo es demasiado grande. El tamaño máximo es 10MB.', 3000);
+            input.value = '';
+            return;
+        }
+        
+        // Mostrar nombre del archivo
+        var nombreArchivoDiv = document.getElementById('nombreArchivoSeleccionado');
+        var textoNombreArchivo = document.getElementById('textoNombreArchivo');
+        if (nombreArchivoDiv && textoNombreArchivo) {
+            textoNombreArchivo.textContent = nombreArchivo + ' (' + tamañoMB + ' MB)';
+            nombreArchivoDiv.style.display = 'block';
+        }
+    }
+}
+
+function cerrarModalFirmarConsentimientoRecepcion() {
+    var modal = document.getElementById('modalFirmarConsentimientoRecepcion');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarFirmarConsentimientoRecepcion() {
+    var form = document.getElementById('formFirmarConsentimientoRecepcion');
+    if (!form) return;
+    
+    // Validar formulario
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    var consentimientoId = document.getElementById('firmarConsentimientoId').value;
+    if (!consentimientoId) {
+        showNotification('error', 'Error: No se pudo identificar el consentimiento.', 3000);
+        return;
+    }
+    
+    var formData = new FormData(form);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    // Mostrar indicador de carga
+    var btnFirmar = event.target;
+    var textoOriginal = btnFirmar.innerHTML;
+    btnFirmar.disabled = true;
+    btnFirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+    
+    fetch('{% url "firmar_consentimiento_recepcion" plan.id 0 %}'.replace('0', consentimientoId), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btnFirmar.disabled = false;
+        btnFirmar.innerHTML = textoOriginal;
+        
+        if (data.success) {
+            showNotification('success', data.message || 'Documento firmado subido exitosamente.', 3000);
+            cerrarModalFirmarConsentimientoRecepcion();
+            // Recargar la página para actualizar el estado
+            setTimeout(function() {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showNotification('error', data.error || 'Error al subir el documento.', 3000);
+        }
+    })
+    .catch(error => {
+        btnFirmar.disabled = false;
+        btnFirmar.innerHTML = textoOriginal;
+        console.error('Error:', error);
+        showNotification('error', 'Error al subir el documento. Por favor, intenta nuevamente.', 3000);
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.addEventListener('click', function(e) {
+    var modal = document.getElementById('modalFirmarConsentimientoRecepcion');
+    if (modal && e.target === modal) {
+        cerrarModalFirmarConsentimientoRecepcion();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - PRESUPUESTO
+// =========================
+var presupuestoAcciones = {
+    id: null,
+    nombre: '',
+    pdfUrl: '',
+    puedeAceptar: false
+};
+
+function abrirMenuOpcionesPresupuesto(planId, nombrePlan, pdfUrl, puedeAceptar) {
+    presupuestoAcciones.id = planId;
+    presupuestoAcciones.nombre = nombrePlan || 'este tratamiento';
+    presupuestoAcciones.pdfUrl = pdfUrl;
+    presupuestoAcciones.puedeAceptar = (puedeAceptar === true || puedeAceptar === 'true');
+    
+    var modal = document.getElementById('modalOpcionesPresupuesto');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('opcionesPresupuestoTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = presupuestoAcciones.nombre;
+    }
+    
+    var btnAceptar = document.getElementById('btnAccionAceptarPresupuesto');
+    if (btnAceptar) {
+        btnAceptar.style.display = presupuestoAcciones.puedeAceptar ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuOpcionesPresupuesto() {
+    var modal = document.getElementById('modalOpcionesPresupuesto');
+    if (modal) {
+        modal.style.display = 'none';
+    document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarPresupuesto() {
+    if (!presupuestoAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaPresupuesto();
+}
+
+function accionAceptarPresupuesto() {
+    if (!presupuestoAcciones.puedeAceptar) return;
+    abrirModalConfirmarAceptarPresupuesto();
+}
+
+// Confirmaciones visuales para presupuesto
+function abrirModalConfirmarDescargaPresupuesto() {
+    var modal = document.getElementById('modalConfirmarDescargaPresupuesto');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaPresupuestoTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = presupuestoAcciones.nombre || 'este tratamiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaPresupuesto() {
+    var modal = document.getElementById('modalConfirmarDescargaPresupuesto');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaPresupuesto() {
+    cerrarModalConfirmarDescargaPresupuesto();
+    if (presupuestoAcciones.pdfUrl) {
+        showNotification('info', 'Preparando descarga del PDF del presupuesto...', 2500);
+        window.open(presupuestoAcciones.pdfUrl, '_blank');
+    }
+}
+
+function abrirModalConfirmarAceptarPresupuesto() {
+    var modal = document.getElementById('modalConfirmarAceptarPresupuesto');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarAceptarPresupuestoTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = presupuestoAcciones.nombre || 'este tratamiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarAceptarPresupuesto() {
+    var modal = document.getElementById('modalConfirmarAceptarPresupuesto');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarAceptarPresupuesto() {
+    cerrarModalConfirmarAceptarPresupuesto();
+    if (!presupuestoAcciones.id) return;
+    aceptarPresupuesto(presupuestoAcciones.id);
+}
+
+// Función para cancelar tratamiento
+function abrirModalCancelarPlan(planId) {
+    var modal = document.getElementById('modalCancelarPlan');
+    if (!modal) return;
+    
+    // Limpiar formulario
+    document.getElementById('motivoCancelacion').value = '';
+    document.getElementById('planIdCancelar').value = planId;
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalCancelarPlan() {
+    var modal = document.getElementById('modalCancelarPlan');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarCancelarPlan() {
+    var planId = document.getElementById('planIdCancelar').value;
+    var motivo = document.getElementById('motivoCancelacion').value.trim();
+    
+    if (!planId) {
+        showNotification('error', 'Error: No se pudo identificar el plan.', 3000);
+        return;
+    }
+    
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    if (motivo) {
+        formData.append('motivo_cancelacion', motivo);
+    }
+    
+    // Mostrar indicador de carga
+    var btnCancelar = event.target;
+    var textoOriginal = btnCancelar.innerHTML;
+    btnCancelar.disabled = true;
+    btnCancelar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelando...';
+    
+    fetch('{% url "cancelar_plan_tratamiento" plan.id %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Error al cancelar el plan');
+            });
+        }
+    })
+    .then(data => {
+        btnCancelar.disabled = false;
+        btnCancelar.innerHTML = textoOriginal;
+        
+        if (data.success) {
+            showNotification('success', data.message || 'Plan cancelado exitosamente.', 4000);
+            cerrarModalCancelarPlan();
+            setTimeout(function() {
+            window.location.reload();
+            }, 1500);
+        } else {
+            showNotification('error', data.error || 'Error al cancelar el plan.', 3000);
+        }
+    })
+    .catch(error => {
+        btnCancelar.disabled = false;
+        btnCancelar.innerHTML = textoOriginal;
+        console.error('Error:', error);
+        showNotification('error', error.message || 'Error al cancelar el plan. Por favor, intenta nuevamente.', 3000);
+    });
+}
+
+// Función para finalizar tratamiento
+function abrirModalFinalizarTratamiento(planId) {
+    var modal = document.getElementById('modalFinalizarTratamiento');
+    if (!modal) return;
+    
+    // Limpiar formulario
+    document.getElementById('motivoFinalizacion').value = '';
+    document.getElementById('planIdFinalizar').value = planId;
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalFinalizarTratamiento() {
+    var modal = document.getElementById('modalFinalizarTratamiento');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function finalizarTratamiento() {
+    var planId = document.getElementById('planIdFinalizar').value;
+    var motivo = document.getElementById('motivoFinalizacion').value.trim();
+    
+    if (!confirm('¿Estás seguro de que deseas finalizar este tratamiento?\n\nEsta acción marcará el tratamiento como completado y no se podrá revertir fácilmente.')) {
+        return;
+    }
+    
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    if (motivo) {
+        formData.append('motivo_finalizacion', motivo);
+    }
+    
+    fetch('{% url "finalizar_tratamiento" plan.id %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message);
+            setTimeout(() => {
+            window.location.reload();
+            }, 1500);
+        } else {
+            showNotification('error', data.error || 'Error al finalizar el tratamiento');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al finalizar el tratamiento');
+    });
+}
+</script>
+
+<!-- Modal de Confirmación para Enviar Documentos -->
+<div id="modalConfirmarEnvioDocumentos" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="color: white;"><i class="fas fa-envelope"></i> Confirmar Envío de Documentos</h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarEnvioDocumentos()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div style="text-align: center; padding: 20px 0;">
+                <div style="width: 64px; height: 64px; margin: 0 auto 20px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-envelope" style="font-size: 32px; color: var(--primary-color);"></i>
+                </div>
+                <h3 style="margin: 0 0 12px 0; color: #1e293b; font-size: 1.25rem;">¿Enviar documentos por correo?</h3>
+                <p style="margin: 0 0 16px 0; color: #64748b; line-height: 1.6;">
+                    Se enviará el presupuesto y los consentimientos informados del tratamiento al correo del paciente.
+                </p>
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; text-align: left; margin: 16px 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <i class="fas fa-envelope" style="color: var(--primary-color);"></i>
+                        <span style="color: #374151; font-weight: 600;">Correo destinatario:</span>
+                </div>
+                    <div style="color: #1e293b; font-size: 1rem; padding-left: 28px;">
+                        {{ plan.cliente.email }}
+                </div>
+                </div>
+                <p style="margin: 16px 0 0 0; color: #64748b; font-size: 0.9rem;">
+                    El paciente recibirá un correo con los documentos adjuntos en formato PDF.
+                </p>
+                <input type="hidden" id="planIdEnviarDocumentos" value="{{ plan.id }}">
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; padding: 20px 24px; border-top: 1px solid #e5e7eb;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarEnvioDocumentos()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+            <button type="button" class="btn btn-primary" onclick="confirmarEnviarDocumentos()">
+                <i class="fas fa-paper-plane"></i> Enviar Documentos
+                    </button>
+                </div>
+    </div>
+</div>
+
+<!-- Modal de Acciones de Consentimiento -->
+<div id="modalAccionesConsentimiento" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 420px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-file-signature"></i> Opciones de Consentimiento
+            </h3>
+            <button class="modal-close" onclick="cerrarMenuAccionesConsentimiento()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px;">
+            <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: #64748b;">
+                Elige una acción para el consentimiento:
+            </p>
+            <p style="margin: 0; font-size: 0.95rem; color: #0f172a; font-weight: 600;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #94a3b8;"></i>
+                <span id="accionesConsentimientoTitulo"></span>
+            </p>
+            <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                <button type="button"
+                        onclick="abrirModalConfirmarDescargaConsentimiento()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #f1f5f9; color: #0f172a;">
+                    <i class="fas fa-file-pdf" style="color: #dc2626;"></i>
+                    <span style="font-size: 0.9rem;">Descargar PDF</span>
+                    </button>
+                <button type="button"
+                        id="btnAccionDescargarDocumentoFirmado"
+                        onclick="accionDescargarDocumentoFirmado()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #dbeafe; color: #1e40af;">
+                    <i class="fas fa-file-download" style="color: #1e40af;"></i>
+                    <span style="font-size: 0.9rem;">Descargar Documento Firmado</span>
+                </button>
+                <button type="button"
+                        id="btnAccionFirmarConsentimiento"
+                        onclick="abrirModalFirmarConsentimientoRecepcion()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #d1fae5; color: #059669;">
+                    <i class="fas fa-signature"></i>
+                    <span id="textoBotonFirmarConsentimiento" style="font-size: 0.9rem;">Subir Documento Firmado</span>
+                </button>
+                <button type="button"
+                        id="btnAccionEditarConsentimiento"
+                        onclick="accionEditarConsentimiento()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #fef3c7; color: #92400e;">
+                    <i class="fas fa-edit"></i>
+                    <span style="font-size: 0.9rem;">Editar</span>
+                </button>
+                <button type="button"
+                        onclick="abrirModalConfirmarEliminarConsentimiento()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #fef2f2; color: #b91c1c;">
+                    <i class="fas fa-trash-alt"></i>
+                    <span style="font-size: 0.9rem;">Eliminar</span>
+                    </button>
+                </div>
+                </div>
+        <div style="padding: 10px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarMenuAccionesConsentimiento()">
+                <i class="fas fa-times"></i> Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Cerrar modal al hacer clic fuera -->
+<script>
+document.addEventListener('click', function(e) {
+    var modal = document.getElementById('modalConfirmarEnvioDocumentos');
+    if (modal && e.target === modal) {
+        cerrarModalConfirmarEnvioDocumentos();
+    }
+});
+
+// Cerrar con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('modalConfirmarEnvioDocumentos');
+        if (modal && modal.style.display === 'flex') {
+            cerrarModalConfirmarEnvioDocumentos();
+        }
+    }
+});
+</script>
+
+<!-- Modal de Confirmación Descarga Consentimiento -->
+<div id="modalConfirmarDescargaConsentimiento" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 480px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-file-pdf"></i> Confirmar descarga
+            </h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarDescargaConsentimiento()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0f172a; font-weight: 600;">
+                ¿Deseas descargar el PDF del siguiente consentimiento?
+            </p>
+            <p style="margin: 0; font-size: 0.9rem; color: #64748b;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #94a3b8;"></i>
+                <span id="confirmarDescargaConsentimientoTitulo"></span>
+            </p>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarDescargaConsentimiento()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+            <button type="button" class="btn" style="background: var(--primary-color); color: white;" onclick="confirmarDescargaConsentimiento()">
+                <i class="fas fa-file-download"></i> Descargar PDF
+                    </button>
+                </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación Eliminar Consentimiento -->
+<div id="modalConfirmarEliminarConsentimiento" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, #ef4444, #b91c1c);">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-exclamation-triangle"></i> Confirmar eliminación
+            </h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarEliminarConsentimiento()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0f172a; font-weight: 600;">
+                ¿Estás seguro de que deseas eliminar este consentimiento?
+            </p>
+            <p style="margin: 0 0 12px 0; font-size: 0.9rem; color: #64748b;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #f97316;"></i>
+                <span id="confirmarEliminarConsentimientoTitulo"></span>
+            </p>
+            <p style="margin: 0; font-size: 0.8rem; color: #b91c1c;">
+                Esta acción es permanente y no se puede deshacer.
+            </p>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #fee2e2; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarEliminarConsentimiento()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn" style="background: #ef4444; color: white;" onclick="confirmarEliminarConsentimiento()">
+                <i class="fas fa-trash-alt"></i> Sí, eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Firma de Consentimiento por Recepción -->
+<div id="modalFirmarConsentimientoRecepcion" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-upload"></i> Subir Documento Firmado Físicamente
+            </h3>
+            <button class="modal-close" onclick="cerrarModalFirmarConsentimientoRecepcion()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <form id="formFirmarConsentimientoRecepcion">
+                {% csrf_token %}
+                <input type="hidden" name="consentimiento_id" id="firmarConsentimientoId">
+                
+                <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #1e40af; font-weight: 600;">
+                        <i class="fas fa-info-circle"></i> Información importante
+                    </p>
+                    <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: #1e3a8a;">
+                        Sube el documento firmado físicamente por el paciente. Puede ser una fotografía del documento firmado 
+                        (tomada con celular) o un PDF escaneado. El documento debe mostrar claramente la firma del paciente.
+                    </p>
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #374151; font-size: 0.875rem;">
+                        Título del Consentimiento Informado
+                    </label>
+                    <input type="text" id="firmarConsentimientoTitulo" readonly 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 0.875rem;"
+                           placeholder="Título del consentimiento informado">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #374151; font-size: 0.875rem;">
+                        Nombre del Paciente
+                    </label>
+                    <input type="text" id="firmarConsentimientoClienteNombre" readonly 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 0.875rem;">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #374151; font-size: 0.875rem;">
+                        Documento Firmado Físicamente <span style="color: #ef4444;">*</span>
+                    </label>
+                    <div style="border: 2px dashed #d1d5db; border-radius: 8px; padding: 20px; text-align: center; background: #f9fafb; transition: all 0.2s ease;" 
+                         id="fileUploadArea" 
+                         onmouseover="this.style.borderColor='#3b82f6'; this.style.background='#eff6ff';" 
+                         onmouseout="this.style.borderColor='#d1d5db'; this.style.background='#f9fafb';">
+                        <input type="file" 
+                               name="documento_firmado_fisico" 
+                               id="firmarConsentimientoArchivo" 
+                               accept=".pdf,.jpg,.jpeg,.png,.heic,.heif" 
+                               required
+                               style="display: none;"
+                               onchange="mostrarNombreArchivo(this)">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 2rem; color: #6b7280; margin-bottom: 8px; display: block;"></i>
+                        <p style="margin: 0; font-size: 0.875rem; color: #374151; font-weight: 500;">
+                            Haz clic para seleccionar o arrastra el archivo aquí
+                        </p>
+                        <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #64748b;">
+                            Formatos aceptados: PDF, JPG, PNG, HEIC (máx. 10MB)
+                        </p>
+                        <button type="button" 
+                                onclick="document.getElementById('firmarConsentimientoArchivo').click()" 
+                                class="btn" 
+                                style="margin-top: 12px; background: var(--primary-color); color: white; padding: 8px 16px; font-size: 0.875rem;">
+                            <i class="fas fa-folder-open"></i> Seleccionar Archivo
+                        </button>
+                </div>
+                    <div id="nombreArchivoSeleccionado" style="margin-top: 8px; padding: 8px 12px; background: #d1fae5; border-radius: 6px; display: none;">
+                        <i class="fas fa-file-check" style="color: #059669;"></i>
+                        <span id="textoNombreArchivo" style="margin-left: 8px; font-size: 0.875rem; color: #047857; font-weight: 500;"></span>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #374151; font-size: 0.875rem;">
+                        Recepcionista/Administrador que sube el documento
+                    </label>
+                    <input type="text" value="{{ perfil.nombre_completo }}" readonly 
+                           style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 0.875rem;">
+                </div>
+                
+                <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <p style="margin: 0; font-size: 0.8rem; color: #92400e;">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        <strong>Importante:</strong> Asegúrate de que el documento muestre claramente la firma del paciente. 
+                        Este documento será la evidencia legal de la firma del consentimiento.
+                    </p>
+                </div>
+            </form>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalFirmarConsentimientoRecepcion()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+            <button type="button" class="btn" style="background: #10b981; color: white;" onclick="confirmarFirmarConsentimientoRecepcion()">
+                <i class="fas fa-upload"></i> Subir Documento
+                    </button>
+                </div>
+    </div>
+</div>
+
+<!-- Modal de Opciones de Presupuesto -->
+<div id="modalOpcionesPresupuesto" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 480px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-file-invoice-dollar"></i> Opciones de Presupuesto
+            </h3>
+            <button class="modal-close" onclick="cerrarMenuOpcionesPresupuesto()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px;">
+            <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: #64748b;">
+                Elige una acción para el presupuesto del tratamiento:
+            </p>
+            <p style="margin: 0; font-size: 0.95rem; color: #0f172a; font-weight: 600;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #94a3b8;"></i>
+                <span id="opcionesPresupuestoTitulo"></span>
+            </p>
+            <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                <button type="button"
+                        onclick="accionDescargarPresupuesto()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #f1f5f9; color: #0f172a;">
+                    <i class="fas fa-file-pdf" style="color: #0ea5e9;"></i>
+                    <span style="font-size: 0.9rem;">Descargar Presupuesto PDF</span>
+                </button>
+                <button type="button"
+                        id="btnAccionAceptarPresupuesto"
+                        onclick="accionAceptarPresupuesto()"
+                        class="btn"
+                        style="width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 10px; background: #ecfdf5; color: #047857;">
+                    <i class="fas fa-check-circle"></i>
+                    <span style="font-size: 0.9rem;">Aceptar Presupuesto</span>
+                </button>
+            </div>
+        </div>
+        <div style="padding: 10px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarMenuOpcionesPresupuesto()">
+                <i class="fas fa-times"></i> Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Descarga Presupuesto -->
+<div id="modalConfirmarDescargaPresupuesto" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 480px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-file-pdf"></i> Confirmar descarga
+            </h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarDescargaPresupuesto()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0f172a; font-weight: 600;">
+                ¿Deseas descargar el PDF del presupuesto de este tratamiento?
+            </p>
+            <p style="margin: 0; font-size: 0.9rem; color: #64748b;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #94a3b8;"></i>
+                <span id="confirmarDescargaPresupuestoTitulo"></span>
+            </p>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarDescargaPresupuesto()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn" style="background: var(--primary-color); color: white;" onclick="confirmarDescargaPresupuesto()">
+                <i class="fas fa-file-download"></i> Descargar PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Aceptar Presupuesto -->
+<div id="modalConfirmarAceptarPresupuesto" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 520px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-check-circle"></i> Confirmar aceptación de presupuesto
+            </h3>
+            <button class="modal-close" onclick="cerrarModalConfirmarAceptarPresupuesto()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0f172a; font-weight: 600;">
+                ¿Marcar este presupuesto como aceptado por el paciente?
+            </p>
+            <p style="margin: 0 0 12px 0; font-size: 0.9rem; color: #64748b;">
+                Esta acción indica que el paciente ha revisado y aceptado el presupuesto del tratamiento:
+            </p>
+            <p style="margin: 0; font-size: 0.9rem; color: #047857;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #22c55e;"></i>
+                <span id="confirmarAceptarPresupuestoTitulo"></span>
+            </p>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #bbf7d0; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarAceptarPresupuesto()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn" style="background: #22c55e; color: white;" onclick="confirmarAceptarPresupuesto()">
+                <i class="fas fa-check-circle"></i> Sí, aceptar presupuesto
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Aprobar Tratamiento -->
+<div id="modalConfirmarAprobarTratamiento" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 550px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="color: white; font-size: 1rem;">
+                <i class="fas fa-check-double"></i> Confirmar aprobación de tratamiento
+            </h3>
+            <button class="modal-close" onclick="cerrarModalAprobarTratamiento()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <p style="margin: 0 0 12px 0; font-size: 0.95rem; color: #0f172a; font-weight: 600;">
+                ¿Aprobar este tratamiento y habilitar la creación de citas?
+            </p>
+            <p style="margin: 0 0 16px 0; font-size: 0.875rem; color: #64748b; line-height: 1.5;">
+                Al aprobar este tratamiento, se habilitará la creación de citas y el tratamiento comenzará oficialmente. El estado cambiará a "Aprobado" y luego a "En Progreso" al crear la primera cita.
+            </p>
+            
+            <div style="background: #f8fafc; border-radius: 8px; padding: 14px; margin-bottom: 16px; border: 1px solid #e5e7eb;">
+                <div style="color: #374151; font-size: 0.85rem; font-weight: 600; margin-bottom: 10px;">
+                    Condiciones verificadas:
+                </div>
+                <div style="display: grid; gap: 8px;">
+                    <div id="aprobarConsentimientoStatus" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+                        <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                        <span style="color: #047857;">Consentimiento informado firmado</span>
+                    </div>
+                    <div id="aprobarPresupuestoStatus" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+                        <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                        <span style="color: #047857;">Presupuesto aceptado</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: #eff6ff; border-left: 3px solid var(--primary-color); border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+                <div style="color: #1e40af; font-size: 0.8rem; line-height: 1.5;">
+                    <strong>Tratamiento:</strong> {{ plan.nombre }}
+                </div>
+            </div>
+            
+            <input type="hidden" id="planIdAprobar" value="{{ plan.id }}">
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalAprobarTratamiento()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn" style="background: var(--primary-color); color: white;" onclick="confirmarAprobarTratamiento()">
+                <i class="fas fa-check-double"></i> Sí, aprobar tratamiento
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Cerrar modal al hacer clic fuera -->
+<script>
+document.addEventListener('click', function(e) {
+    var modal = document.getElementById('modalConfirmarAprobarTratamiento');
+    if (modal && e.target === modal) {
+        cerrarModalAprobarTratamiento();
+    }
+});
+
+// Cerrar con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('modalConfirmarAprobarTratamiento');
+        if (modal && modal.style.display === 'flex') {
+            cerrarModalAprobarTratamiento();
+        }
+    }
+});
+</script>
+
+<!-- Modal para Finalizar Tratamiento -->
+<div id="modalFinalizarTratamiento" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation();">
+        <div class="modal-header">
+            <h3><i class="fas fa-check-circle"></i> Finalizar Tratamiento</h3>
+            <button class="modal-close" onclick="cerrarModalFinalizarTratamiento()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 20px; padding: 16px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <div style="display: flex; align-items: start; gap: 12px;">
+                    <i class="fas fa-info-circle" style="color: #92400e; font-size: 1.25rem; margin-top: 2px;"></i>
+                    <div style="color: #92400e;">
+                        <strong>¿Estás seguro?</strong>
+                        <div style="font-size: 0.875rem; margin-top: 4px;">
+                            Esta acción marcará el tratamiento como completado. Asegúrate de que todas las citas y fases estén completadas antes de finalizar.
+                </div>
+                </div>
+    </div>
+</div>
+
+                <div class="form-group-modal">
+                    <label class="form-label">
+                    <i class="fas fa-comment"></i> Motivo de Finalización (Opcional)
+                    </label>
+                <textarea name="motivo_finalizacion" id="motivoFinalizacion" class="form-control-modal" rows="4" placeholder="Ej: Tratamiento completado exitosamente, todas las fases finalizadas..."></textarea>
+                </div>
+
+            <input type="hidden" id="planIdFinalizar" value="{{ plan.id }}">
+            
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button type="button" onclick="cerrarModalFinalizarTratamiento()" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                <button type="button" onclick="finalizarTratamiento()" class="btn" style="background: #10b981; color: white;">
+                    <i class="fas fa-check-circle"></i> Finalizar Tratamiento
+                    </button>
+                </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Cancelar Plan -->
+<div id="modalCancelarPlan" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation();">
+        <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+            <h3 style="color: white; font-size: 1.1rem;">
+                <i class="fas fa-times-circle"></i> Cancelar Tratamiento
+            </h3>
+            <button class="modal-close" onclick="cerrarModalCancelarPlan()" style="color: white;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 24px;">
+            <!-- Alerta informativa -->
+            <div style="margin-bottom: 24px; padding: 16px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <div style="display: flex; align-items: start; gap: 12px;">
+                    <i class="fas fa-info-circle" style="color: #d97706; font-size: 1.25rem; flex-shrink: 0; margin-top: 2px;"></i>
+                    <div style="flex: 1;">
+                        <h4 style="margin: 0 0 10px 0; color: #92400e; font-size: 1rem; font-weight: 600;">
+                            Importante: Esta acción es permanente
+                        </h4>
+                        <div style="color: #78350f; font-size: 0.9rem; line-height: 1.6;">
+                            <p style="margin: 0 0 10px 0;">
+                                Al cancelar este tratamiento:
+                            </p>
+                            <ul style="margin: 0; padding-left: 20px; list-style-type: disc; color: #78350f;">
+                                <li>El tratamiento quedará marcado como <strong>Cancelado</strong> en el historial del cliente</li>
+                                <li>Esta acción quedará registrada permanentemente</li>
+                                <li>No se podrán crear nuevas citas para este tratamiento</li>
+                                <li>El estado del tratamiento cambiará a "Cancelado" y será visible en todo el sistema</li>
+                            </ul>
+                            <p style="margin: 12px 0 0 0; font-weight: 500;">
+                                Por favor, confirma que deseas proceder con la cancelación.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Información del plan -->
+            <div style="margin-bottom: 20px; padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #6b7280;">
+                <div style="color: #374151; font-size: 0.875rem; margin-bottom: 8px; font-weight: 600;">
+                    Tratamiento a cancelar:
+                </div>
+                <div style="color: #1f2937; font-size: 1rem; font-weight: 600;">
+                    {{ plan.nombre }}
+                </div>
+                <div style="color: #6b7280; font-size: 0.875rem; margin-top: 4px;">
+                    Cliente: {{ plan.cliente.nombre_completo }}
+                </div>
+                <div style="color: #6b7280; font-size: 0.875rem;">
+                    Estado actual: <span style="font-weight: 600; color: #1f2937;">{{ plan.get_estado_display }}</span>
+                </div>
+            </div>
+            
+            <!-- Campo para motivo -->
+            <div class="form-group-modal" style="margin-bottom: 20px;">
+                <label class="form-label" style="font-weight: 600; color: #374151;">
+                    <i class="fas fa-comment-alt"></i> Motivo de Cancelación <span style="color: #ef4444;">*</span>
+                </label>
+                <textarea name="motivo_cancelacion" 
+                          id="motivoCancelacion" 
+                          class="form-control-modal" 
+                          rows="4" 
+                          required
+                          placeholder="Ej: Paciente decidió no continuar con el tratamiento, problemas de salud, cambio de decisión..."
+                          style="border: 2px solid #d1d5db; font-size: 0.9rem;"></textarea>
+                <small style="color: #6b7280; font-size: 0.75rem; display: block; margin-top: 4px;">
+                    <i class="fas fa-info-circle"></i> El motivo de cancelación es obligatorio y quedará registrado en el historial.
+                </small>
+            </div>
+            
+            <input type="hidden" id="planIdCancelar" value="{{ plan.id }}">
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <button type="button" onclick="cerrarModalCancelarPlan()" class="btn btn-secondary" style="padding: 10px 20px;">
+                    <i class="fas fa-times"></i> No, mantener tratamiento
+                </button>
+                <button type="button" onclick="confirmarCancelarPlan()" class="btn" style="background: #ef4444; color: white; padding: 10px 20px; font-weight: 500;">
+                    <i class="fas fa-times-circle"></i> Sí, cancelar tratamiento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cerrar modal al hacer clic fuera -->
+<script>
+document.addEventListener('click', function(e) {
+    var modal = document.getElementById('modalCancelarPlan');
+    if (modal && e.target === modal) {
+        cerrarModalCancelarPlan();
+    }
+});
+
+// Cerrar con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('modalCancelarPlan');
+        if (modal && modal.style.display === 'flex') {
+            cerrarModalCancelarPlan();
+        }
+    }
+});
+</script>
+
+{% endblock %}
+
+

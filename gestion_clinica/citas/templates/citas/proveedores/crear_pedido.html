@@ -1,0 +1,303 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Crear Nuevo Pedido - Clínica Dental{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .section-container {
+        animation: fadeIn 0.4s ease;
+    }
+    
+    :root {
+        --turquesa-primary: #14b8a6;
+        --turquesa-dark: #0d9488;
+        --turquesa-light: #5eead4;
+        --turquesa-bg: #f0fdfa;
+    }
+    
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+    }
+
+    .form-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid var(--turquesa-bg);
+    }
+
+    .form-header h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1f2937;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .form-header h2 i {
+        color: var(--turquesa-primary);
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.875rem;
+        margin-bottom: 8px;
+    }
+
+    .form-group label i {
+        color: var(--turquesa-primary);
+        margin-right: 6px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+        background: white;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--turquesa-primary);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid var(--turquesa-bg);
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--turquesa-primary), var(--turquesa-dark));
+        color: white;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+        transform: translateY(-1px);
+    }
+
+    .required {
+        color: #ef4444;
+    }
+
+    .help-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+</style>
+
+<div class="section-container">
+    <div class="form-container">
+        <div class="form-header">
+            <h2><i class="fas fa-shopping-cart"></i> Crear Nuevo Pedido</h2>
+            <p style="color: #6b7280; margin-top: 8px;">Completa los datos básicos del pedido. Podrás agregar insumos después de crearlo.</p>
+        </div>
+        
+        <form method="POST" id="formCrearPedido">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="proveedor_id">
+                    <i class="fas fa-truck"></i> Proveedor <span class="required">*</span>
+                </label>
+                <select id="proveedor_id" name="proveedor_id" class="form-control" required>
+                    <option value="">-- Seleccionar proveedor --</option>
+                    {% for proveedor in proveedores %}
+                    <option value="{{ proveedor.id }}">{{ proveedor.nombre }} - {{ proveedor.rut }}</option>
+                    {% endfor %}
+                </select>
+                <div class="help-text">Selecciona el proveedor al que se realizará el pedido</div>
+            </div>
+            
+            <div class="form-group" id="insumos-container" style="display: none;">
+                <label>
+                    <i class="fas fa-boxes"></i> Insumos del Proveedor
+                </label>
+                <div id="insumos-list" style="max-height: 300px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                    <p style="color: #6b7280; font-size: 0.875rem; margin: 0; text-align: center;">Selecciona un proveedor para ver sus insumos</p>
+                </div>
+                <div class="help-text">Selecciona los insumos que deseas incluir en el pedido</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="fecha_entrega">
+                    <i class="fas fa-calendar-check"></i> Fecha de Entrega Esperada <span class="required">*</span>
+                </label>
+                <input type="date" id="fecha_entrega" name="fecha_entrega" class="form-control" required>
+                <div class="help-text">Fecha en la que esperas recibir el pedido</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="observaciones">
+                    <i class="fas fa-sticky-note"></i> Observaciones Generales
+                </label>
+                <textarea id="observaciones" name="observaciones" class="form-control" placeholder="Observaciones adicionales sobre el pedido..."></textarea>
+                <div class="help-text">Información adicional que quieras incluir en el pedido</div>
+            </div>
+            
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="registrar_como_egreso" style="width: auto; cursor: pointer;">
+                    <span><i class="fas fa-dollar-sign"></i> Registrar como Egreso en Finanzas</span>
+                </label>
+                <div class="help-text">Si está marcado, el monto total del pedido se registrará automáticamente como egreso cuando se envíe</div>
+            </div>
+            
+            <div class="form-actions">
+                <a href="{% url 'gestor_inventario_unificado' %}?seccion=pedidos" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Crear Pedido
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Establecer fecha mínima como hoy
+    document.addEventListener('DOMContentLoaded', function() {
+        const fechaInput = document.getElementById('fecha_entrega');
+        const today = new Date().toISOString().split('T')[0];
+        fechaInput.setAttribute('min', today);
+        
+        // Cargar insumos cuando se seleccione un proveedor
+        const proveedorSelect = document.getElementById('proveedor_id');
+        proveedorSelect.addEventListener('change', function() {
+            const proveedorId = this.value;
+            if (proveedorId) {
+                cargarInsumosProveedor(proveedorId);
+            } else {
+                document.getElementById('insumos-container').style.display = 'none';
+                document.getElementById('insumos-list').innerHTML = '<p style="color: #6b7280; font-size: 0.875rem; margin: 0; text-align: center;">Selecciona un proveedor para ver sus insumos</p>';
+            }
+        });
+    });
+    
+    function cargarInsumosProveedor(proveedorId) {
+        const insumosList = document.getElementById('insumos-list');
+        const container = document.getElementById('insumos-container');
+        
+        // Mostrar loading
+        insumosList.innerHTML = '<p style="color: #6b7280; font-size: 0.875rem; margin: 0; text-align: center;"><i class="fas fa-spinner fa-spin"></i> Cargando insumos...</p>';
+        container.style.display = 'block';
+        
+        // Hacer petición AJAX
+        fetch(`/trabajadores/api/insumos-proveedor/${proveedorId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.insumos.length > 0) {
+                    let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+                    data.insumos.forEach(insumo => {
+                        html += `
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <input type="checkbox" name="insumos[]" value="${insumo.id}" id="insumo_${insumo.id}" class="insumo-checkbox" style="width: auto; cursor: pointer;">
+                                <label for="insumo_${insumo.id}" style="flex: 1; cursor: pointer; margin: 0;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <strong style="color: #1f2937; font-size: 0.875rem;">${insumo.nombre}</strong>
+                                            ${insumo.categoria ? `<span style="display: block; color: #6b7280; font-size: 0.75rem; margin-top: 2px;">${insumo.categoria}</span>` : ''}
+                                        </div>
+                                        <div style="text-align: right;">
+                                            ${insumo.precio_unitario ? `<span style="color: #1f2937; font-weight: 600; font-size: 0.875rem;">$${parseFloat(insumo.precio_unitario).toLocaleString('es-CL')}</span>` : '<span style="color: #9ca3af; font-size: 0.75rem;">Sin precio</span>'}
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                                <input type="number" name="cantidad_${insumo.id}" min="1" value="1" placeholder="Cantidad" 
+                                                       class="cantidad-input" style="width: 80px; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.75rem;" 
+                                                       disabled>
+                                                <span style="color: #6b7280; font-size: 0.75rem;">${insumo.unidad_medida}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    insumosList.innerHTML = html;
+                    
+                    // Habilitar/deshabilitar inputs de cantidad según checkbox
+                    document.querySelectorAll('.insumo-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('change', function() {
+                            const cantidadInput = this.closest('div').querySelector('.cantidad-input');
+                            cantidadInput.disabled = !this.checked;
+                            if (!this.checked) {
+                                cantidadInput.value = 1;
+                            }
+                        });
+                    });
+                } else {
+                    insumosList.innerHTML = '<p style="color: #6b7280; font-size: 0.875rem; margin: 0; text-align: center;"><i class="fas fa-info-circle"></i> Este proveedor no tiene insumos asociados</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                insumosList.innerHTML = '<p style="color: #ef4444; font-size: 0.875rem; margin: 0; text-align: center;"><i class="fas fa-exclamation-circle"></i> Error al cargar los insumos</p>';
+            });
+    }
+</script>
+{% endblock %}

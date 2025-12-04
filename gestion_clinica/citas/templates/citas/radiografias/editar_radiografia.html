@@ -1,0 +1,221 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Editar Radiografía - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="header-with-stats">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-edit"></i> Editar Radiografía
+        </h1>
+        <p class="page-subtitle">Editar información de la radiografía para {{ radiografia.paciente_nombre }}</p>
+    </div>
+    <div class="header-actions">
+        <a href="{% url 'mis_pacientes_seccion' paciente_id 'radiografias' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i>
+            <span>Volver</span>
+        </a>
+    </div>
+</div>
+
+<!-- Formulario -->
+<div class="section">
+    <div class="form-container">
+        <form method="post" enctype="multipart/form-data" class="radiografia-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="tipo">
+                    <i class="fas fa-tag"></i> Tipo de Radiografía <span class="required">*</span>
+                </label>
+                <select name="tipo" id="tipo" class="form-control" required>
+                    {% for value, label in tipos_radiografia %}
+                    <option value="{{ value }}" {% if radiografia.tipo == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="imagen">
+                    <i class="fas fa-image"></i> Imagen de la Radiografía
+                </label>
+                <div class="current-image-preview">
+                    <p><strong>Imagen actual:</strong></p>
+                    <img src="{{ radiografia.imagen.url }}" alt="Radiografía actual" style="max-width: 100%; max-height: 300px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                </div>
+                <input type="file" name="imagen" id="imagen" accept="image/*" class="form-control">
+                <small class="form-text">Deja vacío para mantener la imagen actual. Formatos aceptados: JPG, PNG, GIF. Tamaño máximo: 10MB</small>
+                <div id="image-preview" class="image-preview"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="cita">
+                    <i class="fas fa-calendar-check"></i> Cita Asociada (Opcional)
+                </label>
+                <select name="cita" id="cita" class="form-control">
+                    <option value="">Sin cita asociada</option>
+                    {% for cita in citas_paciente %}
+                    <option value="{{ cita.id }}" {% if radiografia.cita and radiografia.cita.id == cita.id %}selected{% endif %}>
+                        {{ cita.fecha_hora|date:"d/m/Y H:i" }} - {{ cita.tipo_servicio.nombre|default:cita.tipo_consulta|default:"Cita" }} ({{ cita.get_estado_display }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <small class="form-text">Asocia esta radiografía con una cita específica</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="fecha_tomada">
+                    <i class="fas fa-calendar"></i> Fecha en que se tomó la radiografía
+                </label>
+                <input type="date" name="fecha_tomada" id="fecha_tomada" class="form-control" value="{% if radiografia.fecha_tomada %}{{ radiografia.fecha_tomada|date:'Y-m-d' }}{% endif %}">
+                <small class="form-text">Fecha en que se tomó la radiografía</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="descripcion">
+                    <i class="fas fa-align-left"></i> Descripción
+                </label>
+                <textarea name="descripcion" id="descripcion" rows="4" class="form-control" placeholder="Descripción o notas sobre la radiografía...">{{ radiografia.descripcion|default:"" }}</textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    <span>Guardar Cambios</span>
+                </button>
+                <a href="{% url 'mis_pacientes_seccion' paciente_id 'radiografias' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    <span>Cancelar</span>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.radiografia-form {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-group label i {
+    color: var(--primary-color);
+    margin-right: 8px;
+}
+
+.required {
+    color: #e74c3c;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--primary-light);
+    border-radius: 8px;
+    font-size: 1em;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    color: var(--primary-text);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.current-image-preview {
+    margin-bottom: 15px;
+    padding: 15px;
+    background: var(--primary-bg);
+    border-radius: 8px;
+    border: 2px solid var(--primary-light);
+}
+
+.current-image-preview p {
+    margin-bottom: 10px;
+    color: var(--primary-text);
+    font-weight: 600;
+}
+
+.image-preview {
+    margin-top: 15px;
+    display: none;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+    padding-top: 25px;
+    border-top: 2px solid var(--primary-light);
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const imagenInput = document.getElementById('imagen');
+    const preview = document.getElementById('image-preview');
+    
+    imagenInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                preview.innerHTML = '<p><strong>Nueva imagen:</strong></p><img src="' + e.target.result + '" alt="Preview">';
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}
+
+
+
+
+

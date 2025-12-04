@@ -45,10 +45,20 @@ class RegistroClienteForm(UserCreationForm):
         help_text="Lista de alergias conocidas (medicamentos, materiales dentales, anestesia, etc.). MUY IMPORTANTE para su seguridad. Si no tiene alergias, escriba 'Ninguna'.",
         widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Ejemplo: Penicilina, látex, anestesia local... (si no tiene alergias, escriba "Ninguna")'})
     )
+    metodo_verificacion = forms.ChoiceField(
+        choices=[
+            ('email', '📧 Recibir código por Email'),
+            ('whatsapp', '💬 Recibir código por WhatsApp'),
+        ],
+        required=True,
+        label="Método de Verificación",
+        help_text="Elige cómo quieres recibir tu código de verificación",
+        widget=forms.RadioSelect(attrs={'class': 'metodo-verificacion'})
+    )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2', 'nombre_completo', 'telefono', 'rut', 'fecha_nacimiento', 'alergias']
+        fields = ['username', 'email', 'password1', 'password2', 'nombre_completo', 'telefono', 'rut', 'fecha_nacimiento', 'alergias', 'metodo_verificacion']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -57,16 +67,43 @@ class RegistroClienteForm(UserCreationForm):
         # Simplificar las validaciones de contraseña
         self.fields['password1'].help_text = "Cualquier contraseña (mínimo 1 carácter)"
         self.fields['password2'].help_text = "Repite la misma contraseña"
+        # Configurar campo de teléfono
+        self.fields['telefono'].widget.attrs.update({
+            'maxlength': '8',
+            'pattern': '[0-9]{8}',
+            'placeholder': '12345678'
+        })
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if not username:
+            raise forms.ValidationError("El nombre de usuario es obligatorio")
+        
+        # Verificar que el username no esté ya registrado
+        from django.contrib.auth.models import User
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Este nombre de usuario ya está en uso. Por favor, elige otro.")
+        
+        return username
 
     def clean_telefono(self):
         tel = self.cleaned_data.get('telefono')
         if not tel:
             raise forms.ValidationError("El teléfono es obligatorio para la verificación")
         
-        normalizado = _normalizar_telefono_chile_form(tel)
+        # Solo permitir 8 dígitos
+        tel_limpio = re.sub(r'\D', '', tel)
+        if len(tel_limpio) != 8:
+            raise forms.ValidationError("El teléfono debe tener exactamente 8 dígitos (número celular chileno)")
+        
+        # Verificar que solo sean números
+        if not tel_limpio.isdigit():
+            raise forms.ValidationError("El teléfono solo debe contener números")
+        
+        normalizado = _normalizar_telefono_chile_form(tel_limpio)
         if not normalizado:
-            raise forms.ValidationError("Ingresa un teléfono válido de Chile (solo números, sin +56 ni 9 inicial)")
-        return tel
+            raise forms.ValidationError("Ingresa un teléfono válido de Chile (8 dígitos)")
+        return tel_limpio
     
     def clean_rut(self):
         rut = self.cleaned_data.get('rut', '').strip()
@@ -76,6 +113,12 @@ class RegistroClienteForm(UserCreationForm):
         import re
         if not re.match(r'^\d{7,8}-[\dkK]$', rut):
             raise forms.ValidationError("El RUT debe tener el formato: 12345678-9 (con guión y dígito verificador)")
+        
+        # Verificar que el RUT no esté ya registrado
+        from .models import PerfilCliente
+        if PerfilCliente.objects.filter(rut=rut).exists():
+            raise forms.ValidationError("Este RUT ya está registrado en el sistema. Si ya tienes cuenta, inicia sesión.")
+        
         return rut
     
     def clean_nombre_completo(self):

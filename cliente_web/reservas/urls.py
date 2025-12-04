@@ -7,11 +7,10 @@ urlpatterns = [
     # Enlaces públicos de confirmación
     path('confirmar/<int:cita_id>/', views.confirmar_cita, name="confirmar_cita"),
     path('citas-fecha/', views.obtener_citas_fecha, name="obtener_citas_fecha"),
-    path('debug/', views.debug_citas, name="debug_citas"),  # Temporal para debugging
-    path('debug/estado-whatsapp/<int:cita_id>/', views.debug_estado_whatsapp, name="debug_estado_whatsapp"),
     
     # URLs del Menú Lateral
     path('mi-perfil/', views.mi_perfil, name="mi_perfil"),
+    path('mis-citas-activas/', views.mis_citas_activas, name="mis_citas_activas"),
     path('historial/', views.historial_citas, name="historial_citas"),
     path('ayuda/', views.ayuda, name="ayuda"),
     
@@ -23,4 +22,18 @@ urlpatterns = [
     path('radiografias/', views.ver_radiografias, name="ver_radiografias"),
     path('radiografia/<int:radiografia_id>/descargar/', views.descargar_radiografia, name="descargar_radiografia"),
     path('radiografia/<int:radiografia_id>/imagen/', views.ver_imagen_radiografia, name="ver_imagen_radiografia"),
+    
+    # URLs de Consentimientos Informados
+    path('consentimientos/', views.ver_consentimientos, name="ver_consentimientos"),
+    path('consentimientos/<int:consentimiento_id>/', views.ver_consentimiento, name="ver_consentimiento"),
+    path('consentimientos/<int:consentimiento_id>/firmar/', views.firmar_consentimiento_cliente, name="firmar_consentimiento_cliente"),
+    
+    # URLs de Presupuestos
+    path('presupuestos/', views.ver_presupuestos, name="ver_presupuestos"),
+    path('presupuestos/<int:presupuesto_id>/', views.ver_presupuesto, name="ver_presupuesto"),
+    path('presupuestos/<int:presupuesto_id>/aceptar/', views.aceptar_presupuesto_cliente, name="aceptar_presupuesto_cliente"),
+    
+    # URLs de Tratamientos (solo activos con presupuesto aceptado)
+    path('tratamientos/', views.ver_tratamientos, name="ver_tratamientos"),
+    path('tratamientos/<int:tratamiento_id>/', views.ver_tratamiento, name="ver_tratamiento"),
 ]

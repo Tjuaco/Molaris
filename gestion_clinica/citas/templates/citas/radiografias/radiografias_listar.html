@@ -1,0 +1,859 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Mis Radiografías - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<!-- Panel Superior con Estadísticas -->
+<div class="radiografias-dashboard-header">
+    <div class="dashboard-header-content">
+        <div class="dashboard-title-section">
+            <div class="title-icon-wrapper">
+                <i class="fas fa-x-ray"></i>
+            </div>
+            <div>
+                <h1 class="dashboard-main-title">Mis Radiografías</h1>
+                <p class="dashboard-subtitle">Gestiona y visualiza las radiografías de tus pacientes vinculados</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Estadísticas en Grid -->
+    <div class="stats-grid-radiografias">
+        <div class="stat-card-radiografia">
+            <div class="stat-icon-wrapper" style="background: linear-gradient(135deg, #14b8a6, #0d9488);">
+                <i class="fas fa-images"></i>
+            </div>
+            <div class="stat-content-wrapper">
+                <div class="stat-value">{{ estadisticas.total_radiografias }}</div>
+                <div class="stat-label">Total Radiografías</div>
+                <div class="stat-detail">{{ estadisticas.radiografias_mes }} este mes</div>
+            </div>
+        </div>
+        
+        <div class="stat-card-radiografia">
+            <div class="stat-icon-wrapper" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content-wrapper">
+                <div class="stat-value">{{ estadisticas.total_pacientes_con_radiografias }}</div>
+                <div class="stat-label">Pacientes con Radiografías</div>
+                <div class="stat-detail">de {{ estadisticas.total_pacientes_vinculados }} vinculados</div>
+            </div>
+        </div>
+        
+        <div class="stat-card-radiografia">
+            <div class="stat-icon-wrapper" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                <i class="fas fa-calendar-week"></i>
+            </div>
+            <div class="stat-content-wrapper">
+                <div class="stat-value">{{ estadisticas.radiografias_semana }}</div>
+                <div class="stat-label">Esta Semana</div>
+                <div class="stat-detail">Nuevas radiografías</div>
+            </div>
+        </div>
+        
+        <div class="stat-card-radiografia highlight-card">
+            <div class="stat-icon-wrapper" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                <i class="fas fa-user-plus"></i>
+            </div>
+            <div class="stat-content-wrapper">
+                <div class="stat-value">{{ pacientes_sin_radiografias|length }}</div>
+                <div class="stat-label">Pacientes Disponibles</div>
+                <div class="stat-detail">Sin radiografías aún</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Barra de Búsqueda Mejorada -->
+<div class="search-section-radiografias">
+    <div class="search-container-modern">
+        <div class="search-icon-wrapper">
+            <i class="fas fa-search"></i>
+        </div>
+        <form method="get" class="search-form-inline">
+            <input 
+                type="text" 
+                name="search" 
+                value="{{ search }}" 
+                placeholder="Buscar por nombre, email o teléfono del paciente..." 
+                class="search-input-modern"
+                autocomplete="off"
+            >
+            {% if search %}
+            <a href="{% url 'radiografias_listar' %}" class="search-clear-btn" title="Limpiar búsqueda">
+                <i class="fas fa-times"></i>
+            </a>
+            {% endif %}
+            <button type="submit" class="search-submit-btn">
+                <i class="fas fa-search"></i>
+                <span>Buscar</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Sección Principal: Pacientes con Radiografías -->
+<div class="main-content-section-radiografias">
+    <div class="section-header-modern">
+        <div class="section-title-group">
+            <div class="section-icon-badge">
+                <i class="fas fa-folder-open"></i>
+            </div>
+            <div>
+                <h2 class="section-title">Pacientes con Radiografías</h2>
+                <p class="section-description">Selecciona un paciente para ver y gestionar sus radiografías</p>
+            </div>
+        </div>
+        <div class="section-badge-count">
+            <span class="count-number">{{ pacientes|length }}</span>
+            <span class="count-label">paciente{{ pacientes|length|pluralize }}</span>
+        </div>
+    </div>
+    
+    {% if pacientes %}
+    <div class="patients-grid-enhanced">
+        {% for paciente in pacientes %}
+        <div class="patient-card-enhanced">
+            <div class="patient-card-top">
+                <div class="patient-avatar-enhanced">
+                    <span class="avatar-initial">{{ paciente.nombre_completo|first|upper }}</span>
+                    {% if paciente.ultima_radiografia %}
+                    <div class="avatar-badge-new" title="Última radiografía: {{ paciente.ultima_radiografia.fecha_carga|date:'d/m/Y' }}">
+                        <i class="fas fa-circle"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="patient-radiografia-count-badge">
+                    <i class="fas fa-x-ray"></i>
+                    <span class="count-number">{{ paciente.total_radiografias }}</span>
+                </div>
+            </div>
+            
+            <div class="patient-card-body-enhanced">
+                <h3 class="patient-name-enhanced">{{ paciente.nombre_completo }}</h3>
+                
+                <div class="patient-info-list">
+                    <div class="info-row-enhanced">
+                        <i class="fas fa-envelope info-icon"></i>
+                        <span class="info-text">{{ paciente.email|truncatechars:30 }}</span>
+                    </div>
+                    
+                    {% if paciente.telefono %}
+                    <div class="info-row-enhanced">
+                        <i class="fas fa-phone info-icon"></i>
+                        <span class="info-text">{{ paciente.telefono }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if paciente.ultima_radiografia %}
+                    <div class="info-row-enhanced highlight-row">
+                        <i class="fas fa-clock info-icon"></i>
+                        <span class="info-text">Última: {{ paciente.ultima_radiografia.fecha_carga|date:"d/m/Y" }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="patient-card-footer-enhanced">
+                <a href="{% url 'radiografias_paciente' paciente.id %}" class="btn-view-radiografias-enhanced">
+                    <i class="fas fa-eye"></i>
+                    <span>Ver Radiografías</span>
+                    <i class="fas fa-arrow-right btn-arrow"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state-enhanced">
+        <div class="empty-icon-large">
+            <i class="fas fa-x-ray"></i>
+        </div>
+        <h3 class="empty-title">No se encontraron pacientes</h3>
+        <p class="empty-description">
+            {% if search %}
+            No hay pacientes que coincidan con tu búsqueda. Intenta con otros términos o 
+            <a href="{% url 'radiografias_listar' %}" class="empty-link">limpiar los filtros</a>.
+            {% else %}
+            Aún no tienes pacientes con radiografías registradas. Comienza agregando radiografías a tus pacientes vinculados.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Sección Secundaria: Pacientes Disponibles para Agregar -->
+{% if pacientes_sin_radiografias %}
+<div class="secondary-content-section-radiografias">
+    <div class="section-header-modern">
+        <div class="section-title-group">
+            <div class="section-icon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                <i class="fas fa-user-plus"></i>
+            </div>
+            <div>
+                <h2 class="section-title">Agregar Radiografías</h2>
+                <p class="section-description">Pacientes vinculados que aún no tienen radiografías registradas</p>
+            </div>
+        </div>
+        <div class="section-badge-count" style="background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e;">
+            <span class="count-number">{{ pacientes_sin_radiografias|length }}</span>
+            <span class="count-label">disponible{{ pacientes_sin_radiografias|length|pluralize }}</span>
+        </div>
+    </div>
+    
+    <div class="patients-grid-enhanced">
+        {% for paciente in pacientes_sin_radiografias %}
+        <div class="patient-card-enhanced available-card">
+            <div class="patient-card-top">
+                <div class="patient-avatar-enhanced" style="background: linear-gradient(135deg, #e2e8f0, #cbd5e1); color: #64748b;">
+                    <span class="avatar-initial">{{ paciente.nombre_completo|first|upper }}</span>
+                </div>
+                <div class="patient-radiografia-count-badge" style="background: #fef3c7; color: #92400e; border-color: #fbbf24;">
+                    <i class="fas fa-plus-circle"></i>
+                    <span class="count-number">0</span>
+                </div>
+            </div>
+            
+            <div class="patient-card-body-enhanced">
+                <h3 class="patient-name-enhanced">{{ paciente.nombre_completo }}</h3>
+                
+                <div class="patient-info-list">
+                    <div class="info-row-enhanced">
+                        <i class="fas fa-envelope info-icon"></i>
+                        <span class="info-text">{{ paciente.email|truncatechars:30 }}</span>
+                    </div>
+                    
+                    {% if paciente.telefono %}
+                    <div class="info-row-enhanced">
+                        <i class="fas fa-phone info-icon"></i>
+                        <span class="info-text">{{ paciente.telefono }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="info-row-enhanced highlight-row" style="background: #fef3c7; color: #92400e;">
+                        <i class="fas fa-info-circle info-icon"></i>
+                        <span class="info-text">Sin radiografías registradas</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="patient-card-footer-enhanced">
+                <a href="{% url 'agregar_radiografia' paciente.id %}" class="btn-add-radiografia-enhanced">
+                    <i class="fas fa-plus"></i>
+                    <span>Agregar Primera Radiografía</span>
+                    <i class="fas fa-arrow-right btn-arrow"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<style>
+/* ===== DASHBOARD HEADER ===== */
+.radiografias-dashboard-header {
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 2px solid #e0f2fe;
+}
+
+.dashboard-header-content {
+    margin-bottom: 28px;
+}
+
+.dashboard-title-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.title-icon-wrapper {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(20, 184, 166, 0.3);
+}
+
+.title-icon-wrapper i {
+    font-size: 36px;
+    color: white;
+}
+
+.dashboard-main-title {
+    margin: 0 0 8px 0;
+    font-size: 32px;
+    font-weight: 800;
+    color: #1e293b;
+    letter-spacing: -0.5px;
+}
+
+.dashboard-subtitle {
+    margin: 0;
+    font-size: 16px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* ===== STATS GRID ===== */
+.stats-grid-radiografias {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-top: 24px;
+}
+
+.stat-card-radiografia {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border: 2px solid #e0f2fe;
+    transition: all 0.3s ease;
+}
+
+.stat-card-radiografia:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: #14b8a6;
+}
+
+.stat-card-radiografia.highlight-card {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+}
+
+.stat-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon-wrapper i {
+    font-size: 28px;
+    color: white;
+}
+
+.stat-content-wrapper {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.stat-detail {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* ===== SEARCH SECTION ===== */
+.search-section-radiografias {
+    margin-bottom: 32px;
+}
+
+.search-container-modern {
+    background: white;
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border: 2px solid #e0f2fe;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.search-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.search-icon-wrapper i {
+    font-size: 20px;
+    color: white;
+}
+
+.search-form-inline {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.search-input-modern {
+    flex: 1;
+    padding: 14px 18px;
+    border: 2px solid #e0f2fe;
+    border-radius: 12px;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    background: #f8fafc;
+    color: #1e293b;
+}
+
+.search-input-modern:focus {
+    outline: none;
+    border-color: #14b8a6;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.1);
+}
+
+.search-clear-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border-radius: 10px;
+    color: #64748b;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.search-clear-btn:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.search-submit-btn {
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+}
+
+.search-submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+}
+
+/* ===== MAIN CONTENT SECTION ===== */
+.main-content-section-radiografias,
+.secondary-content-section-radiografias {
+    margin-bottom: 40px;
+}
+
+.section-header-modern {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid #e0f2fe;
+}
+
+.section-title-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.section-icon-badge {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+}
+
+.section-icon-badge i {
+    font-size: 24px;
+    color: white;
+}
+
+.section-title {
+    margin: 0 0 6px 0;
+    font-size: 26px;
+    font-weight: 800;
+    color: #1e293b;
+    letter-spacing: -0.5px;
+}
+
+.section-description {
+    margin: 0;
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.section-badge-count {
+    background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+    padding: 12px 20px;
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid #7dd3fc;
+}
+
+.count-number {
+    display: block;
+    font-size: 24px;
+    font-weight: 800;
+    color: #0c4a6e;
+    line-height: 1;
+}
+
+.count-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0369a1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* ===== PATIENTS GRID ===== */
+.patients-grid-enhanced {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 24px;
+}
+
+.patient-card-enhanced {
+    background: white;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border: 2px solid #e0f2fe;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.patient-card-enhanced:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    border-color: #14b8a6;
+}
+
+.patient-card-enhanced.available-card {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, #ffffff, #fffbeb);
+}
+
+.patient-card-enhanced.available-card:hover {
+    border-color: #f59e0b;
+}
+
+.patient-card-top {
+    background: linear-gradient(135deg, #f0fdfa, #e0f2fe);
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #e0f2fe;
+    position: relative;
+}
+
+.patient-avatar-enhanced {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 28px;
+    box-shadow: 0 6px 20px rgba(20, 184, 166, 0.3);
+    position: relative;
+}
+
+.avatar-initial {
+    z-index: 1;
+}
+
+.avatar-badge-new {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 20px;
+    height: 20px;
+    background: #10b981;
+    border-radius: 50%;
+    border: 3px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-badge-new i {
+    font-size: 10px;
+    color: white;
+}
+
+.patient-radiografia-count-badge {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    border: 2px solid white;
+}
+
+.patient-radiografia-count-badge i {
+    font-size: 20px;
+}
+
+.patient-card-body-enhanced {
+    padding: 24px;
+    flex: 1;
+}
+
+.patient-name-enhanced {
+    margin: 0 0 20px 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1.3;
+}
+
+.patient-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-row-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e0f2fe;
+    transition: all 0.2s ease;
+}
+
+.info-row-enhanced:hover {
+    background: #f0fdfa;
+    border-color: #14b8a6;
+}
+
+.info-row-enhanced.highlight-row {
+    background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+    border-color: #7dd3fc;
+}
+
+.info-icon {
+    width: 20px;
+    color: #14b8a6;
+    font-size: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.info-text {
+    color: #475569;
+    font-weight: 500;
+    font-size: 14px;
+    flex: 1;
+}
+
+.patient-card-footer-enhanced {
+    padding: 20px 24px;
+    background: #f8fafc;
+    border-top: 2px solid #e0f2fe;
+}
+
+.btn-view-radiografias-enhanced,
+.btn-add-radiografia-enhanced {
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+}
+
+.btn-add-radiografia-enhanced {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-view-radiografias-enhanced:hover,
+.btn-add-radiografia-enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+}
+
+.btn-add-radiografia-enhanced:hover {
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+.btn-arrow {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+}
+
+.btn-view-radiografias-enhanced:hover .btn-arrow,
+.btn-add-radiografia-enhanced:hover .btn-arrow {
+    transform: translateX(4px);
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state-enhanced {
+    background: white;
+    border-radius: 20px;
+    padding: 80px 40px;
+    text-align: center;
+    border: 3px dashed #e0f2fe;
+    background: linear-gradient(135deg, #ffffff, #f0fdfa);
+}
+
+.empty-icon-large {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 32px;
+    background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 4px solid #7dd3fc;
+    box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
+}
+
+.empty-icon-large i {
+    font-size: 56px;
+    color: #14b8a6;
+}
+
+.empty-title {
+    margin: 0 0 16px 0;
+    font-size: 28px;
+    font-weight: 800;
+    color: #1e293b;
+}
+
+.empty-description {
+    margin: 0;
+    font-size: 16px;
+    color: #64748b;
+    line-height: 1.6;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.empty-link {
+    color: #14b8a6;
+    font-weight: 700;
+    text-decoration: none;
+    border-bottom: 2px solid #14b8a6;
+    transition: all 0.2s ease;
+}
+
+.empty-link:hover {
+    color: #0d9488;
+    border-bottom-color: #0d9488;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .radiografias-dashboard-header {
+        padding: 24px 20px;
+    }
+    
+    .dashboard-title-section {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .stats-grid-radiografias {
+        grid-template-columns: 1fr;
+    }
+    
+    .search-container-modern {
+        flex-direction: column;
+        padding: 16px;
+    }
+    
+    .search-form-inline {
+        width: 100%;
+    }
+    
+    .section-header-modern {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .patients-grid-enhanced {
+        grid-template-columns: 1fr;
+    }
+    
+    .patient-card-top {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}

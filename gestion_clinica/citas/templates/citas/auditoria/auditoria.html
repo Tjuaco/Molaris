@@ -1,0 +1,500 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Auditoría - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+    
+    body > .app-container > .main-content {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .auditoria-container {
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        gap: 0;
+        width: 100%;
+        box-sizing: border-box;
+        position: relative;
+    }
+    
+    .main-content {
+        min-width: 0;
+        margin-left: 260px !important;
+        padding: 12px 24px;
+        padding-top: 12px;
+        width: calc(100% - 260px) !important;
+        max-width: calc(100vw - 260px) !important;
+        box-sizing: border-box;
+        position: relative;
+    }
+    
+    .sidebar-left {
+        width: 260px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 20px 0;
+        min-height: calc(100vh - 99px);
+        position: fixed;
+        top: 99px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 100;
+        overflow-y: auto;
+        max-height: calc(100vh - 99px);
+    }
+    
+    .sidebar-header {
+        padding: 0 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding-top: 12px;
+        background: #f0fdfa;
+        border-radius: 0;
+    }
+    
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .sidebar-header h3 i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+    
+    .sidebar-section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 20px 8px;
+        margin-top: 12px;
+        margin-bottom: 4px;
+    }
+    
+    .sidebar-divider {
+        height: 1px;
+        background: #e5e7eb;
+        margin: 12px 20px;
+    }
+    
+    .sidebar-select, .sidebar-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #1e293b;
+        background: white;
+        transition: all 0.2s;
+    }
+    
+    .sidebar-select:focus, .sidebar-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+    
+    .stats-banner {
+        background: linear-gradient(135deg, #14b8a6, #0d9488);
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 16px rgba(20, 184, 166, 0.25);
+        color: white;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+    }
+    
+    .stat-item {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0 0 4px 0;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        opacity: 0.9;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .auditoria-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .auditoria-table thead {
+        background: #f8fafc;
+    }
+    
+    .auditoria-table th {
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .auditoria-table tbody tr {
+        border-bottom: 1px solid #e2e8f0;
+        transition: background 0.2s;
+    }
+    
+    .auditoria-table tbody tr:hover {
+        background: #f8fafc;
+    }
+    
+    .auditoria-table td {
+        padding: 12px 16px;
+        color: #374151;
+        font-size: 0.875rem;
+        vertical-align: middle;
+    }
+    
+    .badge-modulo {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-accion {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-crear { background: #dbeafe; color: #1e40af; }
+    .badge-editar { background: #fef3c7; color: #92400e; }
+    .badge-eliminar { background: #fee2e2; color: #991b1b; }
+    .badge-acceso { background: #d1fae5; color: #065f46; }
+    .badge-exportar { background: #e0e7ff; color: #3730a3; }
+    .badge-enviar { background: #fce7f3; color: #9f1239; }
+    .badge-completar { background: #dcfce7; color: #166534; }
+    .badge-cancelar { background: #fef2f2; color: #991b1b; }
+    .badge-pago { background: #f0fdf4; color: #166534; }
+    .badge-otro { background: #f1f5f9; color: #64748b; }
+    
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 16px;
+        margin-top: 20px;
+    }
+    
+    .pagination a, .pagination span {
+        padding: 8px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    
+    .pagination a {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .pagination a:hover {
+        background: #2563eb;
+    }
+    
+    .pagination span {
+        color: #64748b;
+        background: #f8fafc;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 24px;
+        background: white;
+        border-radius: 12px;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+    }
+    
+    .empty-state-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #64748b;
+        margin: 0 0 8px 0;
+    }
+    
+    .empty-state-text {
+        font-size: 0.875rem;
+        color: #94a3b8;
+        margin: 0;
+    }
+    
+    @media (max-width: 1200px) {
+        .sidebar-left {
+            display: none;
+        }
+        .main-content {
+            margin-left: 0;
+            width: 100%;
+            max-width: 100%;
+        }
+    }
+</style>
+
+<div class="auditoria-container">
+    <!-- Sidebar Izquierdo -->
+    <aside class="sidebar-left">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-file-alt"></i> Auditoría</h3>
+        </div>
+        <form method="get" action="{% url 'gestor_auditoria' %}" id="filtrosForm">
+            <div class="sidebar-section-title">Módulo</div>
+            <div style="padding: 0 20px 12px;">
+                <select name="modulo" class="sidebar-select" onchange="document.getElementById('filtrosForm').submit();">
+                    <option value="">Todos los módulos</option>
+                    {% for modulo_val, modulo_nombre in modulos %}
+                    <option value="{{ modulo_val }}" {% if modulo_filtro == modulo_val %}selected{% endif %}>
+                        {{ modulo_nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <div class="sidebar-section-title">Acción</div>
+            <div style="padding: 0 20px 12px;">
+                <select name="accion" class="sidebar-select" onchange="document.getElementById('filtrosForm').submit();">
+                    <option value="">Todas las acciones</option>
+                    {% for accion_val, accion_nombre in acciones %}
+                    <option value="{{ accion_val }}" {% if accion_filtro == accion_val %}selected{% endif %}>
+                        {{ accion_nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <div class="sidebar-section-title">Usuario</div>
+            <div style="padding: 0 20px 12px;">
+                <select name="usuario" class="sidebar-select" onchange="document.getElementById('filtrosForm').submit();">
+                    <option value="">Todos los usuarios</option>
+                    {% for usuario in usuarios %}
+                    <option value="{{ usuario.id }}" {% if usuario_filtro == usuario.id|stringformat:"s" %}selected{% endif %}>
+                        {{ usuario.nombre_completo }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <div class="sidebar-section-title">Buscar</div>
+            <div style="padding: 0 20px 12px;">
+                <input type="text" name="buscar" value="{{ buscar }}" 
+                       placeholder="Buscar en descripción..." 
+                       class="sidebar-input">
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <div style="padding: 0 20px;">
+                <button type="submit" class="btn" style="width: 100%; background: var(--primary-color); color: white; margin-bottom: 8px; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+                <a href="{% url 'gestor_auditoria' %}" class="btn" style="width: 100%; background: #6b7280; color: white; display: block; text-align: center; text-decoration: none; padding: 10px; border-radius: 8px; font-weight: 600;">
+                    <i class="fas fa-redo"></i> Limpiar
+                </a>
+            </div>
+        </form>
+        
+        <div class="sidebar-divider"></div>
+        
+        <div class="sidebar-section-title">Estadísticas</div>
+        <div style="padding: 0 20px 16px;">
+            <div style="font-size: 0.875rem; color: #1e293b; margin-bottom: 12px; font-weight: 600;">
+                Total: <span style="color: var(--primary-color);">{{ total_registros }}</span>
+            </div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">
+                Hoy: <strong>{{ registros_hoy }}</strong>
+            </div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">
+                Este mes: <strong>{{ registros_semana }}</strong>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- Contenido Principal -->
+    <main class="main-content">
+        <!-- Banner de Estadísticas -->
+        <div class="stats-banner">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-file-alt"></i> Historial de Auditoría
+                </h2>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{{ total_registros }}</div>
+                    <div class="stat-label">Total Registros</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ registros_hoy }}</div>
+                    <div class="stat-label">Hoy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ registros_semana }}</div>
+                    <div class="stat-label">Este Mes</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tabla de Registros -->
+        {% if registros.object_list|length > 0 %}
+        <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <table class="auditoria-table">
+                <thead>
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Usuario</th>
+                        <th>Módulo</th>
+                        <th>Acción</th>
+                        <th>Descripción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in registros %}
+                    <tr>
+                        <td style="color: #64748b; font-size: 0.8125rem;">
+                            {{ registro.fecha_hora|date:"d/m/Y" }}<br>
+                            <span style="color: #94a3b8;">{{ registro.fecha_hora|date:"H:i:s" }}</span>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600; color: #1e293b;">
+                                {{ registro.usuario.nombre_completo|default:"Sistema" }}
+                            </div>
+                            {% if registro.usuario %}
+                            <div style="font-size: 0.75rem; color: #64748b;">
+                                {{ registro.usuario.get_rol_display|default:registro.usuario.rol|default:"-" }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge-modulo" style="background: #e0e7ff; color: #3730a3;">
+                                <i class="fas fa-{% if registro.modulo == 'citas' %}calendar-alt{% elif registro.modulo == 'clientes' %}users{% elif registro.modulo == 'personal' %}user-tie{% elif registro.modulo == 'inventario' %}boxes{% elif registro.modulo == 'finanzas' %}dollar-sign{% elif registro.modulo == 'documentos' %}file-pdf{% elif registro.modulo == 'planes' %}clipboard-list{% elif registro.modulo == 'servicios' %}cog{% elif registro.modulo == 'proveedores' %}truck{% elif registro.modulo == 'sistema' %}cog{% elif registro.modulo == 'reportes' %}file-excel{% else %}file{% endif %}"></i>
+                                {{ registro.get_modulo_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge-accion badge-{{ registro.accion }}">
+                                <i class="fas fa-{% if registro.accion == 'crear' %}plus{% elif registro.accion == 'editar' %}edit{% elif registro.accion == 'eliminar' %}trash{% elif registro.accion == 'acceso' %}sign-in-alt{% elif registro.accion == 'exportar' %}download{% elif registro.accion == 'enviar' %}paper-plane{% elif registro.accion == 'completar' %}check{% elif registro.accion == 'cancelar' %}times{% elif registro.accion == 'pago' %}dollar-sign{% else %}circle{% endif %}"></i>
+                                {{ registro.get_accion_display }}
+                            </span>
+                        </td>
+                        <td style="max-width: 300px;">
+                            <div style="font-weight: 500; color: #1e293b; margin-bottom: 4px;">
+                                {{ registro.descripcion|truncatewords:15 }}
+                            </div>
+                            {% if registro.detalles %}
+                            <div style="font-size: 0.75rem; color: #64748b;">
+                                {{ registro.detalles|truncatewords:10 }}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <!-- Paginación -->
+            {% if registros.has_other_pages %}
+            <div class="pagination">
+                {% if registros.has_previous %}
+                <a href="?page={{ registros.previous_page_number }}{% if modulo_filtro %}&modulo={{ modulo_filtro }}{% endif %}{% if accion_filtro %}&accion={{ accion_filtro }}{% endif %}{% if usuario_filtro %}&usuario={{ usuario_filtro }}{% endif %}{% if buscar %}&buscar={{ buscar }}{% endif %}">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </a>
+                {% endif %}
+                
+                <span>
+                    Página {{ registros.number }} de {{ registros.paginator.num_pages }}
+                </span>
+                
+                {% if registros.has_next %}
+                <a href="?page={{ registros.next_page_number }}{% if modulo_filtro %}&modulo={{ modulo_filtro }}{% endif %}{% if accion_filtro %}&accion={{ accion_filtro }}{% endif %}{% if usuario_filtro %}&usuario={{ usuario_filtro }}{% endif %}{% if buscar %}&buscar={{ buscar }}{% endif %}">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h3 class="empty-state-title">No se encontraron registros</h3>
+            <p class="empty-state-text">Intenta ajustar los filtros de búsqueda</p>
+        </div>
+        {% endif %}
+    </main>
+</div>
+
+{% endblock %}
+

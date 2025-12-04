@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Odontograma, EstadoDiente, Radiografia, InsumoOdontograma
+from .models import (
+    Odontograma, EstadoDiente, Radiografia, InsumoOdontograma,
+    PlanTratamiento, FaseTratamiento, ItemTratamiento
+)
 
 
 @admin.register(Odontograma)
@@ -34,3 +37,26 @@ class InsumoOdontogramaAdmin(admin.ModelAdmin):
     search_fields = ['odontograma__paciente_nombre', 'insumo__nombre']
     readonly_fields = ['fecha_uso']
     date_hierarchy = 'fecha_uso'
+
+
+@admin.register(PlanTratamiento)
+class PlanTratamientoAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'cliente', 'dentista', 'estado', 'precio_final', 'creado_el']
+    list_filter = ['estado', 'dentista', 'creado_el']
+    search_fields = ['nombre', 'cliente__nombre_completo', 'cliente__email']
+    readonly_fields = ['creado_el', 'actualizado_el', 'fecha_aprobacion', 'fecha_completado', 'fecha_cancelacion']
+    date_hierarchy = 'creado_el'
+
+
+@admin.register(FaseTratamiento)
+class FaseTratamientoAdmin(admin.ModelAdmin):
+    list_display = ['plan', 'nombre', 'orden', 'presupuesto', 'completada']
+    list_filter = ['completada', 'plan']
+    search_fields = ['plan__nombre', 'nombre']
+
+
+@admin.register(ItemTratamiento)
+class ItemTratamientoAdmin(admin.ModelAdmin):
+    list_display = ['fase', 'descripcion', 'cantidad', 'precio_unitario', 'precio_total', 'completado']
+    list_filter = ['completado', 'fase__plan']
+    search_fields = ['descripcion', 'fase__nombre']

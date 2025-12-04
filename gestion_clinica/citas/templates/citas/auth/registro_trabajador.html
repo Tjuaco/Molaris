@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Registro de trabajador - Sistema de gestión clínica dental">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Registro de Trabajador - Clínica Dental</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <style>
+        :root {
+            --primary-color: #14b8a6;
+            --primary-dark: #0d9488;
+            --primary-darker: #0f766e;
+            --primary-light: #2dd4bf;
+            --primary-lighter: #5eead4;
+            --primary-bg: #f0fdfa;
+            --primary-text: #134e4a;
+            --error-color: #ef4444;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%);
+            min-height: 100vh;
+            padding: 24px;
+            position: relative;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(20, 184, 166, 0.05) 0%, transparent 70%);
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(-30px, -30px) rotate(180deg); }
+        }
+        
+        .wrap {
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid rgba(20, 184, 166, 0.1);
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(20, 184, 166, 0.15);
+            overflow: hidden;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .card-header {
+            padding: 32px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .card-header i {
+            font-size: 32px;
+        }
+        
+        .card-header h1 {
+            font-size: 1.75rem;
+            margin: 0;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .card-body {
+            padding: 32px;
+        }
+        
+        .alert {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            border-left: 4px solid var(--error-color);
+            text-align: left;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .alert.success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left-color: var(--success-color);
+        }
+        
+        .alert.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left-color: var(--warning-color);
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .alert i {
+            margin-right: 8px;
+        }
+        
+        .section-box {
+            background: var(--primary-bg);
+            border: 1px solid rgba(20, 184, 166, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            margin: 0 0 20px 0;
+            color: var(--primary-text);
+            font-size: 1.125rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title i {
+            color: var(--primary-color);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #334155;
+            font-size: 0.9rem;
+        }
+        
+        input.form-control,
+        select.form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: white;
+            color: #0f172a;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        input.form-control:focus,
+        select.form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.1);
+            background: white;
+        }
+        
+        .error {
+            color: var(--error-color);
+            font-size: 0.85rem;
+            margin-top: 6px;
+            display: block;
+        }
+        
+        .help {
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: 6px;
+            display: block;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 32px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 15px;
+            font-family: inherit;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+        }
+        
+        .btn-success:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .footer {
+            padding: 24px 32px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #64748b;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+        
+        .footer a:hover {
+            color: var(--primary-dark);
+        }
+        
+        .security-note {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--primary-bg);
+            border-radius: 12px;
+            font-size: 13px;
+            color: var(--primary-text);
+            border: 1px solid rgba(20, 184, 166, 0.2);
+            text-align: center;
+        }
+        
+        .security-note i {
+            color: var(--primary-color);
+            margin-right: 6px;
+        }
+        
+        @media (max-width: 768px) {
+            .card {
+                border-radius: 16px;
+            }
+            
+            .card-header,
+            .card-body {
+                padding: 20px;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .footer {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-user-plus"></i>
+                <h1>Registro de Trabajador</h1>
+            </div>
+            <div class="card-body">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert {% if message.tags == 'success' %}success{% elif 'warning' in message.tags or '⚠️' in message|stringformat:'s' %}warning{% endif %}">
+                            <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif 'warning' in message.tags or '⚠️' in message|stringformat:'s' %}fa-exclamation-triangle{% else %}fa-exclamation-circle{% endif %}"></i>
+                            {{ message|safe }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <form method="POST" id="register-form" autocomplete="on" novalidate>
+                    {% csrf_token %}
+
+                    <!-- Datos de acceso -->
+                    <div class="section-box">
+                        <h3 class="section-title">
+                            <i class="fas fa-lock"></i> Datos de Acceso
+                        </h3>
+
+                        <div class="grid">
+                            <div class="form-group">
+                                <label for="{{ form.username.id_for_label }}">Usuario *</label>
+                                {{ form.username }}
+                                {% if form.username.errors %}
+                                    <span class="error">{{ form.username.errors|striptags }}</span>
+                                {% endif %}
+                                {% if form.username.help_text %}
+                                    <span class="help">{{ form.username.help_text }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.email.id_for_label }}">Email *</label>
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                    <span class="error">{{ form.email.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.password1.id_for_label }}">Contraseña *</label>
+                                {{ form.password1 }}
+                                {% if form.password1.errors %}
+                                    <span class="error">{{ form.password1.errors|striptags }}</span>
+                                {% endif %}
+                                {% if form.password1.help_text %}
+                                    <span class="help">{{ form.password1.help_text }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.password2.id_for_label }}">Confirmar Contraseña *</label>
+                                {{ form.password2 }}
+                                {% if form.password2.errors %}
+                                    <span class="error">{{ form.password2.errors|striptags }}</span>
+                                {% endif %}
+                                {% if form.password2.help_text %}
+                                    <span class="help">{{ form.password2.help_text }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos personales -->
+                    <div class="section-box">
+                        <h3 class="section-title">
+                            <i class="fas fa-user"></i> Datos Personales
+                        </h3>
+
+                        <div class="grid">
+                            <div class="form-group">
+                                <label for="{{ form.first_name.id_for_label }}">Nombre *</label>
+                                {{ form.first_name }}
+                                {% if form.first_name.errors %}
+                                    <span class="error">{{ form.first_name.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.last_name.id_for_label }}">Apellido *</label>
+                                {{ form.last_name }}
+                                {% if form.last_name.errors %}
+                                    <span class="error">{{ form.last_name.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label for="{{ form.nombre_completo.id_for_label }}">Nombre Completo *</label>
+                                {{ form.nombre_completo }}
+                                {% if form.nombre_completo.errors %}
+                                    <span class="error">{{ form.nombre_completo.errors|striptags }}</span>
+                                {% endif %}
+                                {% if form.nombre_completo.help_text %}
+                                    <span class="help">{{ form.nombre_completo.help_text }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.telefono.id_for_label }}">Teléfono *</label>
+                                {{ form.telefono }}
+                                {% if form.telefono.errors %}
+                                    <span class="error">{{ form.telefono.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.rol.id_for_label }}">Rol *</label>
+                                {{ form.rol }}
+                                {% if form.rol.errors %}
+                                    <span class="error">{{ form.rol.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos específicos Dentista -->
+                    <div id="dentista-extra" style="display: none;" class="section-box">
+                        <h3 class="section-title">
+                            <i class="fas fa-tooth"></i> Datos de Dentista
+                        </h3>
+
+                        <div class="grid">
+                            <div class="form-group">
+                                <label for="{{ form.especialidad.id_for_label }}">Especialidad</label>
+                                {{ form.especialidad }}
+                                {% if form.especialidad.errors %}
+                                    <span class="error">{{ form.especialidad.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="{{ form.numero_colegio.id_for_label }}">Número de Colegio</label>
+                                {{ form.numero_colegio }}
+                                {% if form.numero_colegio.errors %}
+                                    <span class="error">{{ form.numero_colegio.errors|striptags }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="actions">
+                        <a href="{% url 'login' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver al login
+                        </a>
+                        <button type="submit" class="btn btn-success" id="submit-btn">
+                            <i class="fas fa-user-check"></i> Registrarse
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="security-note">
+                    <i class="fas fa-shield-alt"></i>
+                    Todos los datos están protegidos y encriptados
+                </div>
+            </div>
+            <div class="footer">
+                <span>Clínica Dental · Registro Seguro</span>
+                <a href="{% url 'login' %}">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar sesión
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const rolSelect = document.getElementById('{{ form.rol.id_for_label }}') || document.querySelector('select[name="rol"]');
+            const dentistaExtra = document.getElementById('dentista-extra');
+            const form = document.getElementById('register-form');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            function toggleDentista() {
+                if (!rolSelect) return;
+                dentistaExtra.style.display = rolSelect.value === 'dentista' ? 'block' : 'none';
+            }
+            
+            if (rolSelect) {
+                rolSelect.addEventListener('change', toggleDentista);
+                toggleDentista();
+            }
+            
+            // Prevenir envío múltiple
+            let isSubmitting = false;
+            form.addEventListener('submit', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                isSubmitting = true;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
+            });
+        });
+    </script>
+</body>
+</html>

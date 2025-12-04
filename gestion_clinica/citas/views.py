@@ -6,11 +6,18 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.db.models import Count, Q, F, Sum, Avg
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from django.contrib.auth.views import LoginView
 from django.contrib.auth import logout, authenticate
 from django.contrib.auth.models import User
 from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.cache import cache
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
+from django.utils.decorators import method_decorator
+import logging
+import time
 
 # PDF generation imports
 from reportlab.lib.pagesizes import letter, A4
@@ -25,7 +32,8 @@ from .models import Cita, TipoServicio, HorarioDentista
 from personal.models import Perfil
 from pacientes.models import Cliente
 from inventario.models import Insumo, MovimientoInsumo
-from historial_clinico.models import Odontograma, EstadoDiente, Radiografia
+from historial_clinico.models import Odontograma, EstadoDiente, Radiografia, PlanTratamiento, FaseTratamiento, ItemTratamiento, PagoTratamiento, DocumentoCliente, ConsentimientoInformado, PlantillaConsentimiento
+from django.db.models import Prefetch
 from proveedores.models import Proveedor, SolicitudInsumo
 from evaluaciones.models import Evaluacion
 from finanzas.models import IngresoManual, EgresoManual
@@ -35,7 +43,22 @@ try:
 except ImportError:
     PerfilCliente = None
 from .forms import RegistroTrabajadorForm, PerfilForm
+# Notificaciones ahora se envían a través de mensajeria_service (WhatsApp + SMS)
+from .helpers_planes import verificar_permiso_plan_tratamiento, obtener_clientes_permitidos
+from .models_auditoria import registrar_auditoria
+from .validaciones import (
+    validar_email_cliente,
+    validar_rut_cliente,
+    validar_telefono_cliente,
+    validar_username_disponible,
+    validar_datos_cliente_completos
+)
+from django.db import transaction
 import re
+import logging
+import json
+
+logger = logging.getLogger(__name__)
 
 
 def normalizar_telefono_chileno(telefono):
@@ -103,9 +126,36 @@ from .views_dashboard import (
 def inicio(request):
     return redirect('login')
 
-# Login personalizado para trabajadores
+# Login personalizado para trabajadores con protección de seguridad
+@method_decorator(never_cache, name='dispatch')
 class TrabajadorLoginView(LoginView):
-    template_name = 'citas/login.html'
+    template_name = 'citas/auth/login.html'
+    
+    def dispatch(self, *args, **kwargs):
+        """Aplicar protección de rate limiting"""
+        # Obtener IP del cliente
+        ip_address = self.get_client_ip()
+        
+        # Verificar rate limiting (máximo 5 intentos en 15 minutos)
+        cache_key = f'login_attempts_{ip_address}'
+        attempts = cache.get(cache_key, 0)
+        
+        if attempts >= 5:
+            # Bloquear por 15 minutos
+            messages.error(self.request, '⚠️ Demasiados intentos fallidos. Por favor, espera 15 minutos antes de intentar nuevamente.')
+            logger.warning(f'Login bloqueado por rate limiting - IP: {ip_address}')
+            return self.render_to_response(self.get_context_data())
+        
+        return super().dispatch(*args, **kwargs)
+    
+    def get_client_ip(self):
+        """Obtener la IP real del cliente"""
+        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = self.request.META.get('REMOTE_ADDR')
+        return ip
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -116,47 +166,69 @@ class TrabajadorLoginView(LoginView):
         return context
     
     def form_invalid(self, form):
-        """Personalizar mensajes de error de autenticación"""
-        # Obtener el username del POST directamente si cleaned_data no está disponible
-        username = self.request.POST.get('username', '').strip()
-        password = self.request.POST.get('password', '')
+        """Personalizar mensajes de error de autenticación con seguridad mejorada"""
+        # Obtener IP del cliente
+        ip_address = self.get_client_ip()
+        
+        # Incrementar contador de intentos fallidos
+        cache_key = f'login_attempts_{ip_address}'
+        attempts = cache.get(cache_key, 0) + 1
+        cache.set(cache_key, attempts, 900)  # 15 minutos
+        
+        # Log del intento fallido (sin revelar información sensible)
+        username_attempt = self.request.POST.get('username', '').strip()[:20]  # Limitar longitud
+        logger.warning(f'Intento de login fallido - IP: {ip_address}, Usuario: {username_attempt}, Intentos: {attempts}')
         
         # Limpiar mensajes anteriores
         storage = messages.get_messages(self.request)
         storage.used = True
         
-        # Verificar si el usuario existe
-        if username:
-            try:
-                user = User.objects.get(username=username)
-                # Si el usuario existe, verificar la contraseña
-                if password:
-                    if not user.check_password(password):
-                        messages.error(self.request, '❌ Contraseña incorrecta. Por favor, verifica tu contraseña.')
-                    elif not user.is_active:
-                        messages.error(self.request, '⚠️ Tu cuenta está desactivada. Contacta al administrador.')
-                    else:
-                        # Si la contraseña es correcta pero aún falla, puede ser otro problema
-                        messages.error(self.request, '❌ Error al iniciar sesión. Por favor, intenta nuevamente.')
-                else:
-                    messages.error(self.request, '❌ Por favor, ingresa tu contraseña.')
-            except User.DoesNotExist:
-                messages.error(self.request, '❌ Este usuario no existe. Verifica que hayas ingresado correctamente tu nombre de usuario.')
-            except Exception as e:
-                messages.error(self.request, f'❌ Error al verificar credenciales. Por favor, intenta nuevamente.')
+        # Mensaje genérico que no revela si el usuario existe o no (protección contra user enumeration)
+        # Siempre usar el mismo tiempo de respuesta para evitar timing attacks
+        time.sleep(0.1)  # Pequeño delay para normalizar tiempo de respuesta
+        
+        if attempts >= 5:
+            messages.error(self.request, '⚠️ Demasiados intentos fallidos. Tu acceso ha sido temporalmente bloqueado por 15 minutos.')
         else:
-            messages.error(self.request, '❌ Por favor, ingresa tu nombre de usuario.')
+            messages.error(self.request, '❌ Usuario o contraseña incorrectos. Por favor, verifica tus credenciales.')
+            if attempts >= 3:
+                messages.warning(self.request, f'⚠️ Advertencia: {5 - attempts} intentos restantes antes del bloqueo temporal.')
         
         return super().form_invalid(form)
+    
+    def form_valid(self, form):
+        """Limpiar contador de intentos fallidos al iniciar sesión exitosamente"""
+        ip_address = self.get_client_ip()
+        cache_key = f'login_attempts_{ip_address}'
+        cache.delete(cache_key)
+        
+        # Log de login exitoso
+        logger.info(f'Login exitoso - Usuario: {form.get_user().username}, IP: {ip_address}')
+        
+        # Registrar en auditoría
+        try:
+            perfil = Perfil.objects.get(user=form.get_user())
+            registrar_auditoria(
+                usuario=perfil,
+                accion='login',
+                modulo='sistema',
+                descripcion=f'Inicio de sesión exitoso: {perfil.nombre_completo}',
+                detalles=f'Usuario: {form.get_user().username}',
+                request=self.request
+            )
+        except Perfil.DoesNotExist:
+            pass  # Si no hay perfil, no registrar (puede ser un usuario sin perfil)
+        
+        return super().form_valid(form)
 
     def get_success_url(self):
         # Redirigir según rol del trabajador
         try:
             perfil = Perfil.objects.get(user=self.request.user)
             if perfil.activo:
-                # Si es dentista, redirigir a Mi Perfil
+                # Si es dentista, redirigir al dashboard de dentista
                 if perfil.es_dentista():
-                    return reverse_lazy('mi_perfil')
+                    return reverse_lazy('dashboard_dentista')
                 # Si es administrativo, redirigir al panel de trabajador
                 else:
                     return reverse_lazy('panel_trabajador')
@@ -170,194 +242,86 @@ class TrabajadorLoginView(LoginView):
 # Panel trabajador (recepción/dentista)
 @login_required
 def panel_trabajador(request):
-    # Solo permitir usuarios con perfil de trabajador
+    # Redirigir a la nueva vista de citas del día con navbar lateral
+    # Mantener compatibilidad con parámetro tab para redireccionar correctamente
+    tab = request.GET.get('tab', 'today')
+    
+    if tab == 'today' or tab == '':
+        return redirect('citas_dia')
+    elif tab == 'list':
+        return redirect('citas_disponibles')
+    elif tab == 'taken':
+        return redirect('citas_tomadas')
+    elif tab == 'completed':
+        return redirect('citas_completadas')
+    elif tab == 'calendar':
+        return redirect('calendario_citas')
+    else:
+        # Por defecto, redirigir a citas del día
+        return redirect('citas_dia')
+
+# Vista AJAX para obtener citas del día actualizadas (para actualización automática)
+@login_required
+def obtener_citas_dia_ajax(request):
+    """Vista AJAX que devuelve las citas del día en formato JSON para actualización automática"""
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.activo:
-            messages.error(request, 'Tu cuenta está desactivada.')
-            return redirect('login')
+            return JsonResponse({'error': 'Cuenta desactivada'}, status=403)
     except Perfil.DoesNotExist:
-        messages.error(request, 'No tienes permisos para acceder a este panel.')
-        return redirect('login')
-
-    # Obtener estadísticas según el rol
-    if perfil.es_administrativo():
-        # Panel administrativo simplificado
-        citas_hoy = Cita.objects.filter(
-            fecha_hora__date=timezone.now().date()
-        ).order_by('fecha_hora')
-        
-        # IMPORTANTE: Primero limpiar referencias inválidas a clientes que no existen
-        # Esto evita errores de integridad referencial
-        from pacientes.models import Cliente
-        from django.db import connection
-        
-        # Buscar citas con cliente_id que no existe en la tabla Cliente
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT c.id 
-                FROM citas_cita c
-                LEFT JOIN pacientes_cliente p ON c.cliente_id = p.id
-                WHERE c.cliente_id IS NOT NULL 
-                AND p.id IS NULL
-            """)
-            citas_con_cliente_invalido = [row[0] for row in cursor.fetchall()]
-        
-        # Limpiar referencias inválidas
-        if citas_con_cliente_invalido:
-            Cita.objects.filter(id__in=citas_con_cliente_invalido).update(cliente=None)
-        
-        # Listas simplificadas (con select_related para optimizar consultas)
-        citas_creadas = Cita.objects.filter(estado='disponible').select_related('tipo_servicio', 'dentista', 'cliente').order_by('fecha_hora')
-        citas_tomadas = Cita.objects.filter(estado='reservada').select_related('tipo_servicio', 'dentista', 'cliente').order_by('fecha_hora')
-        citas_completadas = Cita.objects.filter(estado='completada').select_related('tipo_servicio', 'dentista', 'cliente').order_by('-fecha_hora')
-        
-        # IMPORTANTE: Actualizar paciente_nombre en citas que tienen cliente pero paciente_nombre es username
-        # Esto corrige citas antiguas que se reservaron antes de la corrección
-        
-        # Ahora actualizar los nombres
-        for cita in list(citas_tomadas) + list(citas_completadas):
-            try:
-                if cita.cliente:
-                    # Si tiene cliente vinculado, usar siempre el nombre completo del cliente
-                    if cita.paciente_nombre != cita.cliente.nombre_completo:
-                        cita.paciente_nombre = cita.cliente.nombre_completo
-                        cita.save(update_fields=['paciente_nombre'])
-                elif cita.paciente_nombre and ' ' not in cita.paciente_nombre:
-                    # Si no tiene cliente pero paciente_nombre parece ser username (sin espacios)
-                    # Intentar buscar un Cliente por email para obtener el nombre completo
-                    if cita.paciente_email:
-                        try:
-                            cliente = Cliente.objects.get(email=cita.paciente_email)
-                            cita.cliente = cliente
-                            cita.paciente_nombre = cliente.nombre_completo
-                            cita.save(update_fields=['cliente', 'paciente_nombre'])
-                        except Cliente.DoesNotExist:
-                            pass
-            except Exception as e:
-                # Si hay algún error al procesar una cita, continuar con las demás
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Error al procesar cita {cita.id}: {e}")
-                continue
-        
-        # Obtener información de fichas (odontogramas) para citas tomadas y completadas
-        from historial_clinico.models import Odontograma
-        odontogramas = Odontograma.objects.filter(cita__isnull=False).select_related('cita')
-        citas_con_ficha = set(odontogramas.values_list('cita_id', flat=True))
-        
-        # Agregar información de ficha a cada cita tomada
-        for cita in citas_tomadas:
-            cita.tiene_ficha = cita.id in citas_con_ficha
-            if cita.tiene_ficha:
-                cita.odontograma = odontogramas.filter(cita_id=cita.id).first()
-        
-        # Agregar información de ficha a cada cita completada
-        for cita in citas_completadas:
-            cita.tiene_ficha = cita.id in citas_con_ficha
-            if cita.tiene_ficha:
-                cita.odontograma = odontogramas.filter(cita_id=cita.id).first()
-        
-        citas_proximas = Cita.objects.filter(
-            fecha_hora__gte=timezone.now(),
-            estado='reservada'
-        ).order_by('fecha_hora')[:10]
-        
-        disponibles_count = Cita.objects.filter(estado='disponible').count()
-        tomadas_count = Cita.objects.filter(estado='reservada').count()
-        realizadas_count = Cita.objects.filter(estado='completada').count()
-        total_agendables = disponibles_count + tomadas_count
-        ocupacion_pct = int((tomadas_count / total_agendables) * 100) if total_agendables > 0 else 0
-
-        estadisticas = {
-            'citas_hoy': Cita.objects.filter(fecha_hora__date=timezone.now().date()).count(),
-            'disponibles': disponibles_count,
-            'realizadas': realizadas_count,
-            'ocupacion': ocupacion_pct,
-        }
-        
-        # Obtener lista de dentistas para el select
-        dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
-        
-        # Obtener servicios activos para el selector
-        servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
-        
-        # Obtener clientes activos para el selector de pacientes
-        clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
-        
-        # Obtener horarios de dentistas para validación en el frontend
-        horarios_dentistas_dict = {}
-        for dentista in dentistas:
-            horarios = HorarioDentista.objects.filter(dentista=dentista, activo=True).order_by('dia_semana', 'hora_inicio')
-            horarios_dentistas_dict[str(dentista.id)] = [
-                {
-                    'dia_semana': h.dia_semana,
-                    'hora_inicio': h.hora_inicio.strftime('%H:%M'),
-                    'hora_fin': h.hora_fin.strftime('%H:%M'),
-                }
-                for h in horarios
-            ]
-        
-        context = {
-            'perfil': perfil,
-            'citas_hoy': citas_hoy,
-            'citas_proximas': citas_proximas,
-            'citas_creadas': citas_creadas,
-            'citas_tomadas': citas_tomadas,
-            'citas_completadas': citas_completadas,
-            'estadisticas': estadisticas,
-            'dentistas': dentistas,
-            'servicios': servicios_activos,
-            'clientes': clientes,
-            'horarios_dentistas': horarios_dentistas_dict,  # Pasar el dict directamente, json_script lo convierte
-            'es_admin': True
-        }
-        
-    else:  # Dentista
-        # Panel dentista - ver solo sus citas
-        citas_hoy = Cita.objects.filter(
-            fecha_hora__date=timezone.now().date(),
-            dentista=perfil
-        ).order_by('fecha_hora')
-        
-        citas_proximas = Cita.objects.filter(
-            fecha_hora__gte=timezone.now(),
-            dentista=perfil,
-            estado='reservada'
-        ).order_by('fecha_hora')[:10]
-        
-        disponibles_count = Cita.objects.filter(estado='disponible').count()
-        tomadas_count = Cita.objects.filter(dentista=perfil, estado='reservada').count()
-        citas_completadas = Cita.objects.filter(dentista=perfil, estado='completada').select_related('tipo_servicio', 'dentista', 'cliente').order_by('-fecha_hora')
-        total_agendables = disponibles_count + tomadas_count
-        ocupacion_pct = int((tomadas_count / total_agendables) * 100) if total_agendables > 0 else 0
-
-        estadisticas = {
-            'citas_hoy': citas_hoy.count(),
-            'disponibles': disponibles_count,
-            'realizadas': Cita.objects.filter(dentista=perfil, estado='completada').count(),
-            'ocupacion': ocupacion_pct,
-        }
-        
-        # Obtener lista de dentistas para el select
-        dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
-        
-        # Obtener servicios activos para el selector
-        servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
-        
-        context = {
-            'perfil': perfil,
-            'citas_hoy': citas_hoy,
-            'citas_proximas': citas_proximas,
-            'citas_completadas': citas_completadas,
-            'estadisticas': estadisticas,
-            'dentistas': dentistas,
-            'servicios': servicios_activos,
-            'horarios_dentistas': {},  # Los dentistas no pueden crear citas, pero necesitamos la variable
-            'es_admin': False
-        }
+        return JsonResponse({'error': 'Perfil no encontrado'}, status=404)
     
-    return render(request, 'citas/panel_trabajador.html', context)
+    # Obtener citas del día
+    citas_hoy = Cita.objects.filter(
+        fecha_hora__date=timezone.now().date()
+    ).select_related('tipo_servicio', 'dentista', 'cliente').prefetch_related('odontogramas').order_by('fecha_hora')
+    
+    # Obtener información de fichas
+    from historial_clinico.models import Odontograma
+    odontogramas = Odontograma.objects.filter(cita__isnull=False).select_related('cita')
+    citas_con_ficha = set(odontogramas.values_list('cita_id', flat=True))
+    
+    # Preparar datos de citas en formato JSON
+    citas_data = []
+    for cita in citas_hoy:
+        cita.tiene_ficha = cita.id in citas_con_ficha
+        odontograma = None
+        if cita.tiene_ficha:
+            odontograma = odontogramas.filter(cita_id=cita.id).first()
+        
+        # Convertir fecha_hora a zona horaria de Chile
+        from django.utils import timezone
+        import pytz
+        try:
+            chile_tz = pytz.timezone('America/Santiago')
+            if timezone.is_naive(cita.fecha_hora):
+                fecha_hora_chile = timezone.make_aware(cita.fecha_hora, timezone.utc).astimezone(chile_tz)
+            else:
+                fecha_hora_chile = cita.fecha_hora.astimezone(chile_tz)
+        except Exception:
+            fecha_hora_chile = cita.fecha_hora
+        
+        citas_data.append({
+            'id': cita.id,
+            'estado': cita.estado,
+            'estado_display': cita.get_estado_display(),
+            'fecha': fecha_hora_chile.strftime('%d/%m/%Y'),
+            'fecha_hora': fecha_hora_chile.strftime('%Y-%m-%d %H:%M'),
+            'hora': fecha_hora_chile.strftime('%H:%M'),
+            'paciente_nombre': cita.paciente_nombre or (cita.cliente.nombre_completo if cita.cliente else 'Sin asignar'),
+            'dentista_id': cita.dentista.id if cita.dentista else None,
+            'dentista_nombre': cita.dentista.nombre_completo if cita.dentista else 'Sin asignar',
+            'tipo_servicio': cita.tipo_servicio.nombre if cita.tipo_servicio else (cita.tipo_consulta or 'Sin servicio'),
+            'tiene_ficha': cita.tiene_ficha,
+            'odontograma_id': odontograma.id if odontograma else None,
+            'hora_llegada': cita.hora_llegada.strftime('%Y-%m-%d %H:%M') if cita.hora_llegada else None,
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'citas': citas_data,
+        'timestamp': timezone.now().isoformat()
+    })
 
 # Agregar hora disponible (solo administrativos)
 # Esta vista solo procesa POST desde el modal, nunca renderiza una página
@@ -524,75 +488,276 @@ def agregar_hora(request):
             paciente_telefono = None
             estado_cita = 'disponible'
             
-            cliente_id = request.POST.get('cliente_id', '')
-            if cliente_id:
+            # Solo procesar cliente si el checkbox está marcado
+            asignar_cliente = request.POST.get('asignar_cliente', '') == 'on'
+            cliente_id = request.POST.get('cliente_id', '').strip()
+            
+            # Log para debugging (solo en desarrollo)
+            from django.conf import settings
+            if settings.DEBUG:
+                logger.info(f"Procesando cita - asignar_cliente: {asignar_cliente}, cliente_id: '{cliente_id}'")
+            
+            if asignar_cliente and cliente_id:
                 if cliente_id == 'nuevo':
-                    # Crear nuevo cliente
+                    # Crear nuevo cliente - solo si se proporcionaron los datos necesarios
                     paciente_nombre = request.POST.get('paciente_nombre', '').strip()
                     paciente_email = request.POST.get('paciente_email', '').strip()
                     paciente_telefono_raw = request.POST.get('paciente_telefono', '').strip()
                     
                     if paciente_nombre and paciente_email:
                         # Normalizar teléfono si se proporcionó
-                        paciente_telefono = normalizar_telefono_chileno(paciente_telefono_raw) if paciente_telefono_raw else None
+                        paciente_telefono = None
+                        if paciente_telefono_raw:
+                            paciente_telefono = normalizar_telefono_chileno(paciente_telefono_raw)
+                            if not paciente_telefono:
+                                return JsonResponse({
+                                    'success': False, 
+                                    'error': f'El número de teléfono "{paciente_telefono_raw}" no es válido. Por favor, ingrese un número de celular chileno de 8 dígitos (ejemplo: 20589344).'
+                                }, status=400)
                         
-                        # Crear o obtener cliente
-                        cliente_obj, created = Cliente.objects.get_or_create(
-                            email=paciente_email,
-                            defaults={
-                                'nombre_completo': paciente_nombre,
-                                'telefono': paciente_telefono or '',
-                                'activo': True
-                            }
-                        )
-                        # Si el cliente ya existía, actualizar información si es necesario
-                        if not created:
-                            cliente_obj.nombre_completo = paciente_nombre
-                            if paciente_telefono:
-                                cliente_obj.telefono = paciente_telefono
-                            cliente_obj.activo = True
-                            cliente_obj.save()
-                        
-                        estado_cita = 'reservada'
-                else:
+                        try:
+                            # Si no se proporcionó teléfono, usar uno por defecto válido
+                            telefono_para_guardar = paciente_telefono if paciente_telefono else '+56900000000'
+                            
+                            # Crear o obtener cliente
+                            cliente_obj, created = Cliente.objects.get_or_create(
+                                email=paciente_email,
+                                defaults={
+                                    'nombre_completo': paciente_nombre,
+                                    'telefono': telefono_para_guardar,
+                                    'activo': True
+                                }
+                            )
+                            # Si el cliente ya existía, actualizar información si es necesario
+                            if not created:
+                                cliente_obj.nombre_completo = paciente_nombre
+                                if paciente_telefono:
+                                    cliente_obj.telefono = paciente_telefono
+                                cliente_obj.activo = True
+                                try:
+                                    cliente_obj.save()
+                                except Exception as save_error:
+                                    error_msg = str(save_error)
+                                    if 'telefono' in error_msg.lower() or 'phone' in error_msg.lower() or 'regex' in error_msg.lower():
+                                        return JsonResponse({
+                                            'success': False, 
+                                            'error': f'El número de teléfono no es válido. Por favor, ingrese un número de celular chileno de 8 dígitos (ejemplo: 20589344).'
+                                        }, status=400)
+                                    raise
+                            
+                            estado_cita = 'reservada'
+                        except Cliente.MultipleObjectsReturned:
+                            # Si hay múltiples clientes con el mismo email (no debería pasar, pero por seguridad)
+                            cliente_obj = Cliente.objects.filter(email=paciente_email, activo=True).first()
+                            if cliente_obj:
+                                cliente_obj.nombre_completo = paciente_nombre
+                                if paciente_telefono:
+                                    cliente_obj.telefono = paciente_telefono
+                                cliente_obj.activo = True
+                                cliente_obj.save()
+                                estado_cita = 'reservada'
+                            else:
+                                return JsonResponse({
+                                    'success': False, 
+                                    'error': 'Error al procesar el cliente. Por favor, intente nuevamente.'
+                                }, status=400)
+                        except Exception as e:
+                            error_msg = str(e)
+                            import traceback
+                            logger.error(f"Error al crear/actualizar cliente: {e}")
+                            logger.error(traceback.format_exc())
+                            
+                            if 'email' in error_msg.lower() or 'unique' in error_msg.lower() or 'duplicate' in error_msg.lower():
+                                return JsonResponse({
+                                    'success': False, 
+                                    'error': f'Ya existe un cliente con el email "{paciente_email}". Por favor, seleccione el cliente existente o use otro email.'
+                                }, status=400)
+                            elif 'telefono' in error_msg.lower() or 'phone' in error_msg.lower() or 'regex' in error_msg.lower() or 'validator' in error_msg.lower():
+                                return JsonResponse({
+                                    'success': False, 
+                                    'error': f'El número de teléfono no es válido. Por favor, ingrese un número de celular chileno de 8 dígitos (ejemplo: 20589344).'
+                                }, status=400)
+                            else:
+                                # Re-lanzar el error para que se capture en el bloque general
+                                raise
+                    else:
+                        # Si se marcó el checkbox pero no se proporcionaron los datos necesarios
+                        return JsonResponse({
+                            'success': False, 
+                            'error': 'Para crear un nuevo cliente, debe proporcionar al menos el nombre y el email.'
+                        }, status=400)
+                elif cliente_id and cliente_id != 'nuevo':
                     # Usar cliente existente
                     try:
-                        cliente_obj = Cliente.objects.get(id=cliente_id, activo=True)
+                        # Convertir cliente_id a entero
+                        cliente_id_int = int(cliente_id)
+                        cliente_obj = Cliente.objects.get(id=cliente_id_int, activo=True)
                         paciente_nombre = cliente_obj.nombre_completo
                         paciente_email = cliente_obj.email
                         paciente_telefono = cliente_obj.telefono
                         estado_cita = 'reservada'
+                    except ValueError:
+                        # Si cliente_id no es un número válido
+                        logger.error(f"cliente_id no es un número válido: {cliente_id}")
+                        return JsonResponse({
+                            'success': False, 
+                            'error': 'El ID del cliente no es válido. Por favor, seleccione un cliente de la lista.'
+                        }, status=400)
                     except Cliente.DoesNotExist:
-                        messages.warning(request, 'El cliente seleccionado no existe o está inactivo.')
+                        logger.error(f"Cliente con ID {cliente_id} no encontrado o inactivo")
+                        return JsonResponse({
+                            'success': False, 
+                            'error': 'El cliente seleccionado no existe o está inactivo. Por favor, seleccione otro cliente.'
+                        }, status=400)
+                    except Exception as e:
+                        logger.error(f"Error al obtener cliente {cliente_id}: {e}")
+                        import traceback
+                        logger.error(traceback.format_exc())
+                        return JsonResponse({
+                            'success': False, 
+                            'error': 'Error al procesar el cliente seleccionado. Por favor, intente nuevamente.'
+                        }, status=400)
+            
+            # Validar que si se asignó un cliente, el objeto cliente existe
+            if asignar_cliente and estado_cita == 'reservada' and not cliente_obj:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Error: Se intentó asignar un cliente pero no se pudo obtener. Por favor, verifique que el cliente esté activo y exista en el sistema.'
+                }, status=400)
             
             # Crear la cita
-            cita = Cita.objects.create(
-                fecha_hora=fecha_hora,
-                tipo_consulta=tipo_consulta,
-                tipo_servicio=tipo_servicio,
-                precio_cobrado=precio_cobrado,
-                notas=notas,
-                dentista=dentista,
-                creada_por=perfil,
-                cliente=cliente_obj,
-                paciente_nombre=paciente_nombre,
-                paciente_email=paciente_email,
-                paciente_telefono=paciente_telefono,
-                estado=estado_cita
+            try:
+                cita = Cita.objects.create(
+                    fecha_hora=fecha_hora,
+                    tipo_consulta=tipo_consulta,
+                    tipo_servicio=tipo_servicio,
+                    precio_cobrado=precio_cobrado,
+                    notas=notas,
+                    dentista=dentista,
+                    creada_por=perfil,
+                    cliente=cliente_obj,  # Puede ser None si no se asignó cliente
+                    paciente_nombre=paciente_nombre,
+                    paciente_email=paciente_email,
+                    paciente_telefono=paciente_telefono,
+                    estado=estado_cita
+                )
+            except Exception as e:
+                error_msg = str(e)
+                import traceback
+                logger.error(f"Error al crear la cita: {e}")
+                logger.error(traceback.format_exc())
+                
+                # Si el error está relacionado con el cliente o foreign key
+                if 'cliente' in error_msg.lower() or 'foreign key' in error_msg.lower() or 'constraint' in error_msg.lower():
+                    # Verificar si el cliente existe
+                    if cliente_obj:
+                        cliente_existe = Cliente.objects.filter(id=cliente_obj.id, activo=True).exists()
+                        if not cliente_existe:
+                            return JsonResponse({
+                                'success': False, 
+                                'error': 'El cliente seleccionado no existe o está inactivo. Por favor, seleccione otro cliente o cree la cita sin asignar cliente.'
+                            }, status=400)
+                    
+                    return JsonResponse({
+                        'success': False, 
+                        'error': 'Error al asignar el cliente a la cita. Por favor, verifique que el cliente esté activo o cree la cita sin asignar cliente.'
+                    }, status=400)
+                raise
+            
+            # Registrar en auditoría
+            cliente_info = cliente_obj.nombre_completo if cliente_obj else paciente_nombre or "Sin cliente"
+            servicio_info = tipo_servicio.nombre if tipo_servicio else tipo_consulta or "Sin servicio"
+            registrar_auditoria(
+                usuario=perfil,
+                accion='crear',
+                modulo='citas',
+                descripcion=f'Cita creada para {cliente_info} con {dentista.nombre_completo} - {servicio_info}',
+                detalles=f'Fecha: {fecha_hora.strftime("%d/%m/%Y %H:%M")}, Estado: {estado_cita}, Precio: ${precio_cobrado if precio_cobrado else "N/A"}',
+                objeto_id=cita.id,
+                tipo_objeto='Cita',
+                request=request
             )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si la cita está reservada y tiene teléfono
+            # Usar el teléfono del cliente si existe, sino el de la cita
+            telefono_para_notificacion = None
+            if cita.cliente and cita.cliente.telefono:
+                telefono_para_notificacion = cita.cliente.telefono
+            elif paciente_telefono:
+                telefono_para_notificacion = paciente_telefono
+            
+            if estado_cita == 'reservada' and telefono_para_notificacion:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_para_notificacion)
+                    
+                    # Construir mensaje de confirmación
+                    canales_enviados = []
+                    if resultado.get('whatsapp', {}).get('enviado'):
+                        canales_enviados.append('WhatsApp')
+                    if resultado.get('sms', {}).get('enviado'):
+                        canales_enviados.append('SMS')
+                    if resultado.get('email', {}).get('enviado'):
+                        canales_enviados.append('Correo')
+                    
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} a {telefono_para_notificacion}")
+                    else:
+                        logger.warning(f"No se pudieron enviar notificaciones para cita {cita.id}. Errores: WhatsApp={resultado.get('whatsapp', {}).get('error')}, SMS={resultado.get('sms', {}).get('error')}, Email={resultado.get('email', {}).get('error')}")
+                except Exception as e:
+                    # No fallar la creación de la cita si las notificaciones fallan
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
             
             # Si todo salió bien, devolver JSON para que el modal muestre el mensaje
             if estado_cita == 'reservada':
                 mensaje = f'Cita creada y asignada a {paciente_nombre} para {dentista.nombre_completo}.'
+                # Las notificaciones ya se enviaron arriba (línea 692), no duplicar
+                if telefono_para_notificacion or cita.paciente_email:
+                    mensaje += ' Se han enviado notificaciones al paciente.'
             else:
                 mensaje = f'Cita creada correctamente para {dentista.nombre_completo}.'
             
             return JsonResponse({'success': True, 'message': mensaje})
             
         except ValueError as e:
-            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+            error_msg = str(e)
+            if 'time data' in error_msg.lower() or 'date' in error_msg.lower():
+                return JsonResponse({'success': False, 'error': 'El formato de fecha y hora no es válido. Por favor, seleccione una fecha y hora correcta.'}, status=400)
+            return JsonResponse({'success': False, 'error': f'Error en el formato de los datos: {error_msg}'}, status=400)
         except Exception as e:
-            return JsonResponse({'success': False, 'error': f'Error al agregar hora: {e}'}, status=400)
+            # Log del error completo para debugging
+            import traceback
+            logger.error(f"Error al crear cita: {e}")
+            logger.error(traceback.format_exc())
+            # Mensaje genérico pero útil para el usuario
+            error_msg = str(e)
+            error_trace = traceback.format_exc()
+            
+            # Detectar errores específicos
+            if 'dentista' in error_msg.lower():
+                return JsonResponse({'success': False, 'error': 'Error al procesar la información del dentista. Por favor, verifique que el dentista esté activo y tenga horarios configurados.'}, status=400)
+            elif 'horario' in error_msg.lower() or 'schedule' in error_msg.lower():
+                return JsonResponse({'success': False, 'error': 'Error al validar el horario. Por favor, verifique que la fecha y hora seleccionadas sean válidas.'}, status=400)
+            elif 'cliente' in error_msg.lower() or 'paciente' in error_msg.lower() or 'email' in error_msg.lower() or 'unique' in error_msg.lower():
+                # Error relacionado con cliente
+                if 'email' in error_msg.lower() or 'unique' in error_msg.lower():
+                    return JsonResponse({'success': False, 'error': 'Ya existe un cliente con ese email. Por favor, seleccione el cliente existente o use otro email.'}, status=400)
+                elif 'telefono' in error_msg.lower() or 'phone' in error_msg.lower() or 'regex' in error_msg.lower():
+                    return JsonResponse({'success': False, 'error': 'El número de teléfono no es válido. Por favor, ingrese un número de celular chileno de 8 dígitos (ejemplo: 20589344).'}, status=400)
+                else:
+                    return JsonResponse({'success': False, 'error': 'Error al procesar la información del cliente. Por favor, verifique los datos ingresados (nombre, email y teléfono).'}, status=400)
+            elif 'telefono' in error_msg.lower() or 'phone' in error_msg.lower() or 'regex' in error_msg.lower() or 'validator' in error_msg.lower():
+                return JsonResponse({'success': False, 'error': 'El número de teléfono no es válido. Por favor, ingrese un número de celular chileno de 8 dígitos (ejemplo: 20589344).'}, status=400)
+            else:
+                # Mensaje más detallado para debugging (solo en desarrollo)
+                import sys
+                if 'django' in sys.modules and hasattr(sys.modules['django'], 'conf'):
+                    from django.conf import settings
+                    if settings.DEBUG:
+                        return JsonResponse({'success': False, 'error': f'Error al crear la cita: {error_msg}. Detalles: {error_trace[:200]}'}, status=400)
+                return JsonResponse({'success': False, 'error': f'Error al crear la cita: {error_msg}. Por favor, verifique todos los campos e intente nuevamente.'}, status=400)
 
 # Editar cita creada (solo administrativos)
 # - Citas disponibles: se puede editar todo
@@ -616,7 +781,7 @@ def editar_cita(request, cita_id):
         messages.error(request, 'Las citas completadas no se pueden editar. Use "Ajustar Precio" para modificar el precio o notas.')
         return redirect('panel_trabajador')
     
-    # Para citas reservadas/confirmadas: solo permitir editar ciertos campos (no cliente)
+    # Permitir editar cliente si la cita está disponible o si se quiere asignar un cliente a una cita existente
     puede_editar_cliente = (cita.estado == 'disponible')
 
     if request.method == 'POST':
@@ -626,6 +791,7 @@ def editar_cita(request, cita_id):
         precio_cobrado = request.POST.get('precio_cobrado', '')
         notas = request.POST.get('notas', '')
         dentista_id = request.POST.get('dentista', '')
+        cliente_id = request.POST.get('cliente_id', '')
         
         try:
             fecha_hora = datetime.fromisoformat(fecha_hora_str)
@@ -668,12 +834,49 @@ def editar_cita(request, cita_id):
                     cita.tipo_servicio = None
                     cita.precio_cobrado = None
             
+            # Asignar cliente si se proporciona y la cita está disponible
+            if cliente_id and cita.estado == 'disponible':
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, activo=True)
+                    cita.cliente = cliente
+                    cita.paciente_nombre = cliente.nombre_completo
+                    cita.paciente_email = cliente.email
+                    cita.paciente_telefono = cliente.telefono
+                    # Cambiar estado a reservada si se asigna un cliente
+                    cita.estado = 'reservada'
+                except Cliente.DoesNotExist:
+                    messages.warning(request, 'El cliente seleccionado no existe o está inactivo.')
+            elif cliente_id and cita.estado in ['reservada', 'confirmada']:
+                # Permitir cambiar cliente incluso en citas reservadas si se proporciona explícitamente
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, activo=True)
+                    cita.cliente = cliente
+                    cita.paciente_nombre = cliente.nombre_completo
+                    cita.paciente_email = cliente.email
+                    cita.paciente_telefono = cliente.telefono
+                except Cliente.DoesNotExist:
+                    messages.warning(request, 'El cliente seleccionado no existe o está inactivo.')
+            
             cita.notas = notas
             cita.save()
             
+            # Registrar en auditoría
+            cliente_info = cita.cliente.nombre_completo if cita.cliente else cita.paciente_nombre or "Sin cliente"
+            servicio_info = cita.tipo_servicio.nombre if cita.tipo_servicio else cita.tipo_consulta or "Sin servicio"
+            registrar_auditoria(
+                usuario=perfil,
+                accion='editar',
+                modulo='citas',
+                descripcion=f'Cita editada: {cliente_info} - {servicio_info}',
+                detalles=f'Fecha: {cita.fecha_hora.strftime("%d/%m/%Y %H:%M")}, Estado: {cita.estado}, Dentista: {cita.dentista.nombre_completo if cita.dentista else "N/A"}',
+                objeto_id=cita.id,
+                tipo_objeto='Cita',
+                request=request
+            )
+            
             mensaje = 'Cita actualizada correctamente.'
-            if cita.estado in ['reservada', 'confirmada']:
-                mensaje += ' Nota: El cliente no se puede modificar en citas reservadas.'
+            if cliente_id and cita.cliente:
+                mensaje += f' Cliente asignado: {cita.cliente.nombre_completo}.'
             messages.success(request, mensaje)
             
             # Handle AJAX requests
@@ -698,14 +901,18 @@ def editar_cita(request, cita_id):
     if cita.estado in ['reservada', 'confirmada']:
         dentistas = Perfil.objects.filter(es_dentista=True, activo=True).order_by('nombre', 'apellido')
     
+    # Obtener clientes activos para el selector
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+    
     context = {
         'perfil': perfil,
         'cita': cita,
         'servicios': servicios_activos,
         'dentistas': dentistas,
+        'clientes': clientes,
         'puede_editar_cliente': puede_editar_cliente,
     }
-    return render(request, 'citas/editar_cita.html', context)
+    return render(request, 'citas/citas/editar_cita.html', context)
 
 
 # Acciones sobre citas
@@ -715,31 +922,686 @@ def cancelar_cita_admin(request, cita_id):
     try:
         perfil = Perfil.objects.get(user=request.user)
     except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
         return redirect('login')
     
     cita = get_object_or_404(Cita, id=cita_id)
     
     # Verificar permisos: administrativos pueden cancelar cualquier cita, dentistas solo las suyas
     if perfil.es_dentista() and cita.dentista != perfil:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para cancelar esta cita.'}, status=403)
         messages.error(request, 'No tienes permisos para cancelar esta cita.')
         return redirect('mis_citas_dentista')
     elif not perfil.es_administrativo() and not perfil.es_dentista():
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para cancelar citas.'}, status=403)
         messages.error(request, 'No tienes permisos para cancelar citas.')
         return redirect('panel_trabajador')
     
+    # Verificar que la cita pueda ser cancelada (solo reservadas)
+    if cita.estado != 'reservada':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se puede cancelar una cita en estado "{cita.get_estado_display()}". Solo se pueden cancelar citas reservadas.'}, status=400)
+        messages.error(request, f'No se puede cancelar una cita en estado "{cita.get_estado_display()}".')
+        if perfil.es_dentista():
+            return redirect('mis_citas_dentista')
+        else:
+            return redirect('panel_trabajador')
+    
     if cita.cancelar():
-        messages.success(request, f'Cita cancelada para {cita.fecha_hora}')
+        # Enviar notificaciones de cancelación por WhatsApp, SMS y correo electrónico
+        try:
+            from citas.mensajeria_service import enviar_notificaciones_cancelacion_cita
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            resultado = enviar_notificaciones_cancelacion_cita(cita)
+            
+            # Log del resultado
+            canales_exitosos = []
+            if resultado.get('whatsapp', {}).get('enviado'):
+                canales_exitosos.append('WhatsApp')
+            if resultado.get('sms', {}).get('enviado'):
+                canales_exitosos.append('SMS')
+            if resultado.get('email', {}).get('enviado'):
+                canales_exitosos.append('Correo')
+            
+            if canales_exitosos:
+                logger.info(f"Notificaciones de cancelación enviadas por: {', '.join(canales_exitosos)} para cita {cita.id}")
+            else:
+                logger.warning(f"No se pudieron enviar notificaciones de cancelación para cita {cita.id}. Errores: WhatsApp={resultado.get('whatsapp', {}).get('error')}, SMS={resultado.get('sms', {}).get('error')}, Email={resultado.get('email', {}).get('error')}")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar notificaciones de cancelación para cita {cita.id}: {e}", exc_info=True)
+        
+        mensaje = f'Cita del {cita.fecha_hora.strftime("%d/%m/%Y a las %H:%M")} cancelada exitosamente.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': True, 'message': mensaje})
+        messages.success(request, mensaje)
         # Redirigir según el rol
         if perfil.es_dentista():
             return redirect('mis_citas_dentista')
         else:
             return redirect('panel_trabajador')
     else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'No se pudo cancelar la cita. Verifique que la cita esté en estado reservada.'}, status=400)
         messages.error(request, 'No se pudo cancelar la cita')
         if perfil.es_dentista():
             return redirect('mis_citas_dentista')
         else:
             return redirect('panel_trabajador')
+
+@login_required
+def marcar_no_show(request, cita_id):
+    """
+    Vista para marcar una cita como "No Show" (el paciente no se presentó)
+    SOLO DISPONIBLE PARA ADMINISTRATIVOS
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Solo se puede marcar como no_show si está en estado reservada o confirmada
+    if cita.estado not in ['reservada', 'confirmada']:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se puede marcar como "No Show" una cita en estado "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'No se puede marcar como "No Show" una cita en estado "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    # Obtener motivo de no asistencia (OBLIGATORIO)
+    motivo_no_asistencia = request.POST.get('motivo_no_asistencia', '').strip()
+    
+    # Validar que el motivo sea obligatorio
+    if not motivo_no_asistencia:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'El motivo de no asistencia es obligatorio. Por favor, indique la razón por la cual el paciente no asistió.'}, status=400)
+        messages.error(request, 'El motivo de no asistencia es obligatorio. Por favor, indique la razón por la cual el paciente no asistió.')
+        return redirect('panel_trabajador')
+    
+    # Marcar como no_show y guardar motivo
+    cita.estado = 'no_show'
+    cita.motivo_no_asistencia = motivo_no_asistencia
+    cita.save()
+    
+    mensaje = f'Cita marcada como "No Show" para {cita.paciente_nombre or "Sin nombre"} ({cita.fecha_hora.strftime("%d/%m/%Y %H:%M")}). Motivo registrado en el historial.'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def marcar_listo_para_atender(request, cita_id):
+    """
+    Vista para que el dentista marque que está listo para atender al paciente
+    Cambia el estado de "en_espera" a "listo_para_atender"
+    SOLO DISPONIBLE PARA DENTISTAS (el dentista asignado a la cita)
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_dentista():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Solo los dentistas pueden marcar citas como listas para atender.'}, status=403)
+            messages.error(request, 'Solo los dentistas pueden realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Verificar que el dentista esté asignado a esta cita
+    if not cita.dentista or cita.dentista != perfil:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para modificar esta cita.'}, status=403)
+        messages.error(request, 'No tienes permisos para modificar esta cita.')
+        return redirect('panel_trabajador')
+    
+    # Solo se puede marcar como listo si está en estado "en_espera"
+    if cita.estado != 'en_espera':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'La cita debe estar en estado "En Espera" para marcarla como lista. Estado actual: "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'La cita debe estar en estado "En Espera". Estado actual: "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    # Cambiar estado
+    cita.estado = 'listo_para_atender'
+    cita.save()
+    
+    mensaje = f'Cita marcada como "Listo para Atender". La recepcionista será notificada para pasar al paciente.'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def iniciar_atencion(request, cita_id):
+    """
+    Vista para que el dentista marque que inició la atención del paciente
+    Cambia el estado de "listo_para_atender" a "en_progreso"
+    SOLO DISPONIBLE PARA DENTISTAS (el dentista asignado a la cita)
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_dentista():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Solo los dentistas pueden iniciar la atención.'}, status=403)
+            messages.error(request, 'Solo los dentistas pueden realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Verificar que el dentista esté asignado a esta cita
+    if not cita.dentista or cita.dentista != perfil:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para modificar esta cita.'}, status=403)
+        messages.error(request, 'No tienes permisos para modificar esta cita.')
+        return redirect('panel_trabajador')
+    
+    # Solo se puede iniciar atención si está en estado "listo_para_atender"
+    if cita.estado != 'listo_para_atender':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'La cita debe estar en estado "Listo para Atender". Estado actual: "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'La cita debe estar en estado "Listo para Atender". Estado actual: "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    # Cambiar estado
+    cita.estado = 'en_progreso'
+    cita.save()
+    
+    mensaje = f'Atención iniciada para {cita.paciente_nombre or "el paciente"}.'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def finalizar_atencion(request, cita_id):
+    """
+    Vista para que el dentista marque que finalizó la atención (después de crear la ficha)
+    Cambia el estado de "en_progreso" a "finalizada"
+    SOLO DISPONIBLE PARA DENTISTAS (el dentista asignado a la cita)
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_dentista():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Solo los dentistas pueden finalizar la atención.'}, status=403)
+            messages.error(request, 'Solo los dentistas pueden realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Verificar que el dentista esté asignado a esta cita
+    if not cita.dentista or cita.dentista != perfil:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para modificar esta cita.'}, status=403)
+        messages.error(request, 'No tienes permisos para modificar esta cita.')
+        return redirect('panel_trabajador')
+    
+    # Solo se puede finalizar atención si está en estado "en_progreso"
+    if cita.estado != 'en_progreso':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'La cita debe estar en estado "En Progreso". Estado actual: "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'La cita debe estar en estado "En Progreso". Estado actual: "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    # Cambiar estado
+    cita.estado = 'finalizada'
+    cita.save()
+    
+    mensaje = f'Atención finalizada. El paciente puede dirigirse a recepción para pagar.'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def completar_cita_recepcion(request, cita_id):
+    """
+    Vista para que la recepcionista marque la cita como completada (después de recibir el pago)
+    Cambia el estado de "finalizada" a "completada" y registra el precio cobrado
+    SOLO DISPONIBLE PARA ADMINISTRATIVOS
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Solo el personal administrativo puede completar citas.'}, status=403)
+            messages.error(request, 'Solo el personal administrativo puede realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Solo se puede completar si está en estado "finalizada"
+    if cita.estado != 'finalizada':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'La cita debe estar en estado "Finalizada" para completarla. Estado actual: "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'La cita debe estar en estado "Finalizada". Estado actual: "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    # Obtener precio cobrado
+    if request.method == 'POST':
+        import json
+        if request.headers.get('Content-Type') == 'application/json':
+            data = json.loads(request.body)
+            precio_cobrado = data.get('precio_cobrado')
+        else:
+            precio_cobrado = request.POST.get('precio_cobrado')
+        
+        if precio_cobrado:
+            try:
+                precio_cobrado = float(precio_cobrado)
+                if precio_cobrado <= 0:
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        from django.http import JsonResponse
+                        return JsonResponse({'success': False, 'error': 'El precio debe ser mayor a 0.'}, status=400)
+                    messages.error(request, 'El precio debe ser mayor a 0.')
+                    return redirect('panel_trabajador')
+                cita.precio_cobrado = precio_cobrado
+            except (ValueError, TypeError):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'success': False, 'error': 'El precio ingresado no es válido.'}, status=400)
+                messages.error(request, 'El precio ingresado no es válido.')
+                return redirect('panel_trabajador')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Debe ingresar el precio cobrado.'}, status=400)
+            messages.error(request, 'Debe ingresar el precio cobrado.')
+            return redirect('panel_trabajador')
+    
+    # Cambiar estado
+    cita.estado = 'completada'
+    cita.save()
+    
+    # Registrar en auditoría
+    registrar_auditoria(
+        usuario=perfil,
+        accion='cambio_estado',
+        modulo='citas',
+        descripcion=f'Cita completada - Precio cobrado: ${cita.precio_cobrado:,.0f}',
+        detalles=f'Cita ID: {cita.id}, Estado anterior: Finalizada, Estado nuevo: Completada, Precio cobrado: ${cita.precio_cobrado:,.0f}',
+        objeto_id=cita.id,
+        tipo_objeto='Cita',
+        request=request
+    )
+    
+    mensaje = f'Cita completada exitosamente para {cita.paciente_nombre or "el paciente"}. Precio cobrado: ${cita.precio_cobrado:,.0f}'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def marcar_llegada(request, cita_id):
+    """
+    Vista para marcar que el paciente llegó físicamente a la clínica
+    Cambia el estado a "en_espera" y registra la hora de llegada
+    SOLO DISPONIBLE PARA ADMINISTRATIVOS
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Se puede marcar llegada en cualquier estado excepto los finales (completada, no_show, cancelada)
+    # Esto permite manejar casos especiales: llegadas tempranas, tardías, o cambios de estado
+    # Pero NO se puede marcar llegada a una cita disponible (nadie la tomó)
+    estados_no_permitidos = ['completada', 'no_show', 'cancelada', 'disponible']
+    if cita.estado in estados_no_permitidos:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se puede marcar llegada para una cita en estado "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'No se puede marcar llegada para una cita en estado "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    # Marcar como en espera y registrar hora de llegada
+    cita.estado = 'en_espera'
+    cita.hora_llegada = timezone.now()
+    cita.save()
+    
+    mensaje = f'Paciente {cita.paciente_nombre or "Sin nombre"} marcado como "En Espera". Hora de llegada: {cita.hora_llegada.strftime("%H:%M")}.'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def marcar_no_llego(request, cita_id):
+    """
+    Vista para marcar que el paciente no llegó a la cita
+    Cambia el estado a "no_show" (igual que marcar_no_show pero con nombre diferente para claridad)
+    SOLO DISPONIBLE PARA ADMINISTRATIVOS
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita, id=cita_id)
+    
+    # Solo se puede marcar como "No Llegó" si la cita está reservada o confirmada
+    # No tiene sentido marcar "No Llegó" a una cita disponible (nadie la tomó)
+    if cita.estado not in ['reservada', 'confirmada']:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se puede marcar como "No Llegó" una cita en estado "{cita.get_estado_display()}". Solo se puede marcar en citas reservadas o confirmadas.'}, status=400)
+        messages.error(request, f'No se puede marcar como "No Llegó" una cita en estado "{cita.get_estado_display()}". Solo se puede marcar en citas reservadas o confirmadas.')
+        return redirect('panel_trabajador')
+    
+    # Obtener motivo de no asistencia (OBLIGATORIO)
+    motivo_no_asistencia = request.POST.get('motivo_no_asistencia', '').strip()
+    
+    # Validar que el motivo sea obligatorio
+    if not motivo_no_asistencia:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'El motivo de no asistencia es obligatorio. Por favor, indique la razón por la cual el paciente no asistió.'}, status=400)
+        messages.error(request, 'El motivo de no asistencia es obligatorio. Por favor, indique la razón por la cual el paciente no asistió.')
+        return redirect('panel_trabajador')
+    
+    # Marcar como no_show y guardar motivo
+    cita.estado = 'no_show'
+    cita.motivo_no_asistencia = motivo_no_asistencia
+    cita.save()
+    
+    mensaje = f'Cita marcada como "No Llegó" para {cita.paciente_nombre or "Sin nombre"} ({cita.fecha_hora.strftime("%d/%m/%Y %H:%M")}). Motivo registrado en el historial del cliente.'
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'success': True, 'message': mensaje})
+    
+    messages.success(request, mensaje)
+    return redirect('panel_trabajador')
+
+@login_required
+def reagendar_cita(request, cita_id):
+    """
+    Vista para reagendar una cita (cambiar fecha/hora)
+    SOLO DISPONIBLE PARA ADMINISTRATIVOS
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'No tienes permisos para reagendar citas.'}, status=403)
+            messages.error(request, 'No tienes permisos para reagendar citas.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+        messages.error(request, 'Perfil no encontrado.')
+        return redirect('login')
+    
+    cita = get_object_or_404(Cita.objects.select_related('dentista', 'tipo_servicio'), id=cita_id)
+    
+    # Solo se puede reagendar si está en estado reservada, confirmada o disponible
+    if cita.estado not in ['reservada', 'confirmada', 'disponible']:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se puede reagendar una cita en estado "{cita.get_estado_display()}".'}, status=400)
+        messages.error(request, f'No se puede reagendar una cita en estado "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    if request.method == 'POST':
+        nueva_fecha_hora_str = request.POST.get('nueva_fecha_hora', '').strip()
+        nuevo_dentista_id = request.POST.get('nuevo_dentista', '').strip()
+        
+        if not nueva_fecha_hora_str:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Debe seleccionar una nueva fecha y hora.'}, status=400)
+            messages.error(request, 'Debe seleccionar una nueva fecha y hora.')
+            return redirect('panel_trabajador')
+        
+        try:
+            from datetime import datetime
+            fecha_hora_naive = datetime.fromisoformat(nueva_fecha_hora_str)
+            nueva_fecha_hora = timezone.make_aware(fecha_hora_naive)
+        except ValueError:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Formato de fecha/hora inválido.'}, status=400)
+            messages.error(request, 'Formato de fecha/hora inválido.')
+            return redirect('panel_trabajador')
+        
+        # Validar que la nueva fecha no sea en el pasado
+        ahora = timezone.now()
+        if nueva_fecha_hora < ahora:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'No se puede reagendar a una fecha/hora pasada.'}, status=400)
+            messages.error(request, 'No se puede reagendar a una fecha/hora pasada.')
+            return redirect('panel_trabajador')
+        
+        # Determinar el dentista (mantener el actual o cambiar)
+        dentista = cita.dentista
+        if nuevo_dentista_id:
+            try:
+                nuevo_dentista = Perfil.objects.get(id=nuevo_dentista_id, rol='dentista', activo=True)
+                dentista = nuevo_dentista
+            except Perfil.DoesNotExist:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'success': False, 'error': 'Dentista seleccionado no válido.'}, status=400)
+                messages.error(request, 'Dentista seleccionado no válido.')
+                return redirect('panel_trabajador')
+        
+        # Validar horario del dentista
+        if dentista:
+            dia_semana = nueva_fecha_hora.weekday()
+            hora_cita = nueva_fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+                messages.error(request, f'El dentista no trabaja los {dias_nombres[dia_semana]}.')
+                return redirect('panel_trabajador')
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                horarios_str = ', '.join([f"{h.hora_inicio.strftime('%H:%M')}-{h.hora_fin.strftime('%H:%M')}" for h in horarios_dia])
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'success': False, 'error': f'La hora seleccionada no está dentro del horario de trabajo del dentista. Horarios disponibles: {horarios_str}'}, status=400)
+                messages.error(request, f'La hora seleccionada no está dentro del horario de trabajo del dentista. Horarios disponibles: {horarios_str}')
+                return redirect('panel_trabajador')
+        
+        # Verificar que no se solape con otra cita del mismo dentista
+        citas_existentes = Cita.objects.filter(
+            dentista=dentista,
+            fecha_hora__date=nueva_fecha_hora.date(),
+            estado__in=['disponible', 'reservada', 'confirmada']
+        ).exclude(id=cita.id)
+        
+        from datetime import timedelta
+        duracion_minutos = 30
+        if cita.tipo_servicio and cita.tipo_servicio.duracion_estimada:
+            duracion_minutos = cita.tipo_servicio.duracion_estimada
+        
+        fecha_hora_fin = nueva_fecha_hora + timedelta(minutes=duracion_minutos)
+        
+        for cita_existente in citas_existentes:
+            fecha_hora_existente_fin = cita_existente.fecha_hora
+            if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+            else:
+                fecha_hora_existente_fin += timedelta(minutes=30)
+            
+            if (nueva_fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'success': False, 'error': f'La nueva fecha/hora se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+                messages.error(request, f'La nueva fecha/hora se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.')
+                return redirect('panel_trabajador')
+        
+        # Verificar que no exista ya una cita en esa fecha/hora exacta
+        if Cita.objects.filter(fecha_hora=nueva_fecha_hora).exclude(id=cita.id).exists():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Ya existe una cita en esa fecha y hora exacta.'}, status=400)
+            messages.error(request, 'Ya existe una cita en esa fecha y hora exacta.')
+            return redirect('panel_trabajador')
+        
+        # Guardar fecha/hora anterior para el mensaje
+        fecha_hora_anterior = cita.fecha_hora
+        
+        # Guardar dentista anterior para el mensaje
+        dentista_anterior = cita.dentista
+        
+        # Actualizar la cita
+        cita.fecha_hora = nueva_fecha_hora
+        if dentista:
+            cita.dentista = dentista
+        cita.save()
+        
+        mensaje = f'Cita reagendada de {fecha_hora_anterior.strftime("%d/%m/%Y %H:%M")} a {nueva_fecha_hora.strftime("%d/%m/%Y %H:%M")}.'
+        if dentista and dentista != dentista_anterior:
+            mensaje += f' Asignada a {dentista.nombre_completo}.'
+        
+        # Handle AJAX requests
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': True, 'message': mensaje})
+        
+        messages.success(request, mensaje)
+        return redirect('panel_trabajador')
+    
+    # Si es GET, devolver información de la cita para el modal
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({
+            'success': True,
+            'cita': {
+                'id': cita.id,
+                'fecha_hora_actual': cita.fecha_hora.strftime('%Y-%m-%dT%H:%M'),
+                'paciente_nombre': cita.paciente_nombre or 'Sin asignar',
+                'dentista_id': cita.dentista.id if cita.dentista else None,
+                'dentista_nombre': cita.dentista.nombre_completo if cita.dentista else 'Sin asignar',
+            }
+        })
+    
+    return redirect('panel_trabajador')
 
 @login_required
 def confirmar_cita(request, cita_id):
@@ -888,11 +1750,33 @@ def completar_cita(request, cita_id):
             )
             return redirect('completar_cita', cita_id=cita_id)
         
+        # Obtener y guardar los nuevos campos
+        metodo_pago = request.POST.get('metodo_pago', '')
+        if metodo_pago in ['efectivo', 'transferencia', 'tarjeta']:
+            cita.metodo_pago = metodo_pago
+        
+        motivo_ajuste = request.POST.get('motivo_ajuste_precio', '').strip()
+        if motivo_ajuste:
+            cita.motivo_ajuste_precio = motivo_ajuste
+        
+        notas_finalizacion = request.POST.get('notas_finalizacion', '').strip()
+        if notas_finalizacion:
+            cita.notas_finalizacion = notas_finalizacion
+        
+        # Guardar información de quién completó y cuándo
+        cita.completada_por = perfil
+        cita.fecha_completada = timezone.now()
+        
         # Todas las validaciones pasaron, marcar como completada
         if cita.completar():
+            # Guardar los campos adicionales
+            cita.save()
+            
             mensaje = f'✅ Cita del {cita.fecha_hora.strftime("%d/%m/%Y a las %H:%M")} marcada como completada exitosamente.'
             if cita.precio_cobrado:
                 mensaje += f' Precio a cobrar: ${cita.precio_cobrado:,.0f}'
+            if cita.metodo_pago:
+                mensaje += f' | Método de pago: {cita.get_metodo_pago_display()}'
             messages.success(request, mensaje)
             return redirect('panel_trabajador')
         else:
@@ -1005,7 +1889,7 @@ def completar_cita(request, cita_id):
         'validaciones': validaciones,  # Pasar validaciones al template
         'ahora': ahora,  # Para mostrar en el template si es necesario
     }
-    return render(request, 'citas/completar_cita.html', context)
+    return render(request, 'citas/citas/completar_cita.html', context)
 
 
 # Ajustar precio de cita completada (solo administrativos)
@@ -1076,7 +1960,7 @@ def ajustar_precio_cita(request, cita_id):
         'perfil': perfil,
         'cita': cita,
     }
-    return render(request, 'citas/ajustar_precio_cita.html', context)
+    return render(request, 'citas/citas/ajustar_precio_cita.html', context)
 
 
 # Eliminar cita (solo administrativos)
@@ -1085,37 +1969,309 @@ def eliminar_cita(request, cita_id):
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_administrativo():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'No tienes permisos para eliminar citas.'}, status=403)
             messages.error(request, 'No tienes permisos para eliminar citas.')
             return redirect('panel_trabajador')
     except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
         return redirect('login')
 
     cita = get_object_or_404(Cita, id=cita_id)
-    fecha_texto = cita.fecha_hora
+    
+    # Solo se pueden eliminar citas disponibles
+    if cita.estado != 'disponible':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se puede eliminar una cita en estado "{cita.get_estado_display()}". Solo se pueden eliminar citas disponibles.'}, status=400)
+        messages.error(request, f'No se puede eliminar una cita en estado "{cita.get_estado_display()}".')
+        return redirect('panel_trabajador')
+    
+    fecha_texto = cita.fecha_hora.strftime('%d/%m/%Y a las %H:%M')
+    cliente_info = cita.cliente.nombre_completo if cita.cliente else cita.paciente_nombre or "Sin cliente"
+    servicio_info = cita.tipo_servicio.nombre if cita.tipo_servicio else cita.tipo_consulta or "Sin servicio"
+    
     try:
         cita.delete()
-        messages.success(request, f'Cita eliminada: {fecha_texto}')
+        
+        # Registrar en auditoría
+        registrar_auditoria(
+            usuario=perfil,
+            accion='eliminar',
+            modulo='citas',
+            descripcion=f'Cita eliminada: {cliente_info} - {servicio_info}',
+            detalles=f'Fecha original: {fecha_texto}, Estado: {cita.estado}',
+            objeto_id=cita_id,
+            tipo_objeto='Cita',
+            request=request
+        )
+        
+        mensaje = f'Cita del {fecha_texto} eliminada exitosamente.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': True, 'message': mensaje})
+        messages.success(request, mensaje)
     except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'success': False, 'error': f'No se pudo eliminar la cita: {str(e)}'}, status=500)
         messages.error(request, f'No se pudo eliminar la cita: {e}')
 
     # Volver al panel del trabajador para ver los cambios
     return redirect('panel_trabajador')
+
+# ==========================================
+# VISTAS SEPARADAS PARA GESTIÓN DE CITAS CON NAVBAR LATERAL
+# ==========================================
+
+@login_required
+def citas_dia(request):
+    """Vista para citas del día con navbar lateral"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a este panel.')
+        return redirect('login')
+    
+    # Verificar permisos pero no redirigir a panel_trabajador para evitar bucles
+    # Si no es administrativo, mostrar funcionalidad limitada
+    es_admin = perfil.es_administrativo()
+    if not es_admin:
+        # Si no es administrativo, mostrar mensaje pero permitir acceso básico
+        # para evitar bucles de redirección
+        messages.warning(request, 'Acceso limitado: Solo usuarios administrativos pueden gestionar citas.')
+    
+    # Filtro de búsqueda
+    search_query = request.GET.get('search', '').strip()
+    
+    # Citas del día
+    citas_hoy = Cita.objects.filter(
+        fecha_hora__date=timezone.now().date()
+    ).exclude(estado='cancelada').select_related('tipo_servicio', 'dentista', 'cliente').prefetch_related('odontogramas')
+    
+    # Aplicar filtro de búsqueda si existe
+    if search_query:
+        citas_hoy = citas_hoy.filter(
+            Q(cliente__nombre_completo__icontains=search_query) |
+            Q(cliente__email__icontains=search_query) |
+            Q(cliente__telefono__icontains=search_query) |
+            Q(paciente_nombre__icontains=search_query) |
+            Q(paciente_email__icontains=search_query) |
+            Q(tipo_servicio__nombre__icontains=search_query) |
+            Q(tipo_consulta__icontains=search_query) |
+            Q(dentista__nombre_completo__icontains=search_query) |
+            Q(notas__icontains=search_query)
+        )
+    
+    citas_hoy = citas_hoy.order_by('fecha_hora')
+    
+    # Limpiar referencias inválidas
+    from pacientes.models import Cliente
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT c.id 
+            FROM citas_cita c
+            LEFT JOIN pacientes_cliente p ON c.cliente_id = p.id
+            WHERE c.cliente_id IS NOT NULL 
+            AND p.id IS NULL
+        """)
+        citas_con_cliente_invalido = [row[0] for row in cursor.fetchall()]
+    
+    if citas_con_cliente_invalido:
+        Cita.objects.filter(id__in=citas_con_cliente_invalido).update(cliente=None)
+    
+    # Obtener información de fichas
+    from historial_clinico.models import Odontograma
+    odontogramas = Odontograma.objects.filter(cita__isnull=False).select_related('cita')
+    citas_con_ficha = set(odontogramas.values_list('cita_id', flat=True))
+    
+    citas_hoy_list = list(citas_hoy)
+    for cita in citas_hoy_list:
+        cita.tiene_ficha = cita.id in citas_con_ficha
+        if cita.tiene_ficha:
+            cita.odontograma = odontogramas.filter(cita_id=cita.id).first()
+    
+    # Obtener citas pasadas que requieren atención (para el sidebar)
+    citas_pasadas = Cita.objects.filter(
+        fecha_hora__lt=timezone.now()
+    ).exclude(
+        estado__in=['completada', 'cancelada', 'no_show']
+    ).filter(
+        estado__in=['disponible', 'reservada', 'confirmada']
+    ).select_related('tipo_servicio', 'dentista', 'cliente').order_by('-fecha_hora')[:10]
+    
+    # Paginación - 6 registros por página
+    page = request.GET.get('page', 1)
+    paginator = Paginator(citas_hoy_list, 6)
+    try:
+        citas_pag = paginator.page(page)
+    except PageNotAnInteger:
+        citas_pag = paginator.page(1)
+    except EmptyPage:
+        citas_pag = paginator.page(paginator.num_pages)
+    
+    # Estadísticas
+    estadisticas = {
+        'citas_hoy': Cita.objects.filter(fecha_hora__date=timezone.now().date()).count(),
+        'disponibles': Cita.objects.filter(estado='disponible').count(),
+        'realizadas': Cita.objects.filter(estado='completada').count(),
+    }
+    
+    # Obtener datos necesarios
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
+    servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+    
+    context = {
+        'perfil': perfil,
+        'citas': citas_pag,
+        'estadisticas': estadisticas,
+        'dentistas': dentistas,
+        'servicios_activos': servicios_activos,
+        'clientes': clientes,
+        'es_admin': es_admin,
+        'seccion_activa': 'dia',
+        'search_query': search_query,
+        'citas_pasadas': citas_pasadas,
+    }
+    return render(request, 'citas/citas/gestor_citas_base.html', context)
+
+@login_required
+def citas_disponibles(request):
+    """Vista para citas disponibles con navbar lateral"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a este panel.')
+        return redirect('login')
+    
+    # Verificar permisos pero no redirigir a panel_trabajador para evitar bucles
+    es_admin = perfil.es_administrativo()
+    if not es_admin:
+        messages.warning(request, 'Acceso limitado: Solo usuarios administrativos pueden gestionar citas.')
+    
+    # Filtro de búsqueda
+    search_query = request.GET.get('search', '').strip()
+    
+    # Citas disponibles
+    citas_list = Cita.objects.filter(estado='disponible').select_related('tipo_servicio', 'dentista', 'cliente')
+    
+    # Aplicar filtro de búsqueda si existe
+    if search_query:
+        citas_list = citas_list.filter(
+            Q(cliente__nombre_completo__icontains=search_query) |
+            Q(cliente__email__icontains=search_query) |
+            Q(tipo_servicio__nombre__icontains=search_query) |
+            Q(tipo_consulta__icontains=search_query) |
+            Q(dentista__nombre_completo__icontains=search_query) |
+            Q(fecha_hora__date__icontains=search_query)
+        )
+    
+    citas_list = citas_list.order_by('fecha_hora')
+    
+    # Obtener citas pasadas que requieren atención (para el sidebar)
+    citas_pasadas = Cita.objects.filter(
+        fecha_hora__lt=timezone.now()
+    ).exclude(
+        estado__in=['completada', 'cancelada', 'no_show']
+    ).filter(
+        estado__in=['disponible', 'reservada', 'confirmada']
+    ).select_related('tipo_servicio', 'dentista', 'cliente').order_by('-fecha_hora')[:10]
+    
+    # Paginación - 6 registros por página
+    page = request.GET.get('page', 1)
+    paginator = Paginator(citas_list, 6)
+    try:
+        citas_pag = paginator.page(page)
+    except PageNotAnInteger:
+        citas_pag = paginator.page(1)
+    except EmptyPage:
+        citas_pag = paginator.page(paginator.num_pages)
+    
+    # Estadísticas
+    estadisticas = {
+        'citas_hoy': Cita.objects.filter(fecha_hora__date=timezone.now().date()).count(),
+        'disponibles': Cita.objects.filter(estado='disponible').count(),
+        'realizadas': Cita.objects.filter(estado='completada').count(),
+    }
+    
+    # Obtener datos necesarios
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
+    servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
+    from pacientes.models import Cliente
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+    
+    context = {
+        'perfil': perfil,
+        'citas': citas_pag,
+        'estadisticas': estadisticas,
+        'dentistas': dentistas,
+        'servicios_activos': servicios_activos,
+        'clientes': clientes,
+        'es_admin': es_admin,
+        'seccion_activa': 'disponibles',
+        'search_query': search_query,
+        'citas_pasadas': citas_pasadas,
+    }
+    return render(request, 'citas/citas/gestor_citas_base.html', context)
 
 # Listado de citas tomadas (reservadas o confirmadas) - solo administrativos
 @login_required
 def citas_tomadas(request):
     try:
         perfil = Perfil.objects.get(user=request.user)
-        if not perfil.es_administrativo():
-            messages.error(request, 'No tienes permisos para ver este listado.')
-            return redirect('panel_trabajador')
+        # Verificar permisos pero no redirigir a panel_trabajador para evitar bucles
+        es_admin = perfil.es_administrativo()
+        if not es_admin:
+            messages.warning(request, 'Acceso limitado: Solo usuarios administrativos pueden gestionar citas.')
     except Perfil.DoesNotExist:
         return redirect('login')
 
-    citas_list = Cita.objects.filter(estado__in=['reservada', 'confirmada']).order_by('fecha_hora')
+    # Filtro de búsqueda
+    search_query = request.GET.get('search', '').strip()
     
-    # Paginación - 10 registros por página
-    paginator = Paginator(citas_list, 10)
+    citas_list = Cita.objects.filter(estado__in=['reservada', 'confirmada']).select_related('tipo_servicio', 'dentista', 'cliente')
+    
+    # Aplicar filtro de búsqueda si existe
+    if search_query:
+        citas_list = citas_list.filter(
+            Q(cliente__nombre_completo__icontains=search_query) |
+            Q(cliente__email__icontains=search_query) |
+            Q(cliente__telefono__icontains=search_query) |
+            Q(paciente_nombre__icontains=search_query) |
+            Q(paciente_email__icontains=search_query) |
+            Q(tipo_servicio__nombre__icontains=search_query) |
+            Q(tipo_consulta__icontains=search_query) |
+            Q(dentista__nombre_completo__icontains=search_query) |
+            Q(fecha_hora__date__icontains=search_query) |
+            Q(notas__icontains=search_query)
+        )
+    
+    citas_list = citas_list.order_by('fecha_hora')
+    
+    # Obtener información de fichas
+    from historial_clinico.models import Odontograma
+    odontogramas = Odontograma.objects.filter(cita__isnull=False).select_related('cita')
+    citas_con_ficha = set(odontogramas.values_list('cita_id', flat=True))
+    
+    citas_list_processed = list(citas_list)
+    for cita in citas_list_processed:
+        cita.tiene_ficha = cita.id in citas_con_ficha
+        if cita.tiene_ficha:
+            cita.odontograma = odontogramas.filter(cita_id=cita.id).first()
+    
+    # Paginación - 6 registros por página
+    paginator = Paginator(citas_list_processed, 6)
     page = request.GET.get('page', 1)
     
     try:
@@ -1125,27 +2281,90 @@ def citas_tomadas(request):
     except EmptyPage:
         citas = paginator.page(paginator.num_pages)
 
+    # Obtener citas pasadas que requieren atención (para el sidebar)
+    citas_pasadas = Cita.objects.filter(
+        fecha_hora__lt=timezone.now()
+    ).exclude(
+        estado__in=['completada', 'cancelada', 'no_show']
+    ).filter(
+        estado__in=['disponible', 'reservada', 'confirmada']
+    ).select_related('tipo_servicio', 'dentista', 'cliente').order_by('-fecha_hora')[:10]
+    
+    # Estadísticas
+    estadisticas = {
+        'citas_hoy': Cita.objects.filter(fecha_hora__date=timezone.now().date()).count(),
+        'disponibles': Cita.objects.filter(estado='disponible').count(),
+        'realizadas': Cita.objects.filter(estado='completada').count(),
+    }
+    
+    # Obtener datos necesarios
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
+    servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
+    from pacientes.models import Cliente
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+    
     context = {
         'perfil': perfil,
         'citas': citas,
+        'estadisticas': estadisticas,
+        'dentistas': dentistas,
+        'servicios_activos': servicios_activos,
+        'clientes': clientes,
+        'es_admin': es_admin,
+        'seccion_activa': 'tomadas',
+        'search_query': search_query,
+        'citas_pasadas': citas_pasadas,
     }
-    return render(request, 'citas/citas_tomadas.html', context)
+    return render(request, 'citas/citas/gestor_citas_base.html', context)
 
 # Listado de citas completadas - solo administrativos
 @login_required
 def citas_completadas(request):
     try:
         perfil = Perfil.objects.get(user=request.user)
-        if not perfil.es_administrativo():
-            messages.error(request, 'No tienes permisos para ver este listado.')
-            return redirect('panel_trabajador')
+        # Verificar permisos pero no redirigir a panel_trabajador para evitar bucles
+        es_admin = perfil.es_administrativo()
+        if not es_admin:
+            messages.warning(request, 'Acceso limitado: Solo usuarios administrativos pueden gestionar citas.')
     except Perfil.DoesNotExist:
         return redirect('login')
 
-    citas_list = Cita.objects.filter(estado='completada').order_by('-fecha_hora')
+    # Filtro de búsqueda
+    search_query = request.GET.get('search', '').strip()
     
-    # Paginación - 10 registros por página
-    paginator = Paginator(citas_list, 10)
+    # Citas completadas incluyen 'completada', 'no_show' y 'cancelada' (todas son parte del historial)
+    citas_list = Cita.objects.filter(estado__in=['completada', 'no_show', 'cancelada']).select_related('tipo_servicio', 'dentista', 'cliente')
+    
+    # Aplicar filtro de búsqueda si existe
+    if search_query:
+        citas_list = citas_list.filter(
+            Q(cliente__nombre_completo__icontains=search_query) |
+            Q(cliente__email__icontains=search_query) |
+            Q(cliente__telefono__icontains=search_query) |
+            Q(paciente_nombre__icontains=search_query) |
+            Q(paciente_email__icontains=search_query) |
+            Q(tipo_servicio__nombre__icontains=search_query) |
+            Q(tipo_consulta__icontains=search_query) |
+            Q(dentista__nombre_completo__icontains=search_query) |
+            Q(fecha_hora__date__icontains=search_query) |
+            Q(notas__icontains=search_query)
+        )
+    
+    citas_list = citas_list.order_by('-fecha_hora')
+    
+    # Obtener información de fichas
+    from historial_clinico.models import Odontograma
+    odontogramas = Odontograma.objects.filter(cita__isnull=False).select_related('cita')
+    citas_con_ficha = set(odontogramas.values_list('cita_id', flat=True))
+    
+    citas_list_processed = list(citas_list)
+    for cita in citas_list_processed:
+        cita.tiene_ficha = cita.id in citas_con_ficha
+        if cita.tiene_ficha:
+            cita.odontograma = odontogramas.filter(cita_id=cita.id).first()
+    
+    # Paginación - 6 registros por página
+    paginator = Paginator(citas_list_processed, 6)
     page = request.GET.get('page', 1)
     
     try:
@@ -1155,94 +2374,150 @@ def citas_completadas(request):
     except EmptyPage:
         citas = paginator.page(paginator.num_pages)
 
+    # Estadísticas
+    estadisticas = {
+        'citas_hoy': Cita.objects.filter(fecha_hora__date=timezone.now().date()).count(),
+        'disponibles': Cita.objects.filter(estado='disponible').count(),
+        'realizadas': Cita.objects.filter(estado='completada').count(),
+    }
+    
+    # Obtener datos necesarios
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
+    servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
+    from pacientes.models import Cliente
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+
     context = {
         'perfil': perfil,
         'citas': citas,
+        'estadisticas': estadisticas,
+        'dentistas': dentistas,
+        'servicios_activos': servicios_activos,
+        'clientes': clientes,
+        'es_admin': es_admin,
+        'seccion_activa': 'completadas',
+        'search_query': search_query,
     }
-    return render(request, 'citas/citas_completadas.html', context)
+    return render(request, 'citas/citas/gestor_citas_base.html', context)
 
-# Registrar nuevo trabajador
+@login_required
+def calendario_citas(request):
+    """Vista para calendario general con navbar lateral"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a este panel.')
+        return redirect('login')
+    
+    if not perfil.es_administrativo():
+        messages.error(request, 'No tienes permisos para ver este listado.')
+        return redirect('panel_trabajador')
+    
+    # Filtro de búsqueda (opcional para el calendario)
+    search_query = request.GET.get('search', '').strip()
+    
+    # Obtener todas las citas para el calendario (con filtro si existe)
+    citas_calendario = Cita.objects.all().select_related('tipo_servicio', 'dentista', 'cliente').order_by('fecha_hora')
+    
+    # Aplicar filtro de búsqueda si existe
+    if search_query:
+        citas_calendario = citas_calendario.filter(
+            Q(cliente__nombre_completo__icontains=search_query) |
+            Q(cliente__email__icontains=search_query) |
+            Q(cliente__telefono__icontains=search_query) |
+            Q(paciente_nombre__icontains=search_query) |
+            Q(paciente_email__icontains=search_query) |
+            Q(tipo_servicio__nombre__icontains=search_query) |
+            Q(tipo_consulta__icontains=search_query) |
+            Q(dentista__nombre_completo__icontains=search_query) |
+            Q(notas__icontains=search_query)
+        )
+    
+    # Estadísticas
+    estadisticas = {
+        'citas_hoy': Cita.objects.filter(fecha_hora__date=timezone.now().date()).count(),
+        'disponibles': Cita.objects.filter(estado='disponible').count(),
+        'realizadas': Cita.objects.filter(estado='completada').count(),
+    }
+    
+    # Obtener datos necesarios
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).select_related('user')
+    servicios_activos = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
+    from pacientes.models import Cliente
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+    
+    context = {
+        'perfil': perfil,
+        'estadisticas': estadisticas,
+        'dentistas': dentistas,
+        'servicios_activos': servicios_activos,
+        'clientes': clientes,
+        'es_admin': True,
+        'seccion_activa': 'calendario',
+        'search_query': search_query,
+        'citas_calendario': citas_calendario,
+    }
+    return render(request, 'citas/citas/gestor_citas_base.html', context)
+
+# Registrar nuevo trabajador con protección de seguridad
+@never_cache
+@csrf_protect
 def registro_trabajador(request):
+    # Rate limiting para registro (máximo 3 registros por IP en 1 hora)
+    ip_address = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0] if request.META.get('HTTP_X_FORWARDED_FOR') else request.META.get('REMOTE_ADDR', '')
+    cache_key_reg = f'register_attempts_{ip_address}'
+    reg_attempts = cache.get(cache_key_reg, 0)
+    
+    if reg_attempts >= 3:
+        messages.error(request, '⚠️ Demasiados intentos de registro. Por favor, espera 1 hora antes de intentar nuevamente.')
+        logger.warning(f'Registro bloqueado por rate limiting - IP: {ip_address}')
+        form = RegistroTrabajadorForm()
+        return render(request, 'citas/auth/registro_trabajador.html', {'form': form})
+    
     if request.method == 'POST':
         form = RegistroTrabajadorForm(request.POST)
         
-        if not form.is_valid():
-            # Validaciones personalizadas con mensajes específicos
-            username = request.POST.get('username', '').strip()
-            email = request.POST.get('email', '').strip()
-            password1 = request.POST.get('password1', '')
-            password2 = request.POST.get('password2', '')
-            
-            # Limpiar mensajes anteriores
-            storage = messages.get_messages(request)
-            storage.used = True
-            
-            # Verificar si el usuario ya existe
-            if username:
-                if User.objects.filter(username=username).exists():
-                    messages.error(request, '❌ Este usuario ya existe. Por favor, elige otro nombre de usuario.')
-                elif len(username) < 3:
-                    messages.error(request, '❌ El nombre de usuario debe tener al menos 3 caracteres.')
-            
-            # Verificar si el email ya existe
-            if email:
-                if User.objects.filter(email=email).exists():
-                    messages.error(request, '❌ Este email ya está registrado. Por favor, usa otro email.')
-                elif '@' not in email:
-                    messages.error(request, '❌ Por favor, ingresa un email válido.')
-            
-            # Verificar contraseñas
-            if password1 and password2:
-                if password1 != password2:
-                    messages.error(request, '❌ Las contraseñas no coinciden. Por favor, verifica que ambas sean iguales.')
-                elif len(password1) < 8:
-                    messages.error(request, '❌ La contraseña debe tener al menos 8 caracteres.')
-            elif not password1:
-                messages.error(request, '❌ Por favor, ingresa una contraseña.')
-            elif not password2:
-                messages.error(request, '❌ Por favor, confirma tu contraseña.')
-            
-            # Verificar campos requeridos
-            if not request.POST.get('first_name', '').strip():
-                messages.error(request, '❌ Por favor, ingresa tu nombre.')
-            if not request.POST.get('last_name', '').strip():
-                messages.error(request, '❌ Por favor, ingresa tu apellido.')
-            if not request.POST.get('nombre_completo', '').strip():
-                messages.error(request, '❌ Por favor, ingresa tu nombre completo.')
-            if not request.POST.get('telefono', '').strip():
-                messages.error(request, '❌ Por favor, ingresa tu teléfono.')
-            if not request.POST.get('rol', ''):
-                messages.error(request, '❌ Por favor, selecciona un rol.')
-            
-            # Mostrar otros errores del formulario si no se capturaron arriba
-            if form.errors:
-                for field, errors in form.errors.items():
-                    for error in errors:
-                        if 'username' in field.lower() and 'already exists' in error.lower():
-                            continue  # Ya lo manejamos arriba
-                        elif 'email' in field.lower() and 'already exists' in error.lower():
-                            continue  # Ya lo manejamos arriba
-                        else:
-                            messages.error(request, f'❌ {error}')
-        else:
+        if form.is_valid():
             # Formulario válido, intentar guardar
             try:
                 user = form.save()
-                print(f"DEBUG - Usuario creado: {user.username}")
+                
+                # Limpiar contador de intentos
+                cache.delete(cache_key_reg)
+                
+                # Log de registro exitoso
+                logger.info(f'Registro exitoso - Usuario: {user.username}, IP: {ip_address}')
+                
                 messages.success(request, '✅ Trabajador registrado correctamente. Ya puedes iniciar sesión.')
                 return redirect('login')
             except Exception as e:
-                print(f"DEBUG - Error al crear usuario: {e}")
+                # Incrementar contador de intentos fallidos
+                cache.set(cache_key_reg, reg_attempts + 1, 3600)  # 1 hora
+                
+                logger.error(f'Error al registrar trabajador - IP: {ip_address}, Error: {str(e)}')
+                
+                # Mensajes de error genéricos (no revelar detalles técnicos)
                 if 'username' in str(e).lower() and 'already exists' in str(e).lower():
                     messages.error(request, '❌ Este usuario ya existe. Por favor, elige otro nombre de usuario.')
                 elif 'email' in str(e).lower() and 'already exists' in str(e).lower():
                     messages.error(request, '❌ Este email ya está registrado. Por favor, usa otro email.')
                 else:
-                    messages.error(request, f'❌ Error al registrar trabajador: {str(e)}')
+                    messages.error(request, '❌ Error al registrar trabajador. Por favor, verifica todos los campos e intenta nuevamente.')
+        else:
+            # Incrementar contador de intentos fallidos solo si hay errores de validación
+            if form.errors:
+                cache.set(cache_key_reg, reg_attempts + 1, 3600)  # 1 hora
+                logger.warning(f'Intento de registro con errores - IP: {ip_address}')
+            
+            # Los errores del formulario se mostrarán automáticamente en el template
+            # No necesitamos agregar validaciones manuales aquí, el formulario ya las tiene
     else:
         form = RegistroTrabajadorForm()
     
-    return render(request, 'citas/registro_trabajador.html', {'form': form})
+    return render(request, 'citas/auth/registro_trabajador.html', {'form': form})
 
 # Editar perfil
 @login_required
@@ -1262,11 +2537,12 @@ def editar_perfil(request):
     else:
         form = PerfilForm(instance=perfil)
     
-    return render(request, 'citas/editar_perfil.html', {'form': form, 'perfil': perfil})
+    return render(request, 'citas/perfil/editar_perfil.html', {'form': form, 'perfil': perfil})
 
 # Dashboard con estadísticas
 @login_required
 def dashboard(request):
+    """Vista principal del Dashboard - Página de inicio del sistema"""
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.activo:
@@ -1275,34 +2551,122 @@ def dashboard(request):
     except Perfil.DoesNotExist:
         return redirect('login')
     
-    # Estadísticas generales
-    hoy = timezone.now().date()
+    # Fechas de referencia
+    ahora = timezone.now()
+    hoy = ahora.date()
+    inicio_mes = hoy.replace(day=1)
+    fin_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
     semana_actual = hoy - timedelta(days=7)
     mes_actual = hoy - timedelta(days=30)
     
     if perfil.es_administrativo():
-        # Estadísticas para administrativos
-        estadisticas = {
-            'citas_hoy': Cita.objects.filter(fecha_hora__date=hoy).count(),
-            'citas_semana': Cita.objects.filter(fecha_hora__date__gte=semana_actual).count(),
-            'citas_mes': Cita.objects.filter(fecha_hora__date__gte=mes_actual).count(),
-            'citas_disponibles': Cita.objects.filter(estado='disponible').count(),
-            'citas_reservadas': Cita.objects.filter(estado='reservada').count(),
-            'citas_confirmadas': Cita.objects.filter(estado='confirmada').count(),
-            'citas_completadas': Cita.objects.filter(estado='completada').count(),
-        }
+        # ===== ESTADÍSTICAS GENERALES =====
+        total_citas = Cita.objects.count()
+        total_clientes = Cliente.objects.filter(activo=True).count()
+        total_personal = Perfil.objects.filter(activo=True).count()
+        total_insumos = Insumo.objects.count()
+        
+        # Citas
+        citas_hoy = Cita.objects.filter(fecha_hora__date=hoy).count()
+        citas_semana = Cita.objects.filter(fecha_hora__date__gte=semana_actual).count()
+        citas_mes = Cita.objects.filter(fecha_hora__date__gte=inicio_mes, fecha_hora__date__lte=fin_mes).count()
+        citas_disponibles = Cita.objects.filter(estado='disponible').count()
+        citas_reservadas = Cita.objects.filter(estado='reservada').count()
+        citas_confirmadas = Cita.objects.filter(estado='confirmada').count()
+        citas_completadas = Cita.objects.filter(estado='completada').count()
+        
+        # Citas próximas (próximas 7 días)
+        proximos_7_dias = hoy + timedelta(days=7)
+        citas_proximas = Cita.objects.filter(
+            fecha_hora__date__gte=hoy,
+            fecha_hora__date__lte=proximos_7_dias,
+            estado__in=['reservada', 'confirmada']
+        ).select_related('dentista', 'cliente').order_by('fecha_hora')[:10]
+        
+        # Citas de hoy con detalles
+        citas_hoy_detalle = Cita.objects.filter(
+            fecha_hora__date=hoy
+        ).select_related('dentista', 'cliente').order_by('fecha_hora')
+        
+        # Finanzas
+        total_ingresos = IngresoManual.objects.aggregate(Sum('monto'))['monto__sum'] or 0
+        total_egresos = EgresoManual.objects.aggregate(Sum('monto'))['monto__sum'] or 0
+        ingresos_mes = IngresoManual.objects.filter(
+            fecha__gte=inicio_mes,
+            fecha__lte=fin_mes
+        ).aggregate(Sum('monto'))['monto__sum'] or 0
+        egresos_mes = EgresoManual.objects.filter(
+            fecha__gte=inicio_mes,
+            fecha__lte=fin_mes
+        ).aggregate(Sum('monto'))['monto__sum'] or 0
+        balance_total = total_ingresos - total_egresos
+        balance_mes = ingresos_mes - egresos_mes
+        
+        # Ingresos de citas completadas
+        ingresos_citas_mes = Cita.objects.filter(
+            estado='completada',
+            fecha_hora__date__gte=inicio_mes,
+            fecha_hora__date__lte=fin_mes,
+            precio_cobrado__isnull=False
+        ).aggregate(Sum('precio_cobrado'))['precio_cobrado__sum'] or 0
+        
+        # Insumos con stock bajo
+        insumos_bajo_stock = Insumo.objects.filter(
+            cantidad_actual__lte=F('cantidad_minima')
+        ).count()
+        
+        # Clientes nuevos este mes
+        clientes_nuevos_mes = Cliente.objects.filter(
+            fecha_registro__date__gte=inicio_mes,
+            fecha_registro__date__lte=fin_mes
+        ).count()
         
         # Citas por estado (últimos 7 días)
         citas_por_estado = Cita.objects.filter(
             fecha_hora__date__gte=semana_actual
         ).values('estado').annotate(total=Count('estado'))
         
+        estadisticas = {
+            'total_citas': total_citas,
+            'total_clientes': total_clientes,
+            'total_personal': total_personal,
+            'total_insumos': total_insumos,
+            'citas_hoy': citas_hoy,
+            'citas_semana': citas_semana,
+            'citas_mes': citas_mes,
+            'citas_disponibles': citas_disponibles,
+            'citas_reservadas': citas_reservadas,
+            'citas_confirmadas': citas_confirmadas,
+            'citas_completadas': citas_completadas,
+            'insumos_bajo_stock': insumos_bajo_stock,
+            'clientes_nuevos_mes': clientes_nuevos_mes,
+        }
+        
     else:
         # Estadísticas para dentistas
+        citas_hoy = Cita.objects.filter(fecha_hora__date=hoy, dentista=perfil).count()
+        citas_semana = Cita.objects.filter(fecha_hora__date__gte=semana_actual, dentista=perfil).count()
+        citas_mes = Cita.objects.filter(fecha_hora__date__gte=inicio_mes, fecha_hora__date__lte=fin_mes, dentista=perfil).count()
+        
+        # Citas próximas del dentista
+        proximos_7_dias = hoy + timedelta(days=7)
+        citas_proximas = Cita.objects.filter(
+            dentista=perfil,
+            fecha_hora__date__gte=hoy,
+            fecha_hora__date__lte=proximos_7_dias,
+            estado__in=['reservada', 'confirmada']
+        ).select_related('cliente').order_by('fecha_hora')[:10]
+        
+        # Citas de hoy del dentista
+        citas_hoy_detalle = Cita.objects.filter(
+            fecha_hora__date=hoy,
+            dentista=perfil
+        ).select_related('cliente').order_by('fecha_hora')
+        
         estadisticas = {
-            'citas_hoy': Cita.objects.filter(fecha_hora__date=hoy, dentista=perfil).count(),
-            'citas_semana': Cita.objects.filter(fecha_hora__date__gte=semana_actual, dentista=perfil).count(),
-            'citas_mes': Cita.objects.filter(fecha_hora__date__gte=mes_actual, dentista=perfil).count(),
+            'citas_hoy': citas_hoy,
+            'citas_semana': citas_semana,
+            'citas_mes': citas_mes,
             'citas_pendientes': Cita.objects.filter(dentista=perfil, estado='reservada').count(),
             'citas_confirmadas': Cita.objects.filter(dentista=perfil, estado='confirmada').count(),
             'citas_completadas': Cita.objects.filter(dentista=perfil, estado='completada').count(),
@@ -1313,15 +2677,124 @@ def dashboard(request):
             fecha_hora__date__gte=semana_actual,
             dentista=perfil
         ).values('estado').annotate(total=Count('estado'))
+        
+        # Valores por defecto para dentistas
+        total_ingresos = 0
+        total_egresos = 0
+        ingresos_mes = 0
+        egresos_mes = 0
+        balance_total = 0
+        balance_mes = 0
+        ingresos_citas_mes = 0
+        insumos_bajo_stock = 0
+        clientes_nuevos_mes = 0
     
     context = {
         'perfil': perfil,
         'estadisticas': estadisticas,
         'citas_por_estado': citas_por_estado,
-        'es_admin': perfil.es_administrativo()
+        'citas_proximas': citas_proximas,
+        'citas_hoy_detalle': citas_hoy_detalle,
+        'es_admin': perfil.es_administrativo(),
+        # Finanzas (solo para admin)
+        'total_ingresos': total_ingresos,
+        'total_egresos': total_egresos,
+        'ingresos_mes': ingresos_mes,
+        'egresos_mes': egresos_mes,
+        'balance_total': balance_total,
+        'balance_mes': balance_mes,
+        'ingresos_citas_mes': ingresos_citas_mes,
+        'insumos_bajo_stock': insumos_bajo_stock,
+        'clientes_nuevos_mes': clientes_nuevos_mes,
+        'hoy': hoy,
     }
     
-    return render(request, 'citas/dashboard.html', context)
+    return render(request, 'citas/dashboard/dashboard.html', context)
+
+# Dashboard específico para dentistas
+@login_required
+def dashboard_dentista(request):
+    """Vista de inicio específica para dentistas con accesos rápidos"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+        
+        # Solo permitir acceso a dentistas
+        if not perfil.es_dentista():
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('dashboard')
+    except Perfil.DoesNotExist:
+        return redirect('login')
+    
+    # Fechas de referencia
+    ahora = timezone.now()
+    hoy = ahora.date()
+    inicio_mes = hoy.replace(day=1)
+    fin_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    semana_actual = hoy - timedelta(days=7)
+    proximos_7_dias = hoy + timedelta(days=7)
+    
+    # Estadísticas del dentista
+    citas_hoy = Cita.objects.filter(fecha_hora__date=hoy, dentista=perfil).count()
+    citas_semana = Cita.objects.filter(
+        fecha_hora__date__gte=semana_actual,
+        dentista=perfil
+    ).count()
+    citas_mes = Cita.objects.filter(
+        fecha_hora__date__gte=inicio_mes,
+        fecha_hora__date__lte=fin_mes,
+        dentista=perfil
+    ).count()
+    
+    citas_pendientes = Cita.objects.filter(dentista=perfil, estado='reservada').count()
+    citas_confirmadas = Cita.objects.filter(dentista=perfil, estado='confirmada').count()
+    citas_completadas = Cita.objects.filter(dentista=perfil, estado='completada').count()
+    
+    # Citas de hoy con detalles
+    citas_hoy_detalle = Cita.objects.filter(
+        fecha_hora__date=hoy,
+        dentista=perfil
+    ).select_related('cliente').order_by('fecha_hora')[:10]
+    
+    # Citas próximas (próximas 7 días)
+    citas_proximas = Cita.objects.filter(
+        dentista=perfil,
+        fecha_hora__date__gte=hoy,
+        fecha_hora__date__lte=proximos_7_dias,
+        estado__in=['reservada', 'confirmada']
+    ).select_related('cliente').order_by('fecha_hora')[:10]
+    
+    # Contar pacientes únicos del dentista
+    pacientes_count = Cita.objects.filter(dentista=perfil).values('cliente').distinct().count()
+    
+    # Planes de tratamiento activos
+    planes_activos = PlanTratamiento.objects.filter(
+        dentista=perfil,
+        estado='en_proceso'
+    ).count()
+    
+    estadisticas = {
+        'citas_hoy': citas_hoy,
+        'citas_semana': citas_semana,
+        'citas_mes': citas_mes,
+        'citas_pendientes': citas_pendientes,
+        'citas_confirmadas': citas_confirmadas,
+        'citas_completadas': citas_completadas,
+        'pacientes_count': pacientes_count,
+        'planes_activos': planes_activos,
+    }
+    
+    context = {
+        'perfil': perfil,
+        'estadisticas': estadisticas,
+        'citas_proximas': citas_proximas,
+        'citas_hoy_detalle': citas_hoy_detalle,
+        'hoy': hoy,
+    }
+    
+    return render(request, 'citas/dashboard/dashboard_dentista.html', context)
 
 # Vista de diagnóstico - Todas las citas (solo administrativos)
 @login_required
@@ -1364,7 +2837,7 @@ def todas_las_citas(request):
         'estados_disponibles': Cita.ESTADO_CHOICES
     }
     
-    return render(request, 'citas/todas_las_citas.html', context)
+    return render(request, 'citas/citas/todas_las_citas.html', context)
 
 # Gestor de Clientes - solo administrativos
 @login_required
@@ -1381,7 +2854,7 @@ def gestor_clientes(request):
     search = request.GET.get('search', '')
     estado = request.GET.get('estado', '')
     
-    # Obtener clientes desde el modelo Cliente
+    # Obtener clientes desde el modelo Cliente (sistema de gestión)
     clientes_query = Cliente.objects.all()
     
     # Aplicar filtros de búsqueda
@@ -1400,8 +2873,8 @@ def gestor_clientes(request):
     elif estado == 'inactivo':
         clientes_query = clientes_query.filter(activo=False)
     
-    # Anotar cada cliente con el número de citas que tiene
-    from django.db.models import Count
+    # Anotar cada cliente con el número de citas, odontogramas y radiografías
+    from django.db.models import Count, Max
     try:
         # Intentar anotar con todas las relaciones
         clientes_query = clientes_query.annotate(
@@ -1409,9 +2882,11 @@ def gestor_clientes(request):
         )
         # Intentar agregar odontogramas y radiografias si las relaciones existen
         try:
+            from historial_clinico.models import Odontograma, Radiografia
             clientes_query = clientes_query.annotate(
                 total_odontogramas=Count('odontogramas', distinct=True),
-                total_radiografias=Count('radiografias', distinct=True)
+                total_radiografias=Count('radiografias', distinct=True),
+                ultima_cita_fecha=Max('citas__fecha_hora')
             )
         except:
             # Si falla, solo usar total_citas
@@ -1420,8 +2895,75 @@ def gestor_clientes(request):
         # Si hay error con las anotaciones, usar consulta sin anotaciones
         pass
     
+    # Obtener emails de clientes ya existentes para no duplicar
+    emails_existentes = set(clientes_query.values_list('email', flat=True))
+    
+    # Obtener clientes registrados desde cliente_web que no tienen Cliente en gestion_clinica
+    clientes_web = []
+    try:
+        from django.contrib.auth.models import User
+        from cuentas.models import PerfilCliente
+        
+        # Obtener todos los PerfilCliente
+        perfiles_web = PerfilCliente.objects.all()
+        
+        # Filtrar por búsqueda si existe
+        if search:
+            from django.db.models import Q
+            perfiles_web = perfiles_web.filter(
+                Q(nombre_completo__icontains=search) |
+                Q(email__icontains=search) |
+                Q(telefono__icontains=search) |
+                Q(rut__icontains=search)
+            )
+        
+        # Solo incluir los que NO tienen Cliente asociado (por email)
+        for perfil in perfiles_web:
+            if perfil.email and perfil.email not in emails_existentes:
+                # Crear un objeto similar a Cliente para la vista
+                cliente_web = type('ClienteWeb', (), {
+                    'id': f'web_{perfil.id}',
+                    'nombre_completo': perfil.nombre_completo,
+                    'email': perfil.email,
+                    'telefono': perfil.telefono,
+                    'rut': perfil.rut or '',
+                    'fecha_nacimiento': perfil.fecha_nacimiento,
+                    'alergias': perfil.alergias or '',
+                    'fecha_registro': perfil.user.date_joined if perfil.user else None,
+                    'activo': perfil.user.is_active if perfil.user else True,
+                    'tiene_alergias': perfil.tiene_alergias,
+                    'edad': perfil.edad,
+                    'total_citas': 0,  # Se puede calcular después si es necesario
+                    'total_odontogramas': 0,
+                    'total_radiografias': 0,
+                    'es_de_web': True,  # Marca para identificar que viene de cliente_web
+                    'user_id': perfil.user.id if perfil.user else None,
+                    'username': perfil.user.username if perfil.user else None,
+                })()
+                clientes_web.append(cliente_web)
+    except ImportError:
+        # Si no se puede importar PerfilCliente, continuar sin errores
+        pass
+    except Exception as e:
+        # Si hay error, registrar pero continuar
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Error al obtener clientes de cliente_web: {e}")
+    
+    # Convertir QuerySet a lista para poder combinar
+    clientes_list = list(clientes_query)
+    
+    # Agregar clientes de web
+    clientes_list.extend(clientes_web)
+    
     # Ordenar por nombre
-    clientes_list = clientes_query.order_by('nombre_completo')
+    clientes_list.sort(key=lambda x: x.nombre_completo.lower())
+    
+    # Aplicar filtro de estado a clientes_web también
+    if estado == 'activo':
+        clientes_list = [c for c in clientes_list if getattr(c, 'activo', True)]
+    elif estado == 'inactivo':
+        clientes_list = [c for c in clientes_list if not getattr(c, 'activo', True)]
     
     # Paginación - 10 registros por página
     paginator = Paginator(clientes_list, 10)
@@ -1434,18 +2976,37 @@ def gestor_clientes(request):
     except EmptyPage:
         clientes = paginator.page(paginator.num_pages)
     
-    # Estadísticas
-    total_clientes = Cliente.objects.count()
+    # Estadísticas (incluyendo clientes de web)
+    total_clientes = Cliente.objects.count() + len(clientes_web)
     clientes_con_citas_count = Cliente.objects.filter(citas__isnull=False).distinct().count()
+    
+    # Calcular clientes nuevos (últimos 30 días)
+    fecha_limite = timezone.now() - timedelta(days=30)
+    clientes_nuevos = Cliente.objects.filter(fecha_registro__gte=fecha_limite).count()
+    
+    # Calcular clientes con alergias
+    clientes_con_alergias = Cliente.objects.exclude(alergias__isnull=True).exclude(alergias='').exclude(alergias__iexact='ninguna').count()
+    
+    # Datos adicionales para panel derecho
+    # Clientes recientes (últimos 5 registrados)
+    clientes_recientes = Cliente.objects.order_by('-fecha_registro')[:5]
+    
+    # Citas próximas de clientes (próximos 7 días)
+    fecha_limite = timezone.now() + timedelta(days=7)
+    citas_proximas = Cita.objects.filter(
+        fecha_hora__gte=timezone.now(),
+        fecha_hora__lte=fecha_limite,
+        estado__in=['reservada', 'confirmada']
+    ).select_related('cliente', 'tipo_servicio', 'dentista').order_by('fecha_hora')[:5]
     
     estadisticas = {
         'total_clientes': total_clientes,
         'clientes_con_citas': clientes_con_citas_count,
+        'clientes_gestion': Cliente.objects.count(),
+        'clientes_web': len(clientes_web),
+        'clientes_nuevos': clientes_nuevos,
+        'clientes_con_alergias': clientes_con_alergias,
     }
-    
-    # Debug: verificar que tenemos clientes
-    # Si no hay clientes en la página pero hay en total, podría ser un problema de paginación
-    total_en_query = clientes_list.count() if hasattr(clientes_list, 'count') else len(list(clientes_list))
     
     context = {
         'perfil': perfil,
@@ -1454,10 +3015,274 @@ def gestor_clientes(request):
         'search': search,
         'estado': estado,
         'es_admin': True,
-        'total_en_query': total_en_query,  # Para debug
+        'clientes_recientes': clientes_recientes,
+        'citas_proximas': citas_proximas,
     }
     
-    return render(request, 'citas/gestor_clientes.html', context)
+    return render(request, 'citas/clientes/gestor_clientes.html', context)
+
+# Exportar clientes a Excel
+@login_required
+def exportar_excel_clientes(request):
+    """Exporta la lista de clientes a un archivo Excel con diseño mejorado"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'No tienes permisos para exportar clientes.')
+            return redirect('gestor_clientes')
+    except Perfil.DoesNotExist:
+        return redirect('login')
+    
+    # Intentar usar openpyxl para mejor diseño
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # Crear el libro de trabajo Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Clientes"
+        
+        # Estilos
+        header_fill = PatternFill(start_color="3b82f6", end_color="2563eb", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        border_style = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        title_font = Font(bold=True, size=16, color="1e293b")
+        subtitle_font = Font(size=10, color="64748b")
+        
+        # Título y información
+        ws.merge_cells('A1:I1')
+        ws['A1'] = "LISTA DE CLIENTES - CLÍNICA DENTAL"
+        ws['A1'].font = title_font
+        ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+        
+        ws.merge_cells('A2:I2')
+        ws['A2'] = f"Fecha de exportación: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+        ws['A2'].font = subtitle_font
+        ws['A2'].alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Fila vacía
+        ws.row_dimensions[3].height = 5
+        
+        # Encabezados
+        headers = [
+            'Nombre Completo', 'RUT', 'Email', 'Teléfono', 
+            'Fecha Nacimiento', 'Edad', 'Alergias', 'Fecha Registro', 
+            'Estado', 'Total Citas'
+        ]
+        
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+            cell.border = border_style
+        
+        # Obtener todos los clientes
+        clientes = Cliente.objects.all().order_by('nombre_completo')
+        
+        # Obtener clientes de web
+        clientes_web = []
+        try:
+            from cuentas.models import PerfilCliente
+            perfiles_web = PerfilCliente.objects.all()
+            emails_existentes = set(Cliente.objects.values_list('email', flat=True))
+            
+            for perfil in perfiles_web:
+                if perfil.email and perfil.email not in emails_existentes:
+                    cliente_web = type('ClienteWeb', (), {
+                        'nombre_completo': perfil.nombre_completo,
+                        'rut': perfil.rut or '',
+                        'email': perfil.email,
+                        'telefono': perfil.telefono or '',
+                        'fecha_nacimiento': perfil.fecha_nacimiento,
+                        'alergias': perfil.alergias or '',
+                        'fecha_registro': perfil.user.date_joined if perfil.user else None,
+                        'activo': perfil.user.is_active if perfil.user else True,
+                        'total_citas': 0,
+                        'edad': getattr(perfil, 'edad', None),
+                    })()
+                    clientes_web.append(cliente_web)
+        except ImportError:
+            pass
+        
+        # Escribir datos
+        row_num = 5
+        for cliente in list(clientes) + clientes_web:
+            # Calcular edad si hay fecha de nacimiento
+            edad = ''
+            if hasattr(cliente, 'fecha_nacimiento') and cliente.fecha_nacimiento:
+                try:
+                    from datetime import date
+                    hoy = date.today()
+                    fecha_nac = cliente.fecha_nacimiento
+                    if isinstance(fecha_nac, datetime):
+                        fecha_nac = fecha_nac.date()
+                    edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
+                except:
+                    edad = getattr(cliente, 'edad', '')
+            
+            # Formatear fechas
+            fecha_nac = ''
+            if hasattr(cliente, 'fecha_nacimiento') and cliente.fecha_nacimiento:
+                if isinstance(cliente.fecha_nacimiento, datetime):
+                    fecha_nac = cliente.fecha_nacimiento.strftime('%d/%m/%Y')
+                else:
+                    fecha_nac = cliente.fecha_nacimiento.strftime('%d/%m/%Y')
+            
+            fecha_reg = ''
+            if hasattr(cliente, 'fecha_registro') and cliente.fecha_registro:
+                if isinstance(cliente.fecha_registro, datetime):
+                    fecha_reg = cliente.fecha_registro.strftime('%d/%m/%Y %H:%M')
+                else:
+                    fecha_reg = str(cliente.fecha_registro)
+            
+            # Escribir fila
+            data = [
+                cliente.nombre_completo or '',
+                getattr(cliente, 'rut', '') or '',
+                cliente.email or '',
+                getattr(cliente, 'telefono', '') or '',
+                fecha_nac,
+                str(edad) if edad else '',
+                getattr(cliente, 'alergias', '') or 'Ninguna',
+                fecha_reg,
+                'Activo' if getattr(cliente, 'activo', True) else 'Inactivo',
+                getattr(cliente, 'total_citas', 0) or 0,
+            ]
+            
+            for col_num, value in enumerate(data, 1):
+                cell = ws.cell(row=row_num, column=col_num, value=value)
+                cell.border = border_style
+                if col_num == 1:  # Nombre completo
+                    cell.font = Font(bold=True)
+                elif col_num == 9:  # Estado
+                    if value == 'Activo':
+                        cell.fill = PatternFill(start_color="d1fae5", end_color="d1fae5", fill_type="solid")
+                    else:
+                        cell.fill = PatternFill(start_color="fee2e2", end_color="fee2e2", fill_type="solid")
+            
+            row_num += 1
+        
+        # Ajustar ancho de columnas
+        column_widths = [30, 15, 30, 15, 15, 8, 25, 18, 12, 12]
+        for col_num, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col_num)].width = width
+        
+        # Congelar paneles (fijar encabezados)
+        ws.freeze_panes = 'A5'
+        
+        # Crear respuesta HTTP
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"clientes_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Guardar el libro de trabajo
+        wb.save(response)
+        
+        return response
+        
+    except ImportError:
+        # Fallback a CSV mejorado si openpyxl no está disponible
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        filename = f"clientes_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Escribir BOM UTF-8
+        response.write('\ufeff')
+        
+        import csv
+        writer = csv.writer(response, delimiter=';')  # Usar punto y coma para mejor compatibilidad
+        
+        # Título
+        writer.writerow(['LISTA DE CLIENTES - CLÍNICA DENTAL'])
+        writer.writerow([f'Fecha de exportación: {timezone.now().strftime("%d/%m/%Y %H:%M:%S")}'])
+        writer.writerow([])  # Fila vacía
+        
+        # Encabezados
+        writer.writerow(['Nombre Completo', 'RUT', 'Email', 'Teléfono', 'Fecha Nacimiento', 'Edad', 'Alergias', 'Fecha Registro', 'Estado', 'Total Citas'])
+        
+        # Obtener todos los clientes
+        clientes = Cliente.objects.all().order_by('nombre_completo')
+        
+        # Obtener clientes de web
+        clientes_web = []
+        try:
+            from cuentas.models import PerfilCliente
+            perfiles_web = PerfilCliente.objects.all()
+            emails_existentes = set(Cliente.objects.values_list('email', flat=True))
+            
+            for perfil in perfiles_web:
+                if perfil.email and perfil.email not in emails_existentes:
+                    cliente_web = type('ClienteWeb', (), {
+                        'nombre_completo': perfil.nombre_completo,
+                        'rut': perfil.rut or '',
+                        'email': perfil.email,
+                        'telefono': perfil.telefono or '',
+                        'fecha_nacimiento': perfil.fecha_nacimiento,
+                        'alergias': perfil.alergias or '',
+                        'fecha_registro': perfil.user.date_joined if perfil.user else None,
+                        'activo': perfil.user.is_active if perfil.user else True,
+                        'total_citas': 0,
+                        'edad': getattr(perfil, 'edad', None),
+                    })()
+                    clientes_web.append(cliente_web)
+        except ImportError:
+            pass
+        
+        # Escribir datos
+        for cliente in list(clientes) + clientes_web:
+            # Calcular edad
+            edad = ''
+            if hasattr(cliente, 'fecha_nacimiento') and cliente.fecha_nacimiento:
+                try:
+                    from datetime import date
+                    hoy = date.today()
+                    fecha_nac = cliente.fecha_nacimiento
+                    if isinstance(fecha_nac, datetime):
+                        fecha_nac = fecha_nac.date()
+                    edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
+                except:
+                    edad = getattr(cliente, 'edad', '')
+            
+            # Formatear fechas
+            fecha_nac = ''
+            if hasattr(cliente, 'fecha_nacimiento') and cliente.fecha_nacimiento:
+                if isinstance(cliente.fecha_nacimiento, datetime):
+                    fecha_nac = cliente.fecha_nacimiento.strftime('%d/%m/%Y')
+                else:
+                    fecha_nac = cliente.fecha_nacimiento.strftime('%d/%m/%Y')
+            
+            fecha_reg = ''
+            if hasattr(cliente, 'fecha_registro') and cliente.fecha_registro:
+                if isinstance(cliente.fecha_registro, datetime):
+                    fecha_reg = cliente.fecha_registro.strftime('%d/%m/%Y %H:%M')
+                else:
+                    fecha_reg = str(cliente.fecha_registro)
+            
+            writer.writerow([
+                cliente.nombre_completo or '',
+                getattr(cliente, 'rut', '') or '',
+                cliente.email or '',
+                getattr(cliente, 'telefono', '') or '',
+                fecha_nac,
+                str(edad) if edad else '',
+                getattr(cliente, 'alergias', '') or 'Ninguna',
+                fecha_reg,
+                'Activo' if getattr(cliente, 'activo', True) else 'Inactivo',
+                getattr(cliente, 'total_citas', 0) or 0,
+            ])
+        
+        return response
 
 # Gestor de Insumos - solo administrativos
 @login_required
@@ -1481,7 +3306,8 @@ def gestor_insumos(request):
         insumos = insumos.filter(
             Q(nombre__icontains=search) |
             Q(descripcion__icontains=search) |
-            Q(proveedor__icontains=search) |
+            Q(proveedor_principal__nombre__icontains=search) |
+            Q(proveedor_texto__icontains=search) |
             Q(ubicacion__icontains=search)
         )
     
@@ -1520,19 +3346,23 @@ def gestor_insumos(request):
         'insumos_agotados': insumos_agotados,
     }
     
+    # Obtener proveedores activos para el formulario
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
+    
     context = {
         'perfil': perfil,
         'insumos': insumos,
         'estadisticas': estadisticas,
         'categorias': Insumo.CATEGORIA_CHOICES,
         'estados': Insumo.ESTADO_CHOICES,
+        'proveedores': proveedores,
         'search': search,
         'categoria': categoria,
         'estado': estado,
         'es_admin': True
     }
     
-    return render(request, 'citas/gestor_insumos.html', context)
+    return render(request, 'citas/insumos/gestor_insumos.html', context)
 
 # Agregar nuevo insumo
 @login_required
@@ -1541,7 +3371,7 @@ def agregar_insumo(request):
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_administrativo():
             messages.error(request, 'No tienes permisos para agregar insumos.')
-            return redirect('gestor_insumos')
+            return redirect('gestor_inventario_unificado')
     except Perfil.DoesNotExist:
         return redirect('login')
 
@@ -1552,46 +3382,85 @@ def agregar_insumo(request):
         cantidad_actual_str = request.POST.get('cantidad_actual', '0')
         cantidad_minima_str = request.POST.get('cantidad_minima', '1')
         unidad_medida = request.POST.get('unidad_medida', 'unidad')
-        precio_unitario_str = request.POST.get('precio_unitario', '')
-        proveedor = request.POST.get('proveedor', '').strip()
+        precio_unitario_str = request.POST.get('precio_unitario_raw', '') or request.POST.get('precio_unitario', '')
+        # Limpiar puntos del formato chileno
+        if precio_unitario_str:
+            precio_unitario_str = precio_unitario_str.replace('.', '')
+        proveedor_id = request.POST.get('proveedor_principal', '').strip()
         fecha_vencimiento = request.POST.get('fecha_vencimiento', '')
         ubicacion = request.POST.get('ubicacion', '').strip()
         notas = request.POST.get('notas', '').strip()
+        
+        # Verificar si es petición AJAX
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         
         # Validaciones
         errores = []
         
         if not nombre:
-            errores.append('El nombre del insumo es obligatorio.')
+            error_msg = 'El nombre del insumo es obligatorio. Por favor, ingrese un nombre para el insumo.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
+        
+        if len(nombre) < 3:
+            error_msg = 'El nombre del insumo debe tener al menos 3 caracteres.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
         
         if not categoria:
-            errores.append('La categoría es obligatoria.')
+            error_msg = 'La categoría es obligatoria. Por favor, seleccione una categoría para el insumo.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
         
         try:
             cantidad_actual = int(cantidad_actual_str)
             if cantidad_actual < 0:
-                errores.append('La cantidad actual no puede ser negativa.')
-        except ValueError:
-            errores.append('La cantidad actual debe ser un número válido.')
+                error_msg = 'La cantidad actual no puede ser negativa. Por favor, ingrese un valor mayor o igual a 0.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                errores.append(error_msg)
+        except (ValueError, TypeError):
+            error_msg = 'La cantidad actual debe ser un número entero válido.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
         
         try:
             cantidad_minima = int(cantidad_minima_str)
             if cantidad_minima < 1:
-                errores.append('La cantidad mínima debe ser al menos 1.')
-        except ValueError:
-            errores.append('La cantidad mínima debe ser un número válido.')
+                error_msg = 'La cantidad mínima debe ser al menos 1. Por favor, ingrese un valor mayor a 0.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                errores.append(error_msg)
+        except (ValueError, TypeError):
+            error_msg = 'La cantidad mínima debe ser un número entero válido.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
         
         if cantidad_actual < cantidad_minima:
-            errores.append('La cantidad actual no puede ser menor que la cantidad mínima.')
+            error_msg = f'La cantidad actual ({cantidad_actual}) no puede ser menor que la cantidad mínima ({cantidad_minima}). Por favor, ajuste los valores.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
         
         precio_unitario = None
         if precio_unitario_str:
             try:
                 precio_unitario = round(float(precio_unitario_str))  # Redondear a entero para pesos chilenos
                 if precio_unitario < 0:
-                    errores.append('El precio unitario no puede ser negativo.')
-            except ValueError:
-                errores.append('El precio unitario debe ser un número válido.')
+                    error_msg = 'El precio unitario no puede ser negativo. Por favor, ingrese un valor positivo o deje el campo vacío.'
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                    errores.append(error_msg)
+            except (ValueError, TypeError):
+                error_msg = 'El precio unitario debe ser un número válido. Por favor, ingrese un valor numérico o deje el campo vacío.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                errores.append(error_msg)
         
         # Validar fecha de vencimiento
         fecha_vencimiento_obj = None
@@ -1600,28 +3469,70 @@ def agregar_insumo(request):
                 from datetime import datetime
                 fecha_vencimiento_obj = datetime.strptime(fecha_vencimiento, '%Y-%m-%d').date()
                 if fecha_vencimiento_obj < timezone.now().date():
-                    errores.append('La fecha de vencimiento no puede ser anterior a hoy.')
-            except ValueError:
-                errores.append('La fecha de vencimiento debe tener un formato válido.')
+                    error_msg = 'La fecha de vencimiento no puede ser anterior a la fecha actual. Por favor, seleccione una fecha válida.'
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                    errores.append(error_msg)
+            except (ValueError, TypeError):
+                error_msg = 'La fecha de vencimiento debe tener un formato válido (YYYY-MM-DD). Por favor, verifique el formato.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                errores.append(error_msg)
         
         # Verificar si ya existe un insumo con el mismo nombre
         if Insumo.objects.filter(nombre__iexact=nombre).exists():
-            errores.append('Ya existe un insumo con este nombre.')
+            error_msg = f'Ya existe un insumo con el nombre "{nombre}". Por favor, elija un nombre diferente.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': error_msg}, status=400)
+            errores.append(error_msg)
+        
+        # Validar y obtener proveedor si se proporciona
+        proveedor_principal = None
+        if proveedor_id:
+            try:
+                proveedor_principal = Proveedor.objects.get(id=proveedor_id, activo=True)
+            except (Proveedor.DoesNotExist, ValueError):
+                error_msg = 'El proveedor seleccionado no existe o está inactivo.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                errores.append(error_msg)
         
         if errores:
             for error in errores:
                 messages.error(request, error)
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': errores[0]}, status=400)
         else:
             try:
+                # Procesar imagen si se proporciona
+                imagen = None
+                if 'imagen' in request.FILES:
+                    imagen = request.FILES['imagen']
+                    # Validar tamaño (máximo 5MB)
+                    if imagen.size > 5 * 1024 * 1024:
+                        error_msg = 'La imagen es demasiado grande. El tamaño máximo permitido es 5MB.'
+                        if is_ajax:
+                            return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                        messages.error(request, error_msg)
+                        context = {
+                            'perfil': perfil,
+                            'categorias': Insumo.CATEGORIA_CHOICES,
+                            'proveedores': Proveedor.objects.filter(activo=True).order_by('nombre'),
+                            'es_admin': True,
+                            'form_data': request.POST
+                        }
+                        return render(request, 'citas/insumos/agregar_insumo.html', context)
+                
                 insumo = Insumo.objects.create(
                     nombre=nombre,
                     categoria=categoria,
                     descripcion=descripcion,
+                    imagen=imagen,
                     cantidad_actual=cantidad_actual,
                     cantidad_minima=cantidad_minima,
                     unidad_medida=unidad_medida,
                     precio_unitario=precio_unitario,
-                    proveedor=proveedor,
+                    proveedor_principal=proveedor_principal,
                     fecha_vencimiento=fecha_vencimiento_obj,
                     ubicacion=ubicacion,
                     notas=notas,
@@ -1639,19 +3550,40 @@ def agregar_insumo(request):
                     realizado_por=perfil
                 )
                 
-                messages.success(request, f'Insumo "{nombre}" agregado correctamente.')
-                return redirect('gestor_insumos')
+                success_msg = f'✅ Insumo "{nombre}" agregado correctamente con {cantidad_actual} {unidad_medida} de stock inicial.'
+                
+                if is_ajax:
+                    return JsonResponse({
+                        'success': True,
+                        'message': success_msg,
+                        'insumo': {
+                            'id': insumo.id,
+                            'nombre': insumo.nombre,
+                            'categoria': insumo.get_categoria_display(),
+                            'cantidad_actual': insumo.cantidad_actual,
+                        }
+                    })
+                
+                messages.success(request, success_msg)
+                return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
             except Exception as e:
-                messages.error(request, f'Error al agregar insumo: {str(e)}')
+                error_msg = f'❌ Error inesperado al agregar el insumo. Por favor, intente nuevamente. Si el problema persiste, contacte al administrador del sistema. Detalles: {str(e)}'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=500)
+                messages.error(request, error_msg)
+    
+    # Obtener proveedores activos para el formulario
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
     
     context = {
         'perfil': perfil,
         'categorias': Insumo.CATEGORIA_CHOICES,
+        'proveedores': proveedores,
         'es_admin': True,
         'form_data': request.POST if request.method == 'POST' else {}
     }
     
-    return render(request, 'citas/agregar_insumo.html', context)
+    return render(request, 'citas/insumos/agregar_insumo.html', context)
 
 # Editar insumo
 @login_required
@@ -1660,7 +3592,7 @@ def editar_insumo(request, insumo_id):
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_administrativo():
             messages.error(request, 'No tienes permisos para editar insumos.')
-            return redirect('gestor_insumos')
+            return redirect('gestor_inventario_unificado')
     except Perfil.DoesNotExist:
         return redirect('login')
 
@@ -1670,6 +3602,7 @@ def editar_insumo(request, insumo_id):
         insumo.nombre = request.POST.get('nombre')
         insumo.categoria = request.POST.get('categoria')
         insumo.descripcion = request.POST.get('descripcion', '')
+        insumo.cantidad_actual = int(request.POST.get('cantidad_actual', 0))
         insumo.cantidad_minima = int(request.POST.get('cantidad_minima', 1))
         insumo.unidad_medida = request.POST.get('unidad_medida', 'unidad')
         precio_unitario_str = request.POST.get('precio_unitario')
@@ -1680,26 +3613,63 @@ def editar_insumo(request, insumo_id):
                 insumo.precio_unitario = None
         else:
             insumo.precio_unitario = None
-        insumo.proveedor = request.POST.get('proveedor', '')
-        insumo.fecha_vencimiento = request.POST.get('fecha_vencimiento')
+        # Actualizar proveedor principal
+        proveedor_id = request.POST.get('proveedor_principal', '').strip()
+        if proveedor_id:
+            try:
+                insumo.proveedor_principal = Proveedor.objects.get(id=proveedor_id, activo=True)
+            except (Proveedor.DoesNotExist, ValueError):
+                insumo.proveedor_principal = None
+        else:
+            insumo.proveedor_principal = None
+        
+        fecha_vencimiento_str = request.POST.get('fecha_vencimiento', '')
+        if fecha_vencimiento_str:
+            try:
+                from datetime import datetime
+                insumo.fecha_vencimiento = datetime.strptime(fecha_vencimiento_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                insumo.fecha_vencimiento = None
+        else:
+            insumo.fecha_vencimiento = None
         insumo.ubicacion = request.POST.get('ubicacion', '')
         insumo.notas = request.POST.get('notas', '')
         
+        # Procesar imagen si se proporciona una nueva
+        if 'imagen' in request.FILES:
+            nueva_imagen = request.FILES['imagen']
+            # Validar tamaño (máximo 5MB)
+            if nueva_imagen.size > 5 * 1024 * 1024:
+                messages.error(request, 'La imagen es demasiado grande. El tamaño máximo permitido es 5MB.')
+                context = {
+                    'perfil': perfil,
+                    'insumo': insumo,
+                    'categorias': Insumo.CATEGORIA_CHOICES,
+                    'proveedores': Proveedor.objects.filter(activo=True).order_by('nombre'),
+                    'es_admin': True
+                }
+                return render(request, 'citas/insumos/editar_insumo.html', context)
+            insumo.imagen = nueva_imagen
+        
         try:
             insumo.save()
-            messages.success(request, f'Insumo "{insumo.nombre}" actualizado correctamente.')
-            return redirect('gestor_insumos')
+            messages.success(request, f'✅ Insumo "{insumo.nombre}" actualizado correctamente.')
+            return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
         except Exception as e:
             messages.error(request, f'Error al actualizar insumo: {e}')
+    
+    # Obtener proveedores activos para el formulario
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
     
     context = {
         'perfil': perfil,
         'insumo': insumo,
         'categorias': Insumo.CATEGORIA_CHOICES,
+        'proveedores': proveedores,
         'es_admin': True
     }
     
-    return render(request, 'citas/editar_insumo.html', context)
+    return render(request, 'citas/insumos/editar_insumo.html', context)
 
 # Movimiento de stock
 @login_required
@@ -1708,7 +3678,7 @@ def movimiento_insumo(request, insumo_id):
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_administrativo():
             messages.error(request, 'No tienes permisos para realizar movimientos de stock.')
-            return redirect('gestor_insumos')
+            return redirect('gestor_inventario_unificado')
     except Perfil.DoesNotExist:
         return redirect('login')
 
@@ -1722,7 +3692,7 @@ def movimiento_insumo(request, insumo_id):
         
         if cantidad <= 0:
             messages.error(request, 'La cantidad debe ser mayor a 0.')
-            return redirect('gestor_insumos')
+            return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
         
         cantidad_anterior = insumo.cantidad_actual
         
@@ -1732,7 +3702,7 @@ def movimiento_insumo(request, insumo_id):
             elif tipo == 'salida':
                 if cantidad > insumo.cantidad_actual:
                     messages.error(request, 'No hay suficiente stock disponible.')
-                    return redirect('gestor_insumos')
+                    return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
                 insumo.cantidad_actual -= cantidad
             elif tipo == 'ajuste':
                 insumo.cantidad_actual = cantidad
@@ -1751,8 +3721,8 @@ def movimiento_insumo(request, insumo_id):
                 realizado_por=perfil
             )
             
-            messages.success(request, f'Movimiento de stock realizado correctamente.')
-            return redirect('gestor_insumos')
+            messages.success(request, f'✅ Movimiento de stock realizado correctamente.')
+            return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
         except Exception as e:
             messages.error(request, f'Error al realizar movimiento: {e}')
     
@@ -1763,7 +3733,36 @@ def movimiento_insumo(request, insumo_id):
         'es_admin': True
     }
     
-    return render(request, 'citas/movimiento_insumo.html', context)
+    return render(request, 'citas/insumos/movimiento_insumo.html', context)
+
+# Eliminar insumo
+@login_required
+def eliminar_insumo(request, insumo_id):
+    """Vista para eliminar un insumo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'No tienes permisos para eliminar insumos.')
+            return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
+    except Perfil.DoesNotExist:
+        return redirect('login')
+    
+    if request.method == 'POST':
+        try:
+            insumo = get_object_or_404(Insumo, id=insumo_id)
+            nombre = insumo.nombre
+            
+            # Verificar si tiene movimientos asociados
+            movimientos_count = insumo.movimientos.count()
+            if movimientos_count > 0:
+                messages.warning(request, f'⚠️ El insumo "{nombre}" tiene {movimientos_count} movimiento(s) registrado(s). Se eliminarán también los movimientos asociados.')
+            
+            insumo.delete()
+            messages.success(request, f'✅ Insumo "{nombre}" eliminado correctamente.')
+        except Exception as e:
+            messages.error(request, f'❌ Error inesperado al eliminar el insumo. Por favor, intente nuevamente. Si el problema persiste, contacte al administrador del sistema. Detalles: {str(e)}')
+    
+    return redirect(reverse('gestor_inventario_unificado') + '?seccion=insumos')
 
 # Historial de movimientos
 @login_required
@@ -1772,7 +3771,7 @@ def historial_movimientos(request):
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_administrativo():
             messages.error(request, 'No tienes permisos para ver el historial de movimientos.')
-            return redirect('gestor_insumos')
+            return redirect('gestor_inventario_unificado')
     except Perfil.DoesNotExist:
         return redirect('login')
 
@@ -1805,7 +3804,7 @@ def historial_movimientos(request):
         'es_admin': True
     }
     
-    return render(request, 'citas/historial_movimientos.html', context)
+    return render(request, 'citas/insumos/historial_movimientos.html', context)
 
 # Gestión de Personal - solo administrativos
 @login_required
@@ -1844,11 +3843,23 @@ def gestor_personal(request):
     
     personal = personal.order_by('nombre_completo')
     
+    # Paginación - 10 registros por página
+    paginator = Paginator(personal, 10)
+    page = request.GET.get('page', 1)
+    
+    try:
+        personal = paginator.page(page)
+    except PageNotAnInteger:
+        personal = paginator.page(1)
+    except EmptyPage:
+        personal = paginator.page(paginator.num_pages)
+    
     # Estadísticas de personal
     total_personal = Perfil.objects.count()
     dentistas_count = Perfil.objects.filter(rol='dentista', activo=True).count()
     administrativos_count = Perfil.objects.filter(rol='administrativo', activo=True).count()
     personal_inactivo = Perfil.objects.filter(activo=False).count()
+    personal_sin_acceso = Perfil.objects.filter(requiere_acceso_sistema=False).count()
     
     # Estadísticas adicionales
     from datetime import datetime, timedelta
@@ -1860,6 +3871,18 @@ def gestor_personal(request):
     dentistas_porcentaje = round((dentistas_count / total_personal * 100) if total_personal > 0 else 0, 1)
     administrativos_porcentaje = round((administrativos_count / total_personal * 100) if total_personal > 0 else 0, 1)
 
+    # Datos adicionales para panel derecho
+    # Personal reciente (últimos 5 registrados)
+    personal_reciente = Perfil.objects.order_by('-fecha_registro')[:5]
+    
+    # Dentistas con horarios configurados hoy
+    dentistas_con_horario_hoy = Perfil.objects.filter(
+        rol='dentista',
+        activo=True,
+        horarios__dia_semana=timezone.now().weekday(),
+        horarios__activo=True
+    ).distinct()[:5]
+
     estadisticas = {
         'total_personal': total_personal,
         'dentistas': dentistas_count,
@@ -1868,6 +3891,7 @@ def gestor_personal(request):
         'nuevos_este_mes': nuevos_este_mes,
         'dentistas_porcentaje': dentistas_porcentaje,
         'administrativos_porcentaje': administrativos_porcentaje,
+        'sin_acceso': personal_sin_acceso,
     }
     
     context = {
@@ -1878,10 +3902,12 @@ def gestor_personal(request):
         'search': search,
         'rol': rol,
         'estado': estado,
-        'es_admin': True
+        'es_admin': True,
+        'personal_reciente': personal_reciente,
+        'dentistas_con_horario_hoy': dentistas_con_horario_hoy,
     }
     
-    return render(request, 'citas/gestor_personal.html', context)
+    return render(request, 'citas/personal/gestor_personal.html', context)
 
 # Agregar nuevo personal
 @login_required
@@ -1895,6 +3921,10 @@ def agregar_personal(request):
         return redirect('login')
 
     if request.method == 'POST':
+        logging.info('=== RECIBIENDO POST PARA AGREGAR PERSONAL ===')
+        logging.info(f'POST data: {dict(request.POST)}')
+        logging.info(f'FILES data: {dict(request.FILES)}')
+        
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
         nombre_completo = request.POST.get('nombre_completo', '').strip()
@@ -1905,6 +3935,8 @@ def agregar_personal(request):
         numero_colegio = request.POST.get('numero_colegio', '').strip()
         requiere_acceso = request.POST.get('requiere_acceso_sistema') == 'on'
         foto = request.FILES.get('foto')
+        
+        logging.info(f'Datos procesados: nombre={nombre_completo}, email={email}, telefono={telefono}, rol={rol}, requiere_acceso={requiere_acceso}')
         
         # Validaciones
         errores = []
@@ -1944,13 +3976,19 @@ def agregar_personal(request):
                 errores.append('El número de colegio es obligatorio para dentistas.')
         
         if errores:
+            logging.error(f'Errores de validación encontrados: {errores}')
             for error in errores:
                 messages.error(request, error)
+                logging.error(f'Mensaje de error agregado: {error}')
+            logging.info('Redirigiendo a gestor_personal con errores')
+            return redirect('gestor_personal')
         else:
             try:
+                logging.info(f'Iniciando creación de personal: {nombre_completo}, email: {email}, rol: {rol}')
                 user = None
                 # Solo crear usuario si requiere acceso al sistema
                 if requiere_acceso:
+                    logging.info(f'Creando usuario para personal con acceso: {username}')
                     user = User.objects.create_user(
                         username=username,
                         email=email,
@@ -1958,9 +3996,13 @@ def agregar_personal(request):
                         first_name=nombre_completo.split()[0] if nombre_completo.split() else '',
                         last_name=' '.join(nombre_completo.split()[1:]) if len(nombre_completo.split()) > 1 else ''
                     )
+                    logging.info(f'Usuario creado: {user.id}')
+                else:
+                    logging.info('Personal sin acceso al sistema, no se crea usuario')
                 
-                # Crear perfil
-                perfil_nuevo = Perfil.objects.create(
+                # Crear perfil con validación explícita
+                logging.info('Creando objeto Perfil...')
+                perfil_nuevo = Perfil(
                     user=user,
                     nombre_completo=nombre_completo,
                     telefono=telefono,
@@ -1972,20 +4014,49 @@ def agregar_personal(request):
                     foto=foto if foto else None
                 )
                 
+                # Validar el modelo antes de guardar
+                logging.info('Validando perfil...')
+                perfil_nuevo.full_clean()
+                logging.info('Guardando perfil en base de datos...')
+                perfil_nuevo.save()
+                logging.info(f'Perfil guardado con ID: {perfil_nuevo.id}')
+                
+                # Verificar que se guardó correctamente
+                perfil_guardado = Perfil.objects.filter(id=perfil_nuevo.id).first()
+                if not perfil_guardado:
+                    raise Exception('El perfil no se guardó correctamente en la base de datos.')
+                
+                # Verificar en la tabla
+                total_perfiles = Perfil.objects.count()
+                logging.info(f'Total de perfiles en la base de datos: {total_perfiles}')
+                
                 tipo_personal = "con acceso al sistema" if requiere_acceso else "sin acceso al sistema"
                 messages.success(request, f'Personal "{nombre_completo}" agregado correctamente ({tipo_personal}).')
+                logging.info(f'Personal "{nombre_completo}" agregado exitosamente. ID: {perfil_guardado.id}')
                 return redirect('gestor_personal')
             except Exception as e:
-                messages.error(request, f'Error al agregar personal: {str(e)}')
+                import traceback
+                error_detail = str(e)
+                # Si es un error de validación, mostrar el mensaje específico
+                if hasattr(e, 'message_dict'):
+                    error_messages = []
+                    for field, messages_list in e.message_dict.items():
+                        error_messages.extend(messages_list)
+                    error_detail = '; '.join(error_messages)
+                elif hasattr(e, 'messages'):
+                    error_detail = '; '.join([str(msg) for msg in e.messages])
+                
+                # Log detallado del error
+                error_traceback = traceback.format_exc()
+                logging.error(f'Error al agregar personal: {error_detail}\n{error_traceback}')
+                print(f'ERROR AL AGREGAR PERSONAL: {error_detail}')
+                print(f'TRACEBACK: {error_traceback}')
+                
+                messages.error(request, f'Error al agregar personal: {error_detail}')
+                return redirect('gestor_personal')
     
-    context = {
-        'perfil': perfil,
-        'roles': Perfil.ROLE_CHOICES,
-        'es_admin': True,
-        'form_data': request.POST if request.method == 'POST' else {}
-    }
-    
-    return render(request, 'citas/agregar_personal.html', context)
+    # Si es GET, redirigir al gestor de personal
+    return redirect('gestor_personal')
 
 # Editar personal
 @login_required
@@ -2114,6 +4185,21 @@ def editar_personal(request, personal_id):
                 
                 personal.save()
                 
+                # Registrar en auditoría
+                detalles_personal = f'Rol: {rol}, Email: {email}, Activo: {"Sí" if activo else "No"}'
+                if requiere_acceso:
+                    detalles_personal += ', Acceso al sistema: Sí'
+                registrar_auditoria(
+                    usuario=perfil_admin,
+                    accion='actualizar',
+                    modulo='personal',
+                    descripcion=f'Personal editado: {nombre_completo}',
+                    detalles=detalles_personal,
+                    objeto_id=personal.id,
+                    tipo_objeto='Perfil',
+                    request=request
+                )
+                
                 messages.success(request, f'Personal "{nombre_completo}" actualizado correctamente.')
                 return redirect('gestor_personal')
             except Exception as e:
@@ -2126,7 +4212,7 @@ def editar_personal(request, personal_id):
         'es_admin': True
     }
     
-    return render(request, 'citas/editar_personal.html', context)
+    return render(request, 'citas/personal/editar_personal.html', context)
 
 # Eliminar personal
 @login_required
@@ -2153,6 +4239,21 @@ def eliminar_personal(request, personal_id):
                 user = personal.user
                 user.delete()
             
+            # Registrar en auditoría ANTES de eliminar
+            detalles_eliminacion = f'Rol: {personal.rol}, Email: {personal.email}'
+            if personal.user:
+                detalles_eliminacion += ', Usuario web eliminado'
+            registrar_auditoria(
+                usuario=perfil_admin,
+                accion='eliminar',
+                modulo='personal',
+                descripcion=f'Personal eliminado: {nombre_completo}',
+                detalles=detalles_eliminacion,
+                objeto_id=personal_id,
+                tipo_objeto='Perfil',
+                request=request
+            )
+            
             # Eliminar perfil
             personal.delete()
             
@@ -2161,6 +4262,68 @@ def eliminar_personal(request, personal_id):
             messages.error(request, f'Error al eliminar personal: {str(e)}')
     
     return redirect('gestor_personal')
+
+# Toggle estado personal (activar/desactivar)
+@login_required
+def toggle_estado_personal(request, personal_id):
+    """
+    Vista para activar/desactivar un miembro del personal
+    También desactiva/activa su cuenta de usuario web si existe
+    """
+    try:
+        perfil_admin = Perfil.objects.get(user=request.user)
+        if not perfil_admin.es_administrativo():
+            return JsonResponse({
+                'success': False,
+                'error': 'No tienes permisos para realizar esta acción'
+            }, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'No tienes permisos'
+        }, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Método no permitido'
+        }, status=405)
+    
+    try:
+        from django.contrib.auth.models import User
+        
+        personal = Perfil.objects.get(id=personal_id)
+        nuevo_estado = not personal.activo
+        personal.activo = nuevo_estado
+        personal.save()
+        
+        # Buscar si existe un usuario web asociado
+        if personal.user:
+            # Desactivar/activar también el usuario de Django
+            personal.user.is_active = nuevo_estado
+            personal.user.save()
+            
+            mensaje = f'Personal "{personal.nombre_completo}" {"activado" if nuevo_estado else "desactivado"} exitosamente. '
+            mensaje += f'Usuario web también {"activado" if nuevo_estado else "desactivado"} (no podrá hacer login).'
+        else:
+            # El personal no tiene usuario web
+            mensaje = f'Personal "{personal.nombre_completo}" {"activado" if nuevo_estado else "desactivado"} exitosamente.'
+        
+        return JsonResponse({
+            'success': True,
+            'activo': personal.activo,
+            'message': mensaje
+        })
+    except Perfil.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Personal no encontrado'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al cambiar el estado: {str(e)}'
+        }, status=500)
 
 # Calendario personal para dentistas
 @login_required
@@ -2240,9 +4403,71 @@ def calendario_personal(request):
         'es_dentista': True
     }
     
-    return render(request, 'citas/calendario_personal.html', context)
+    return render(request, 'citas/personal/calendario_personal.html', context)
 
 # Vista para mostrar perfil del dentista
+@login_required
+def obtener_perfil_json(request):
+    """Vista AJAX para obtener información del perfil en JSON"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        
+        # Obtener estadísticas según el rol
+        if perfil.es_dentista():
+            citas_totales = Cita.objects.filter(dentista=perfil).count()
+            citas_completadas = Cita.objects.filter(dentista=perfil, estado='completada').count()
+            citas_pendientes = Cita.objects.filter(dentista=perfil, estado='reservada').count()
+            citas_confirmadas = Cita.objects.filter(dentista=perfil, estado='confirmada').count()
+            clientes_gestionados = 0
+        elif perfil.es_administrativo():
+            # Para administrativos: citas creadas por ellos y clientes creados
+            citas_totales = Cita.objects.filter(creada_por=perfil).count()
+            citas_completadas = Cita.objects.filter(creada_por=perfil, estado='completada').count()
+            citas_pendientes = Cita.objects.filter(creada_por=perfil, estado__in=['reservada', 'confirmada']).count()
+            citas_confirmadas = Cita.objects.filter(creada_por=perfil, estado='confirmada').count()
+            # Clientes creados por este administrativo (si hay campo creado_por)
+            try:
+                clientes_gestionados = Cliente.objects.filter(activo=True).count()  # Total de clientes activos
+            except:
+                clientes_gestionados = 0
+        else:
+            citas_totales = 0
+            citas_completadas = 0
+            citas_pendientes = 0
+            citas_confirmadas = 0
+            clientes_gestionados = 0
+        
+        data = {
+            'success': True,
+            'perfil': {
+                'nombre_completo': perfil.nombre_completo,
+                'rol': perfil.get_rol_display(),
+                'especialidad': perfil.especialidad or '',
+                'email': perfil.user.email,
+                'telefono': perfil.telefono or 'No especificado',
+                'activo': perfil.activo,
+                'numero_colegio': perfil.numero_colegio or '',
+                'fecha_registro': perfil.user.date_joined.strftime('%B %Y'),
+                'ultimo_acceso': perfil.user.last_login.strftime('%d/%m/%Y %H:%M') if perfil.user.last_login else 'Nunca',
+                'username': perfil.user.username,
+            },
+            'estadisticas': {
+                'citas_totales': citas_totales,
+                'citas_completadas': citas_completadas,
+                'citas_pendientes': citas_pendientes,
+                'citas_confirmadas': citas_confirmadas,
+                'clientes_gestionados': clientes_gestionados,
+            },
+            'es_dentista': perfil.es_dentista(),
+            'es_administrativo': perfil.es_administrativo(),
+        }
+        
+        return JsonResponse(data)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Perfil no encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 @login_required
 def mi_perfil(request):
     try:
@@ -2266,7 +4491,7 @@ def mi_perfil(request):
         'citas_pendientes': citas_pendientes,
     }
     
-    return render(request, 'citas/mi_perfil.html', context)
+    return render(request, 'citas/perfil/mi_perfil.html', context)
 
 # Vista para asignar dentista a una cita
 @login_required
@@ -2306,7 +4531,7 @@ def asignar_dentista_cita(request, cita_id):
         'es_admin': True
     }
     
-    return render(request, 'citas/asignar_dentista_cita.html', context)
+    return render(request, 'citas/citas/asignar_dentista_cita.html', context)
 
 # Vista para que los dentistas vean sus citas asignadas
 @login_required
@@ -2331,10 +4556,10 @@ def mis_citas_dentista(request):
     from pacientes.models import Cliente
     from historial_clinico.models import Odontograma
     
-    # Separar citas en dos grupos: activas (reservadas) y completadas
+    # Separar citas en dos grupos: activas (reservadas, confirmadas, en_espera, listo_para_atender, en_progreso, finalizada) y completadas
     citas_activas = Cita.objects.filter(
         dentista=perfil,
-        estado='reservada'
+        estado__in=['reservada', 'confirmada', 'en_espera', 'listo_para_atender', 'en_progreso', 'finalizada']
     ).select_related('cliente', 'dentista', 'tipo_servicio')
     
     citas_completadas = Cita.objects.filter(
@@ -2413,7 +4638,7 @@ def mis_citas_dentista(request):
         'citas_completadas_count': citas_completadas_count
     }
     
-    return render(request, 'citas/mis_citas_dentista.html', context)
+    return render(request, 'citas/citas/mis_citas_dentista.html', context)
 
 # Vista para que el dentista tome una cita disponible
 @login_required
@@ -2433,7 +4658,7 @@ def exportar_insumos_pdf(request):
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_administrativo():
             messages.error(request, 'No tienes permisos para exportar insumos.')
-            return redirect('gestor_insumos')
+            return redirect('gestor_inventario_unificado')
     except Perfil.DoesNotExist:
         messages.error(request, 'No tienes permisos para acceder a esta función.')
         return redirect('login')
@@ -2689,20 +4914,20 @@ def gestionar_pacientes(request):
         'es_dentista': True
     }
     
-    return render(request, 'citas/gestionar_pacientes.html', context)
+    return render(request, 'citas/clientes/gestionar_pacientes.html', context)
 
-# Vista para ver detalles de un paciente específico
+# Endpoint JSON para obtener estadísticas de un paciente (usado por el modal)
 @login_required
-def detalle_paciente(request, paciente_id):
-    """Vista para ver los detalles de un paciente específico"""
+def estadisticas_paciente_json(request, paciente_id):
+    """Endpoint JSON para obtener estadísticas de un paciente específico"""
+    from django.http import JsonResponse
+    
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_dentista():
-            messages.error(request, 'Solo los dentistas pueden ver detalles de pacientes.')
-            return redirect('panel_trabajador')
+            return JsonResponse({'success': False, 'message': 'Solo los dentistas pueden ver estadísticas de pacientes.'}, status=403)
     except Perfil.DoesNotExist:
-        messages.error(request, 'No tienes permisos para acceder a esta función.')
-        return redirect('login')
+        return JsonResponse({'success': False, 'message': 'No tienes permisos para acceder a esta función.'}, status=403)
 
     # Obtener el paciente desde las citas asignadas al dentista
     pacientes = perfil.get_pacientes_asignados()
@@ -2714,8 +4939,7 @@ def detalle_paciente(request, paciente_id):
             break
     
     if not paciente:
-        messages.error(request, 'No tienes permisos para ver este paciente.')
-        return redirect('gestionar_pacientes')
+        return JsonResponse({'success': False, 'message': 'No tienes permisos para ver este paciente.'}, status=403)
     
     # Obtener citas del paciente
     citas_paciente = Cita.objects.filter(
@@ -2724,86 +4948,41 @@ def detalle_paciente(request, paciente_id):
     ).order_by('-fecha_hora')
     
     # Estadísticas del paciente
-    estadisticas_paciente = {
-        'total_citas': citas_paciente.count(),
-        'citas_completadas': citas_paciente.filter(estado='completada').count(),
-        'citas_pendientes': citas_paciente.filter(estado='reservada').count(),
-        'citas_canceladas': citas_paciente.filter(estado='cancelada').count(),
-        'ultima_cita': citas_paciente.first(),
-        'proxima_cita': citas_paciente.filter(
-            fecha_hora__gte=timezone.now(),
-            estado='reservada'
-        ).first(),
+    ultima_cita = citas_paciente.first()
+    proxima_cita = citas_paciente.filter(
+        fecha_hora__gte=timezone.now(),
+        estado__in=['reservada', 'confirmada']
+    ).order_by('fecha_hora').first()
+    
+    data = {
+        'success': True,
+        'estadisticas': {
+            'total_citas': citas_paciente.count(),
+            'citas_completadas': citas_paciente.filter(estado='completada').count(),
+            'citas_pendientes': citas_paciente.filter(estado='reservada').count(),
+            'citas_canceladas': citas_paciente.filter(estado='cancelada').count(),
+        },
+        'ultima_cita': None,
+        'proxima_cita': None,
     }
     
-    context = {
-        'perfil': perfil,
-        'paciente': paciente,
-        'citas_paciente': citas_paciente,
-        'estadisticas_paciente': estadisticas_paciente,
-        'es_dentista': True
-    }
+    if ultima_cita:
+        data['ultima_cita'] = {
+            'fecha': ultima_cita.fecha_hora.strftime('%d/%m/%Y'),
+            'hora': ultima_cita.fecha_hora.strftime('%H:%M'),
+            'servicio': str(ultima_cita.tipo_servicio.nombre if ultima_cita.tipo_servicio else ultima_cita.tipo_consulta or 'Consulta general'),
+            'estado': ultima_cita.get_estado_display(),
+        }
     
-    return render(request, 'citas/detalle_paciente.html', context)
-
-# Vista para agregar notas a un paciente
-@login_required
-def agregar_nota_paciente(request, paciente_id):
-    """Vista para agregar o editar notas de un paciente"""
-    try:
-        perfil = Perfil.objects.get(user=request.user)
-        if not perfil.es_dentista():
-            messages.error(request, 'Solo los dentistas pueden agregar notas a pacientes.')
-            return redirect('panel_trabajador')
-    except Perfil.DoesNotExist:
-        messages.error(request, 'No tienes permisos para acceder a esta función.')
-        return redirect('login')
-
-    # Obtener el paciente desde las citas asignadas al dentista
-    pacientes = perfil.get_pacientes_asignados()
-    paciente = None
+    if proxima_cita:
+        data['proxima_cita'] = {
+            'fecha': proxima_cita.fecha_hora.strftime('%d/%m/%Y'),
+            'hora': proxima_cita.fecha_hora.strftime('%H:%M'),
+            'servicio': str(proxima_cita.tipo_servicio.nombre if proxima_cita.tipo_servicio else proxima_cita.tipo_consulta or 'Consulta general'),
+            'estado': proxima_cita.get_estado_display(),
+        }
     
-    for p in pacientes:
-        if p['id'] == int(paciente_id):
-            paciente = p
-            break
-    
-    if not paciente:
-        messages.error(request, 'No tienes permisos para editar este paciente.')
-        return redirect('gestionar_pacientes')
-    
-    if request.method == 'POST':
-        notas = request.POST.get('notas', '').strip()
-        
-        try:
-            # Actualizar las notas en todas las citas del paciente
-            Cita.objects.filter(
-                paciente_email=paciente['email'],
-                dentista=perfil
-            ).update(notas_paciente=notas)
-            
-            # Si es una petición AJAX, devolver JSON
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                from django.http import JsonResponse
-                return JsonResponse({'success': True, 'message': 'Notas del paciente actualizadas correctamente.'})
-            
-            messages.success(request, 'Notas del paciente actualizadas correctamente.')
-            return redirect('detalle_paciente', paciente_id=paciente['id'])
-        except Exception as e:
-            # Si es una petición AJAX, devolver JSON con error
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                from django.http import JsonResponse
-                return JsonResponse({'success': False, 'message': f'Error al actualizar las notas: {e}'}, status=400)
-            
-            messages.error(request, f'Error al actualizar las notas: {e}')
-    
-    context = {
-        'perfil': perfil,
-        'paciente': paciente,
-        'es_dentista': True
-    }
-    
-    return render(request, 'citas/agregar_nota_paciente.html', context)
+    return JsonResponse(data)
 
 # Vista para que los dentistas vean sus estadísticas de pacientes
 @login_required
@@ -2870,7 +5049,7 @@ def estadisticas_pacientes(request):
         'es_dentista': True
     }
     
-    return render(request, 'citas/estadisticas_pacientes.html', context)
+    return render(request, 'citas/clientes/estadisticas_pacientes.html', context)
 
 # Vista para asignar dentista a un cliente (solo administrativos)
 @login_required
@@ -2931,7 +5110,7 @@ def asignar_dentista_cliente(request, cliente_id):
         'es_admin': True
     }
     
-    return render(request, 'citas/asignar_dentista_cliente.html', context)
+    return render(request, 'citas/clientes/asignar_dentista_cliente.html', context)
 
 # ========== GESTIÓN DE ODONTOGRAMAS ==========
 
@@ -2954,7 +5133,7 @@ def listar_odontogramas(request):
     fecha_hasta = request.GET.get('fecha_hasta', '')
     
     # Obtener odontogramas del dentista
-    odontogramas = Odontograma.objects.filter(dentista=perfil)
+    odontogramas = Odontograma.objects.filter(dentista=perfil).select_related('cliente', 'cita')
     
     # Aplicar filtros
     if search:
@@ -2971,6 +5150,48 @@ def listar_odontogramas(request):
     
     odontogramas = odontogramas.order_by('-fecha_creacion')
     
+    # Agrupar odontogramas por cliente/paciente
+    # Usar email como clave única para agrupar
+    pacientes_dict = {}
+    
+    for odontograma in odontogramas:
+        # Determinar clave única: cliente.id si existe, sino email
+        if odontograma.cliente:
+            clave = f"cliente_{odontograma.cliente.id}"
+            nombre_completo = odontograma.cliente.nombre_completo
+            email = odontograma.cliente.email
+            telefono = odontograma.cliente.telefono or ''
+            paciente_id = odontograma.cliente.id
+        else:
+            clave = f"email_{odontograma.paciente_email}"
+            nombre_completo = odontograma.paciente_nombre
+            email = odontograma.paciente_email
+            telefono = odontograma.paciente_telefono or ''
+            paciente_id = None
+        
+        if clave not in pacientes_dict:
+            pacientes_dict[clave] = {
+                'id': paciente_id,
+                'nombre_completo': nombre_completo,
+                'email': email,
+                'telefono': telefono,
+                'odontogramas': [],
+                'total_odontogramas': 0,
+                'ultimo_odontograma': None,
+            }
+        
+        pacientes_dict[clave]['odontogramas'].append(odontograma)
+        pacientes_dict[clave]['total_odontogramas'] += 1
+        
+        # Actualizar último odontograma si es más reciente
+        if not pacientes_dict[clave]['ultimo_odontograma'] or \
+           odontograma.fecha_creacion > pacientes_dict[clave]['ultimo_odontograma'].fecha_creacion:
+            pacientes_dict[clave]['ultimo_odontograma'] = odontograma
+    
+    # Convertir a lista y ordenar por nombre
+    pacientes_con_odontogramas = list(pacientes_dict.values())
+    pacientes_con_odontogramas.sort(key=lambda x: x['nombre_completo'])
+    
     # Estadísticas
     total_odontogramas = odontogramas.count()
     odontogramas_mes = odontogramas.filter(
@@ -2980,11 +5201,13 @@ def listar_odontogramas(request):
     estadisticas = {
         'total_odontogramas': total_odontogramas,
         'odontogramas_mes': odontogramas_mes,
+        'total_pacientes': len(pacientes_con_odontogramas),
     }
     
     context = {
         'perfil': perfil,
-        'odontogramas': odontogramas,
+        'odontogramas': odontogramas,  # Mantener para compatibilidad
+        'pacientes_con_odontogramas': pacientes_con_odontogramas,
         'estadisticas': estadisticas,
         'search': search,
         'fecha_desde': fecha_desde,
@@ -2992,7 +5215,7 @@ def listar_odontogramas(request):
         'es_dentista': True
     }
     
-    return render(request, 'citas/listar_odontogramas.html', context)
+    return render(request, 'citas/odontogramas/listar_odontogramas.html', context)
 
 # Vista para crear un nuevo odontograma
 @login_required
@@ -3007,11 +5230,16 @@ def crear_odontograma(request):
         messages.error(request, 'No tienes permisos para acceder a esta función.')
         return redirect('login')
 
+    # Obtener paciente_id del GET para redirección después de crear
+    paciente_id_redirect = request.GET.get('paciente_id', '')
+    
     if request.method == 'POST':
         # Obtener cita asociada (OBLIGATORIA)
         cita_id = request.POST.get('cita_id', '').strip()
         if not cita_id:
             messages.error(request, 'Debes seleccionar una cita para crear la ficha odontológica. Las fichas deben estar vinculadas a una cita específica.')
+            if paciente_id_redirect:
+                return redirect(f"{reverse('crear_odontograma')}?paciente_id={paciente_id_redirect}")
             return redirect('crear_odontograma')
         
         try:
@@ -3042,7 +5270,13 @@ def crear_odontograma(request):
         estado_general = request.POST.get('estado_general', 'buena')
         observaciones = request.POST.get('observaciones', '').strip()
         plan_tratamiento = request.POST.get('plan_tratamiento', '').strip()
-        proxima_cita = request.POST.get('proxima_cita', '')
+        
+        # Si no se proporcionó fecha de nacimiento o alergias, intentar obtenerlas del cliente
+        if not paciente_fecha_nacimiento and cliente_obj and cliente_obj.fecha_nacimiento:
+            paciente_fecha_nacimiento = cliente_obj.fecha_nacimiento.strftime('%Y-%m-%d')
+        
+        if not alergias and cliente_obj and cliente_obj.alergias:
+            alergias = cliente_obj.alergias
         
         # Validaciones
         errores = []
@@ -3070,21 +5304,6 @@ def crear_odontograma(request):
             except ValueError:
                 errores.append('La fecha de nacimiento debe tener un formato válido.')
         
-        # Validar próxima cita
-        proxima_cita_obj = None
-        if proxima_cita:
-            try:
-                # Usar timezone-aware datetime si es necesario
-                if 'T' in proxima_cita:
-                    proxima_cita_obj = datetime.fromisoformat(proxima_cita.replace('Z', '+00:00'))
-                else:
-                    proxima_cita_obj = datetime.strptime(proxima_cita, '%Y-%m-%dT%H:%M')
-                # Asegurar que sea timezone-aware
-                if timezone.is_naive(proxima_cita_obj):
-                    proxima_cita_obj = timezone.make_aware(proxima_cita_obj)
-            except (ValueError, AttributeError) as e:
-                errores.append('La próxima cita debe tener un formato válido (YYYY-MM-DDTHH:MM).')
-        
         if errores:
             for error in errores:
                 messages.error(request, error)
@@ -3106,16 +5325,25 @@ def crear_odontograma(request):
                     higiene_oral=higiene_oral,
                     estado_general=estado_general,
                     observaciones=observaciones,
-                    plan_tratamiento=plan_tratamiento,
-                    proxima_cita=proxima_cita_obj
+                    plan_tratamiento=plan_tratamiento
                 )
                 
                 # Procesar datos del odontograma interactivo
                 odontograma_data = request.POST.get('odontograma_data', '')
+                odontograma_data_extended = request.POST.get('odontograma_data_extended', '')
+                
                 if odontograma_data:
                     try:
                         import json
                         dientes_data = json.loads(odontograma_data)
+                        extended_data = {}
+                        
+                        # Cargar datos extendidos si existen
+                        if odontograma_data_extended:
+                            try:
+                                extended_data = json.loads(odontograma_data_extended)
+                            except:
+                                extended_data = {}
                         
                         for numero_diente, caras_data in dientes_data.items():
                             # Determinar el estado general del diente
@@ -3141,12 +5369,21 @@ def crear_odontograma(request):
                             else:
                                 estado_general_diente = 'sano'
                             
+                            # Preparar observaciones con datos extendidos
+                            observaciones_data = {
+                                'caras': caras_data
+                            }
+                            
+                            # Agregar metadata (diagnóstico y procedimiento) si existe
+                            if numero_diente in extended_data:
+                                observaciones_data['metadata'] = extended_data[numero_diente]
+                            
                             # Crear estado del diente
                             EstadoDiente.objects.create(
                                 odontograma=odontograma,
                                 numero_diente=int(numero_diente),
                                 estado=estado_general_diente,
-                                observaciones=f"Datos del odontograma interactivo: {json.dumps(caras_data)}"
+                                observaciones=f"Datos del odontograma interactivo: {json.dumps(observaciones_data)}"
                             )
                     except (json.JSONDecodeError, ValueError) as e:
                         messages.warning(request, f'Error al procesar datos del odontograma: {str(e)}')
@@ -3154,11 +5391,6 @@ def crear_odontograma(request):
                 # Procesar insumos utilizados
                 insumos_ids = request.POST.getlist('insumo_id[]')
                 insumos_cantidades = request.POST.getlist('insumo_cantidad[]')
-                
-                # Debug: imprimir lo que recibimos
-                print(f"DEBUG - IDs recibidos: {insumos_ids}")
-                print(f"DEBUG - Cantidades recibidas: {insumos_cantidades}")
-                print(f"DEBUG - POST completo: {request.POST}")
                 
                 insumos_procesados = 0
                 insumos_errores = []
@@ -3177,7 +5409,6 @@ def crear_odontograma(request):
                             
                         try:
                             cantidad = int(cantidad_str)
-                            print(f"DEBUG - Procesando insumo ID {insumo_id}, cantidad {cantidad}")
                             if cantidad > 0:
                                 # Obtener el insumo
                                 from inventario.models import Insumo, MovimientoInsumo
@@ -3223,17 +5454,35 @@ def crear_odontograma(request):
                         except (ValueError, TypeError):
                             insumos_errores.append(f'Cantidad inválida para el insumo')
                 
+                # Si la cita estaba en "en_progreso" o "listo_para_atender", cambiar automáticamente a "finalizada"
+                if cita_obj.estado in ['en_progreso', 'listo_para_atender']:
+                    cita_obj.estado = 'finalizada'
+                    cita_obj.save()
+                
                 # Mensajes de resultado
                 if insumos_procesados > 0:
-                    messages.success(request, f'Odontograma creado correctamente para {paciente_nombre}. Se registraron {insumos_procesados} insumo(s) utilizado(s).')
+                    if cita_obj.estado == 'finalizada':
+                        messages.success(request, f'Odontograma creado correctamente para {paciente_nombre}. Se registraron {insumos_procesados} insumo(s) utilizado(s). La cita ha sido marcada como "Finalizada".')
+                    else:
+                        messages.success(request, f'Odontograma creado correctamente para {paciente_nombre}. Se registraron {insumos_procesados} insumo(s) utilizado(s).')
                 else:
-                    messages.success(request, f'Odontograma creado correctamente para {paciente_nombre}.')
+                    if cita_obj.estado == 'finalizada':
+                        messages.success(request, f'Odontograma creado correctamente para {paciente_nombre}. La cita ha sido marcada como "Finalizada".')
+                    else:
+                        messages.success(request, f'Odontograma creado correctamente para {paciente_nombre}.')
                 
                 if insumos_errores:
                     for error in insumos_errores:
                         messages.warning(request, f'Insumo: {error}')
                 
-                return redirect('listar_odontogramas')
+                # Redirigir según el origen
+                paciente_id_post = request.POST.get('paciente_id_redirect', paciente_id_redirect)
+                if paciente_id_post:
+                    # Si viene desde mis_pacientes, redirigir ahí
+                    return redirect('mis_pacientes_seccion', paciente_id=paciente_id_post, seccion='odontogramas')
+                else:
+                    # Si no, redirigir al listado de odontogramas
+                    return redirect('listar_odontogramas')
             except Exception as e:
                 messages.error(request, f'Error al crear odontograma: {str(e)}')
     
@@ -3244,70 +5493,119 @@ def crear_odontograma(request):
         cantidad_actual__gt=0
     ).order_by('nombre')
     
-    # Obtener citas del dentista (reservadas o completadas) para asociar con la ficha
-    citas_disponibles = Cita.objects.filter(
-        dentista=perfil,
-        estado__in=['reservada', 'completada']
-    ).select_related('cliente').order_by('-fecha_hora')[:50]  # Últimas 50 citas
-    
-    # Si viene desde una cita, auto-rellenar datos
+    # Inicializar variables para datos pre-seleccionados
     form_data = {}
     cita_pre_seleccionada = None
+    cliente_pre_seleccionado = None
     
     if request.method == 'GET':
         cita_id = request.GET.get('cita_id', '')
-        if not cita_id:
-            # Si no viene cita_id, redirigir al listado de odontogramas
+        paciente_id = request.GET.get('paciente_id', '')
+        
+        # Si viene paciente_id, buscar el cliente y sus citas
+        if paciente_id:
+            try:
+                cliente_pre_seleccionado = Cliente.objects.get(id=paciente_id, activo=True)
+                # Buscar la cita más reciente del paciente con este dentista
+                cita_pre_seleccionada = Cita.objects.filter(
+                    cliente=cliente_pre_seleccionado,
+                    dentista=perfil,
+                    estado__in=['reservada', 'completada']
+                ).order_by('-fecha_hora').first()
+                
+                # Si no hay cita, buscar por email
+                if not cita_pre_seleccionada and cliente_pre_seleccionado.email:
+                    cita_pre_seleccionada = Cita.objects.filter(
+                        paciente_email=cliente_pre_seleccionado.email,
+                        dentista=perfil,
+                        estado__in=['reservada', 'completada']
+                    ).order_by('-fecha_hora').first()
+            except Cliente.DoesNotExist:
+                messages.warning(request, 'El paciente seleccionado no existe.')
+        
+        # Si viene cita_id, usarlo directamente
+        if cita_id and not cita_pre_seleccionada:
+            try:
+                cita_pre_seleccionada = Cita.objects.select_related('cliente', 'dentista').get(id=cita_id, dentista=perfil)
+            except Cita.DoesNotExist:
+                messages.warning(request, 'La cita seleccionada no existe o no pertenece a este dentista.')
+        
+        # Si no hay cita ni paciente, redirigir al listado de odontogramas
+        if not cita_pre_seleccionada and not cliente_pre_seleccionado:
             messages.info(request, 'Por favor, selecciona una cita desde el listado para crear la ficha. Las fichas deben estar vinculadas a una cita específica.')
             return redirect('listar_odontogramas')
         
-        if cita_id:
-            try:
-                # Obtener cita con relación al cliente para acceder a nombre_completo
-                cita_pre_seleccionada = Cita.objects.select_related('cliente', 'dentista').get(id=cita_id, dentista=perfil)
-                
-                # Intentar obtener el cliente (prioridad: cliente vinculado > búsqueda por email)
-                cliente_obj = cita_pre_seleccionada.cliente
-                
-                # Si no tiene cliente vinculado pero tiene email, buscar por email
-                if not cliente_obj and cita_pre_seleccionada.paciente_email:
-                    try:
-                        cliente_obj = Cliente.objects.get(email=cita_pre_seleccionada.paciente_email, activo=True)
-                    except (Cliente.DoesNotExist, Cliente.MultipleObjectsReturned):
-                        cliente_obj = Cliente.objects.filter(email=cita_pre_seleccionada.paciente_email, activo=True).first()
-                
-                # Auto-rellenar datos del paciente desde la cita
-                # Prioridad: Cliente encontrado (con nombre_completo) > Datos de la cita
-                if cliente_obj:
-                    # Si encontramos cliente, usar SIEMPRE sus datos completos (nombre_completo, no username)
-                    paciente_nombre_final = cliente_obj.nombre_completo
-                    paciente_email_final = cliente_obj.email
-                    paciente_telefono_final = cliente_obj.telefono or ''
-                    paciente_fecha_nacimiento_final = cliente_obj.fecha_nacimiento.strftime('%Y-%m-%d') if cliente_obj.fecha_nacimiento else ''
-                    alergias_final = cliente_obj.alergias or ''
-                else:
-                    # Si no hay cliente, usar datos de la cita (paciente de recepción)
-                    # IMPORTANTE: Si paciente_nombre parece ser un username (sin espacios, corto), 
-                    # se debe completar manualmente
-                    paciente_nombre_final = cita_pre_seleccionada.paciente_nombre or ''
-                    paciente_email_final = cita_pre_seleccionada.paciente_email or ''
-                    paciente_telefono_final = cita_pre_seleccionada.paciente_telefono or ''
-                    # La cita no tiene fecha de nacimiento, se debe completar manualmente
-                    paciente_fecha_nacimiento_final = ''
-                    alergias_final = ''
-                
-                form_data = {
-                    'paciente_nombre': paciente_nombre_final,
-                    'paciente_email': paciente_email_final,
-                    'paciente_telefono': paciente_telefono_final,
-                    'paciente_fecha_nacimiento': paciente_fecha_nacimiento_final,
-                    'alergias': alergias_final,
-                    'cita_id': str(cita_pre_seleccionada.id),
-                }
-            except Cita.DoesNotExist:
-                messages.warning(request, 'La cita seleccionada no existe o no pertenece a este dentista.')
+        # Si hay cita pre-seleccionada, auto-rellenar datos
+        if cita_pre_seleccionada:
+            # Intentar obtener el cliente (prioridad: cliente vinculado > búsqueda por email)
+            cliente_obj = cita_pre_seleccionada.cliente
+            
+            # Si no tiene cliente vinculado pero tiene email, buscar por email
+            if not cliente_obj and cita_pre_seleccionada.paciente_email:
+                try:
+                    cliente_obj = Cliente.objects.get(email=cita_pre_seleccionada.paciente_email, activo=True)
+                except (Cliente.DoesNotExist, Cliente.MultipleObjectsReturned):
+                    cliente_obj = Cliente.objects.filter(email=cita_pre_seleccionada.paciente_email, activo=True).first()
+            
+            # Auto-rellenar datos del paciente desde la cita
+            # Prioridad: Cliente encontrado (con nombre_completo) > Datos de la cita
+            if cliente_obj:
+                # Si encontramos cliente, usar SIEMPRE sus datos completos (nombre_completo, no username)
+                paciente_nombre_final = cliente_obj.nombre_completo
+                paciente_email_final = cliente_obj.email
+                paciente_telefono_final = cliente_obj.telefono or ''
+                paciente_fecha_nacimiento_final = cliente_obj.fecha_nacimiento.strftime('%Y-%m-%d') if cliente_obj.fecha_nacimiento else ''
+                alergias_final = cliente_obj.alergias or ''
+            else:
+                # Si no hay cliente, usar datos de la cita (paciente de recepción)
+                # IMPORTANTE: Si paciente_nombre parece ser un username (sin espacios, corto), 
+                # se debe completar manualmente
+                paciente_nombre_final = cita_pre_seleccionada.paciente_nombre or ''
+                paciente_email_final = cita_pre_seleccionada.paciente_email or ''
+                paciente_telefono_final = cita_pre_seleccionada.paciente_telefono or ''
+                # La cita no tiene fecha de nacimiento, se debe completar manualmente
+                paciente_fecha_nacimiento_final = ''
+                alergias_final = ''
+            
+            form_data = {
+                'paciente_nombre': paciente_nombre_final,
+                'paciente_email': paciente_email_final,
+                'paciente_telefono': paciente_telefono_final,
+                'paciente_fecha_nacimiento': paciente_fecha_nacimiento_final,
+                'alergias': alergias_final,
+                'cita_id': str(cita_pre_seleccionada.id),
+            }
+        # Si hay cliente pre-seleccionado pero no cita, auto-rellenar datos del cliente
+        elif cliente_pre_seleccionado:
+            form_data = {
+                'paciente_nombre': cliente_pre_seleccionado.nombre_completo,
+                'paciente_email': cliente_pre_seleccionado.email,
+                'paciente_telefono': cliente_pre_seleccionado.telefono or '',
+                'paciente_fecha_nacimiento': cliente_pre_seleccionado.fecha_nacimiento.strftime('%Y-%m-%d') if cliente_pre_seleccionado.fecha_nacimiento else '',
+                'alergias': cliente_pre_seleccionado.alergias or '',
+            }
     elif request.method == 'POST':
         form_data = request.POST
+    
+    # Obtener citas del dentista (reservadas o completadas) para asociar con la ficha
+    # Si hay cliente pre-seleccionado, filtrar sus citas primero
+    if cliente_pre_seleccionado:
+        citas_disponibles = Cita.objects.filter(
+            dentista=perfil,
+            estado__in=['reservada', 'completada'],
+            cliente=cliente_pre_seleccionado
+        ).select_related('cliente').order_by('-fecha_hora')[:50]
+        # Si no hay citas del cliente, incluir todas las citas del dentista
+        if not citas_disponibles.exists():
+            citas_disponibles = Cita.objects.filter(
+                dentista=perfil,
+                estado__in=['reservada', 'completada']
+            ).select_related('cliente').order_by('-fecha_hora')[:50]
+    else:
+        citas_disponibles = Cita.objects.filter(
+            dentista=perfil,
+            estado__in=['reservada', 'completada']
+        ).select_related('cliente').order_by('-fecha_hora')[:50]  # Últimas 50 citas
     
     context = {
         'perfil': perfil,
@@ -3315,10 +5613,11 @@ def crear_odontograma(request):
         'es_dentista': True,
         'form_data': form_data,
         'insumos_disponibles': insumos_disponibles,
-        'cita_pre_seleccionada': cita_pre_seleccionada
+        'cita_pre_seleccionada': cita_pre_seleccionada,
+        'citas_disponibles': citas_disponibles
     }
     
-    return render(request, 'citas/crear_odontograma.html', context)
+    return render(request, 'citas/odontogramas/crear_odontograma.html', context)
 
 # Vista para ver detalles de un odontograma
 @login_required
@@ -3352,13 +5651,33 @@ def detalle_odontograma(request, odontograma_id):
     ]
     
     # Determinar URL de retorno
-    # Prioridad: parámetro return > referer del perfil del cliente > referer general > listar odontogramas
+    # Prioridad: parámetro return > nueva vista Mis Pacientes (si es dentista) > referer > listar odontogramas
     referer = request.META.get('HTTP_REFERER', '')
     return_url = request.GET.get('return', '')
     
     if return_url:
         # Si se pasó un parámetro return, usarlo directamente
         url_retorno = return_url
+    elif perfil.es_dentista():
+        # Si es dentista, intentar redirigir a Mis Pacientes
+        paciente_id = None
+        if odontograma.cliente:
+            paciente_id = odontograma.cliente.id
+        elif odontograma.paciente_email:
+            # Buscar cliente por email
+            try:
+                cliente = Cliente.objects.get(email=odontograma.paciente_email, activo=True)
+                paciente_id = cliente.id
+            except Cliente.DoesNotExist:
+                # Si no hay cliente, usar hash del email
+                paciente_id = hash(odontograma.paciente_email) % 1000000
+        
+        if paciente_id:
+            url_retorno = reverse('mis_pacientes_seccion', args=[paciente_id, 'odontogramas'])
+        elif referer and referer.startswith(request.build_absolute_uri('/')[:-1]):
+            url_retorno = referer
+        else:
+            url_retorno = reverse('listar_odontogramas')
     elif odontograma.cliente:
         # Si el odontograma tiene un cliente asociado, volver al perfil del cliente
         url_retorno = reverse('perfil_cliente', args=[odontograma.cliente.id])
@@ -3381,7 +5700,7 @@ def detalle_odontograma(request, odontograma_id):
         'url_retorno': url_retorno
     }
     
-    return render(request, 'citas/detalle_odontograma.html', context)
+    return render(request, 'citas/odontogramas/detalle_odontograma.html', context)
 
 # Vista para editar un odontograma
 @login_required
@@ -3441,25 +5760,25 @@ def editar_odontograma(request, odontograma_id):
                 messages.error(request, 'La fecha de nacimiento debe tener un formato válido.')
                 return redirect('editar_odontograma', odontograma_id=odontograma.id)
         
-        # Actualizar próxima cita
-        proxima_cita = request.POST.get('proxima_cita', '')
-        if proxima_cita:
-            try:
-                odontograma.proxima_cita = datetime.fromisoformat(proxima_cita)
-            except ValueError:
-                messages.error(request, 'La próxima cita debe tener un formato válido.')
-                return redirect('editar_odontograma', odontograma_id=odontograma.id)
-        else:
-            odontograma.proxima_cita = None
-        
         try:
             odontograma.save()
             # Procesar datos interactivos si vienen del formulario de edición
             odontograma_data = request.POST.get('odontograma_data', '')
+            odontograma_data_extended = request.POST.get('odontograma_data_extended', '')
+            
             if odontograma_data:
                 try:
                     import json
                     dientes_data = json.loads(odontograma_data)
+                    extended_data = {}
+                    
+                    # Cargar datos extendidos si existen
+                    if odontograma_data_extended:
+                        try:
+                            extended_data = json.loads(odontograma_data_extended)
+                        except:
+                            extended_data = {}
+                    
                     from django.db import transaction
                     with transaction.atomic():
                         for numero_diente, caras_data in dientes_data.items():
@@ -3484,6 +5803,16 @@ def editar_odontograma(request, odontograma_id):
                                 estado_general_diente = 'obturado'
                             else:
                                 estado_general_diente = 'sano'
+                            
+                            # Preparar observaciones con datos extendidos
+                            observaciones_data = {
+                                'caras': caras_data
+                            }
+                            
+                            # Agregar metadata (diagnóstico y procedimiento) si existe
+                            if numero_diente in extended_data:
+                                observaciones_data['metadata'] = extended_data[numero_diente]
+                            
                             # Upsert EstadoDiente
                             estado_obj, _ = EstadoDiente.objects.get_or_create(
                                 odontograma=odontograma,
@@ -3491,13 +5820,29 @@ def editar_odontograma(request, odontograma_id):
                                 defaults={'estado': estado_general_diente}
                             )
                             estado_obj.estado = estado_general_diente
-                            estado_obj.observaciones = f"Datos del odontograma interactivo: {json.dumps(caras_data)}"
+                            estado_obj.observaciones = f"Datos del odontograma interactivo: {json.dumps(observaciones_data)}"
                             estado_obj.save()
                 except Exception as e:
                     messages.warning(request, f'Error al procesar datos del odontograma: {str(e)}')
 
             messages.success(request, 'Odontograma actualizado correctamente.')
-            return redirect('listar_odontogramas')
+            # Obtener paciente_id para redirigir a Mis Pacientes
+            paciente_id = None
+            if odontograma.cliente:
+                paciente_id = odontograma.cliente.id
+            elif odontograma.paciente_email:
+                # Buscar cliente por email
+                try:
+                    cliente = Cliente.objects.get(email=odontograma.paciente_email, activo=True)
+                    paciente_id = cliente.id
+                except Cliente.DoesNotExist:
+                    # Si no hay cliente, usar hash del email
+                    paciente_id = hash(odontograma.paciente_email) % 1000000
+            
+            if paciente_id:
+                return redirect('mis_pacientes_seccion', paciente_id=paciente_id, seccion='odontogramas')
+            else:
+                return redirect('listar_odontogramas')
         except Exception as e:
             messages.error(request, f'Error al actualizar odontograma: {str(e)}')
     
@@ -3507,15 +5852,29 @@ def editar_odontograma(request, odontograma_id):
         estado__in=['reservada', 'completada']
     ).order_by('-fecha_hora')[:50]  # Últimas 50 citas
     
+    # Obtener paciente_id para redirección
+    paciente_id = None
+    if odontograma.cliente:
+        paciente_id = odontograma.cliente.id
+    elif odontograma.paciente_email:
+        # Buscar cliente por email
+        try:
+            cliente = Cliente.objects.get(email=odontograma.paciente_email, activo=True)
+            paciente_id = cliente.id
+        except Cliente.DoesNotExist:
+            # Si no hay cliente, usar hash del email
+            paciente_id = hash(odontograma.paciente_email) % 1000000
+    
     context = {
         'perfil': perfil,
         'odontograma': odontograma,
         'condiciones': Odontograma.CONDICION_CHOICES,
         'es_dentista': True,
-        'citas_disponibles': citas_disponibles
+        'citas_disponibles': citas_disponibles,
+        'paciente_id': paciente_id
     }
     
-    return render(request, 'citas/editar_odontograma.html', context)
+    return render(request, 'citas/odontogramas/editar_odontograma.html', context)
 
 # Vista para actualizar el estado de un diente
 @login_required
@@ -3601,7 +5960,7 @@ def actualizar_diente(request, odontograma_id, numero_diente):
         'es_dentista': True
     }
     
-    return render(request, 'citas/actualizar_diente.html', context)
+    return render(request, 'citas/odontogramas/actualizar_diente.html', context)
 
 # Vista para eliminar un odontograma
 @login_required
@@ -3623,10 +5982,18 @@ def eliminar_odontograma(request, odontograma_id):
         paciente_nombre = odontograma.paciente_nombre
         try:
             odontograma.delete()
-            messages.success(request, f'Odontograma de {paciente_nombre} eliminado correctamente.')
+            mensaje = f'Ficha odontológica de {paciente_nombre} eliminada exitosamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': True, 'message': mensaje})
+            messages.success(request, mensaje)
             return redirect('listar_odontogramas')
         except Exception as e:
-            messages.error(request, f'Error al eliminar odontograma: {str(e)}')
+            error_msg = f'Error al eliminar odontograma: {str(e)}'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
     
     context = {
         'perfil': perfil,
@@ -3634,7 +6001,7 @@ def eliminar_odontograma(request, odontograma_id):
         'es_dentista': True
     }
     
-    return render(request, 'citas/eliminar_odontograma.html', context)
+    return render(request, 'citas/odontogramas/eliminar_odontograma.html', context)
 
 # Vista para exportar odontograma a PDF
 @login_required
@@ -3642,15 +6009,15 @@ def exportar_odontograma_pdf(request, odontograma_id):
     """Vista para exportar un odontograma a PDF"""
     try:
         perfil = Perfil.objects.get(user=request.user)
-        if not perfil.es_dentista():
-            messages.error(request, 'Solo los dentistas pueden exportar odontogramas.')
-            # Redirigir de vuelta a la vista de detalle del odontograma
-            return redirect('detalle_odontograma', odontograma_id=odontograma_id)
+        # Permitir tanto a dentistas como a administrativos
+        if not (perfil.es_dentista() or perfil.es_administrativo()):
+            messages.error(request, 'No tienes permisos para exportar odontogramas.')
+            return redirect('panel_trabajador')
     except Perfil.DoesNotExist:
         messages.error(request, 'No tienes permisos para acceder a esta función.')
         return redirect('login')
 
-    # Los administrativos pueden ver el odontograma pero no exportarlo
+    # Los administrativos pueden ver cualquier odontograma, los dentistas solo los suyos
     if perfil.es_administrativo():
         odontograma = get_object_or_404(Odontograma, id=odontograma_id)
     else:
@@ -3671,7 +6038,14 @@ def exportar_odontograma_pdf(request, odontograma_id):
             try:
                 import json
                 json_str = estado_diente.observaciones.replace('Datos del odontograma interactivo: ', '')
-                return json.loads(json_str)
+                data = json.loads(json_str)
+                # Si tiene estructura con 'caras', devolver las caras directamente
+                if isinstance(data, dict) and 'caras' in data:
+                    return data['caras']
+                # Si es directamente un diccionario de caras, devolverlo
+                elif isinstance(data, dict):
+                    return data
+                return None
             except:
                 return None
         return None
@@ -3703,7 +6077,7 @@ def exportar_odontograma_pdf(request, odontograma_id):
         fontName='Helvetica-Bold'
     )
     
-    # Estilo para subtítulos
+    # Estilo para subtítulos con color turquesa
     subtitle_style = ParagraphStyle(
         'CustomSubtitle',
         parent=styles['Heading2'],
@@ -3713,9 +6087,10 @@ def exportar_odontograma_pdf(request, odontograma_id):
         alignment=TA_LEFT,
         textColor=colors.HexColor('#1e293b'),
         fontName='Helvetica-Bold',
-        borderColor=colors.HexColor('#3b82f6'),
+        borderColor=colors.HexColor('#14b8a6'),
         borderWidth=1,
-        borderPadding=6
+        borderPadding=6,
+        backColor=colors.HexColor('#f0fdfa')
     )
     
     # Estilo para información de la clínica
@@ -3763,20 +6138,46 @@ def exportar_odontograma_pdf(request, odontograma_id):
     story.append(clinic_info)
     story.append(Spacer(1, 12))
     
+    # Nota introductoria breve para el paciente con color turquesa
+    nota_intro = Paragraph(
+        "<b>NOTA:</b><br/>"
+        "Este documento contiene el registro de su salud dental. "
+        "El odontograma muestra la condición de cada diente. "
+        "Consulte la leyenda al final para entender los símbolos y colores.",
+        ParagraphStyle(
+            'NotaIntro',
+            parent=styles['Normal'],
+            fontSize=8,
+            spaceAfter=10,
+            alignment=TA_LEFT,
+            textColor=colors.HexColor('#374151'),
+            leading=12,
+            leftIndent=0,
+            rightIndent=0,
+            backColor=colors.HexColor('#f0fdfa'),
+            borderPadding=8,
+            borderColor=colors.HexColor('#14b8a6'),
+            borderWidth=1
+        )
+    )
+    story.append(nota_intro)
+    story.append(Spacer(1, 12))
+    
     # Sección: Información del Paciente
-    paciente_title = Paragraph("<b>📋 INFORMACIÓN DEL PACIENTE</b>", subtitle_style)
+    paciente_title = Paragraph("<b>INFORMACIÓN DEL PACIENTE</b>", subtitle_style)
     story.append(paciente_title)
     
-    # Tabla de información del paciente
+    # Tabla de información del paciente (solo datos esenciales)
     paciente_data = [
-        ['Nombre Completo:', odontograma.paciente_nombre],
+        ['Nombre:', odontograma.paciente_nombre],
         ['Email:', odontograma.paciente_email],
-        ['Teléfono:', odontograma.paciente_telefono or 'No especificado'],
-        ['Fecha de Nacimiento:', odontograma.paciente_fecha_nacimiento.strftime('%d/%m/%Y') if odontograma.paciente_fecha_nacimiento else 'No especificado']
+        ['Teléfono:', odontograma.paciente_telefono or 'No especificado']
     ]
+    if odontograma.paciente_fecha_nacimiento:
+        paciente_data.append(['Fecha de Nacimiento:', odontograma.paciente_fecha_nacimiento.strftime('%d/%m/%Y')])
     paciente_table = Table(paciente_data, colWidths=[2*inch, 4.5*inch])
     paciente_table_style = TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f1f5f9')),
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0fdfa')),
         ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1e293b')),
         ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151')),
         ('ALIGN', (0, 0), (0, -1), 'LEFT'),
@@ -3784,7 +6185,7 @@ def exportar_odontograma_pdf(request, odontograma_id):
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccfbf1')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
@@ -3796,65 +6197,97 @@ def exportar_odontograma_pdf(request, odontograma_id):
     story.append(Spacer(1, 12))
     
     # Sección: Información Clínica
-    clinica_title = Paragraph("<b>🏥 INFORMACIÓN CLÍNICA</b>", subtitle_style)
+    clinica_title = Paragraph("<b>INFORMACIÓN CLÍNICA</b>", subtitle_style)
     story.append(clinica_title)
     
-    # Motivo de consulta
-    motivo_text = Paragraph(f"<b>Motivo de Consulta:</b><br/>{odontograma.motivo_consulta}", section_text_style)
-    story.append(motivo_text)
-    story.append(Spacer(1, 6))
+    # Motivo de consulta (solo si existe)
+    if odontograma.motivo_consulta:
+        motivo_text = Paragraph(f"<b>Motivo de Consulta:</b> {odontograma.motivo_consulta}", section_text_style)
+        story.append(motivo_text)
+        story.append(Spacer(1, 4))
     
-    # Estado e higiene en tabla
-    estado_data = [
-        ['Higiene Oral:', odontograma.get_higiene_oral_display()],
-        ['Estado General:', odontograma.get_estado_general_display()]
-    ]
-    estado_table = Table(estado_data, colWidths=[2*inch, 4.5*inch])
-    estado_table_style = TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f1f5f9')),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1e293b')),
-        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151')),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ])
-    estado_table.setStyle(estado_table_style)
-    story.append(estado_table)
-    story.append(Spacer(1, 8))
+    # Estado e higiene en tabla (solo si hay datos)
+    estado_data = []
+    if odontograma.higiene_oral:
+        estado_data.append(['Higiene Oral:', odontograma.get_higiene_oral_display()])
+    if odontograma.estado_general:
+        estado_data.append(['Estado General:', odontograma.get_estado_general_display()])
+    if estado_data:
+        estado_table = Table(estado_data, colWidths=[2*inch, 4.5*inch])
+        estado_table_style = TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0fdfa')),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1e293b')),
+            ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151')),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccfbf1')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ])
+        estado_table.setStyle(estado_table_style)
+        story.append(estado_table)
+        story.append(Spacer(1, 6))
     
-    # Antecedentes médicos
+    # Antecedentes médicos (solo si existe)
     if odontograma.antecedentes_medicos:
-        antecedentes_text = Paragraph(f"<b>Antecedentes Médicos:</b><br/>{odontograma.antecedentes_medicos}", section_text_style)
+        antecedentes_text = Paragraph(f"<b>Antecedentes Médicos:</b> {odontograma.antecedentes_medicos}", section_text_style)
         story.append(antecedentes_text)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 4))
     
-    # Alergias
+    # Alergias (solo si existe)
     if odontograma.alergias:
-        alergias_text = Paragraph(f"<b>Alergias:</b><br/>{odontograma.alergias}", section_text_style)
+        alergias_text = Paragraph(f"<b>Alergias:</b> {odontograma.alergias}", section_text_style)
         story.append(alergias_text)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 4))
     
-    # Medicamentos actuales
+    # Medicamentos actuales (solo si existe)
     if odontograma.medicamentos_actuales:
-        medicamentos_text = Paragraph(f"<b>Medicamentos Actuales:</b><br/>{odontograma.medicamentos_actuales}", section_text_style)
+        medicamentos_text = Paragraph(f"<b>Medicamentos Actuales:</b> {odontograma.medicamentos_actuales}", section_text_style)
         story.append(medicamentos_text)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 6))
     
     # Sección: Odontograma Visual
-    odontograma_title = Paragraph("<b>🦷 ODONTOGRAMA DENTAL</b>", subtitle_style)
+    odontograma_title = Paragraph("<b>ODONTOGRAMA DENTAL</b>", subtitle_style)
     story.append(odontograma_title)
+    
+    # Explicación clara del odontograma
+    explicacion_odontograma = Paragraph(
+        "<b>¿Cómo leer este odontograma?</b><br/>"
+        "La boca se divide en 4 cuadrantes (superior derecho, superior izquierdo, inferior izquierdo, inferior derecho). "
+        "Cada diente tiene un número único según la numeración internacional (FDI). "
+        "Los símbolos y colores indican el estado de cada diente. Consulte la leyenda al final para entender cada símbolo.",
+        ParagraphStyle(
+            'ExplicacionOdontograma',
+            parent=styles['Normal'],
+            fontSize=9,
+            spaceAfter=8,
+            alignment=TA_LEFT,
+            textColor=colors.HexColor('#374151'),
+            leading=13,
+            leftIndent=0,
+            backColor=colors.HexColor('#f0fdfa'),
+            borderPadding=8,
+            borderColor=colors.HexColor('#ccfbf1'),
+            borderWidth=1
+        )
+    )
+    story.append(explicacion_odontograma)
     story.append(Spacer(1, 6))
     
     # Función para obtener color según estado
     def get_tooth_color(estado):
+        # Asegurarse de que estado sea un string
+        if not isinstance(estado, str):
+            if isinstance(estado, dict):
+                return colors.HexColor('#f3f4f6')  # Gris claro por defecto
+            estado = str(estado) if estado else 'sano'
+        
         color_map = {
             'sano': colors.HexColor('#10b981'),      # Verde
             'cariado': colors.HexColor('#dc2626'),    # Rojo
@@ -3870,7 +6303,7 @@ def exportar_odontograma_pdf(request, odontograma_id):
             'fractura': colors.HexColor('#ef4444'),  # Rojo oscuro
             'extraccion': colors.HexColor('#991b1b'), # Rojo muy oscuro
         }
-        return color_map.get(estado, colors.HexColor('#f3f4f6'))  # Gris claro por defecto
+        return color_map.get(estado.lower() if estado else 'sano', colors.HexColor('#f3f4f6'))  # Gris claro por defecto
     
     # Función para obtener el estado principal del diente (considerando datos interactivos)
     def get_tooth_main_state(numero_diente):
@@ -3906,10 +6339,21 @@ def exportar_odontograma_pdf(request, odontograma_id):
                 return 'sano', interactive_data
         
         # Si no hay datos interactivos, usar el estado general
-        return estado_diente.estado, None
+        # Asegurarse de que siempre devolvamos un string
+        estado = estado_diente.estado
+        if isinstance(estado, dict):
+            # Si el estado es un diccionario, usar 'sano' por defecto
+            return 'sano', None
+        return str(estado) if estado else 'sano', None
     
     # Función para obtener símbolo según estado
     def get_tooth_symbol(estado):
+        # Asegurarse de que estado sea un string
+        if not isinstance(estado, str):
+            if isinstance(estado, dict):
+                return '?'
+            estado = str(estado) if estado else 'sano'
+        
         symbol_map = {
             'sano': '✓',
             'caries': '●',
@@ -3925,31 +6369,18 @@ def exportar_odontograma_pdf(request, odontograma_id):
             'fractura': '◢',
             'extraccion': '✕',
         }
-        return symbol_map.get(estado, '?')
+        return symbol_map.get(estado.lower() if estado else 'sano', '?')
     
-    # Función para obtener texto del diente con caras (si hay datos interactivos)
+    # Función para obtener texto del diente (simplificado - solo número y símbolo principal)
     def get_tooth_display(numero_diente, estado_val, interactive_data):
-        base_text = f"{numero_diente}\n{get_tooth_symbol(estado_val)}"
-        
-        if interactive_data:
-            # Mostrar caras con condiciones
-            caras_info = []
-            cara_symbols = {'oclusal': 'O', 'vestibular': 'V', 'lingual': 'L', 'mesial': 'M', 'distal': 'D'}
-            for cara, condicion in interactive_data.items():
-                if condicion != 'sano':
-                    caras_info.append(f"{cara_symbols.get(cara, cara[0].upper())}:{get_tooth_symbol(condicion)}")
-            
-            if caras_info:
-                base_text += f"\n{', '.join(caras_info[:3])}"  # Mostrar hasta 3 caras
-                if len(caras_info) > 3:
-                    base_text += f"\n+{len(caras_info)-3}"
-        
-        return base_text
+        # Mostrar solo número de diente y símbolo principal - sin duplicar información
+        symbol = get_tooth_symbol(estado_val)
+        return f"{numero_diente}\n{symbol}"
     
     # Crear estructura del odontograma anatómico
     odontograma_data = []
     
-    # Encabezado con nombres de dientes
+    # Encabezado con nombres de dientes (más claro)
     header_row = ['CUADRANTE', 'Molar 3', 'Molar 2', 'Molar 1', 'Premolar 2', 'Premolar 1', 'Canino', 'Incisivo 2', 'Incisivo 1']
     odontograma_data.append(header_row)
     
@@ -3988,40 +6419,40 @@ def exportar_odontograma_pdf(request, odontograma_id):
         inferior_derecho.append(display_text)
     odontograma_data.append(inferior_derecho)
     
-    # Crear tabla del odontograma mejorada
-    odontograma_table = Table(odontograma_data, colWidths=[0.9*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch])
+    # Crear tabla del odontograma mejorada (con más espacio para legibilidad)
+    odontograma_table = Table(odontograma_data, colWidths=[1*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.75*inch])
     
-    # Estilo de la tabla del odontograma mejorada
+    # Estilo de la tabla del odontograma mejorada con colores turquesa
     table_style = TableStyle([
-        # Encabezado
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e293b')),
+        # Encabezado con color turquesa
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#14b8a6')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
         
-        # Cuadrantes - colores diferenciados
-        ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#3b82f6')),  # Sup Der
-        ('BACKGROUND', (0, 2), (0, 2), colors.HexColor('#2563eb')),  # Sup Izq
-        ('BACKGROUND', (0, 4), (0, 4), colors.HexColor('#10b981')),  # Inf Izq
-        ('BACKGROUND', (0, 5), (0, 5), colors.HexColor('#059669')),  # Inf Der
+        # Cuadrantes - colores turquesa diferenciados
+        ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#14b8a6')),  # Sup Der
+        ('BACKGROUND', (0, 2), (0, 2), colors.HexColor('#0d9488')),  # Sup Izq
+        ('BACKGROUND', (0, 4), (0, 4), colors.HexColor('#5eead4')),  # Inf Izq
+        ('BACKGROUND', (0, 5), (0, 5), colors.HexColor('#2dd4bf')),  # Inf Der
         
         # Texto de cuadrantes
         ('TEXTCOLOR', (0, 1), (0, 5), colors.white),
         ('FONTNAME', (0, 1), (0, 5), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 1), (0, 5), 8),
         
-        # Dientes
-        ('FONTNAME', (1, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (1, 1), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#1e293b')),
+        # Dientes - texto más grande y legible
+        ('FONTNAME', (1, 1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (1, 1), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#14b8a6')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (1, 1), (-1, -1), 6),
-        ('BOTTOMPADDING', (1, 1), (-1, -1), 6),
-        ('LEFTPADDING', (1, 1), (-1, -1), 4),
-        ('RIGHTPADDING', (1, 1), (-1, -1), 4),
+        ('TOPPADDING', (1, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (1, 1), (-1, -1), 8),
+        ('LEFTPADDING', (1, 1), (-1, -1), 6),
+        ('RIGHTPADDING', (1, 1), (-1, -1), 6),
     ])
     
     # Aplicar colores específicos a dientes según su estado
@@ -4053,84 +6484,250 @@ def exportar_odontograma_pdf(request, odontograma_id):
                 else:
                     table_style.add('TEXTCOLOR', (col_idx, row_idx), (col_idx, row_idx), colors.HexColor('#1e293b'))
     
-    # Estilo para la fila separadora
-    table_style.add('BACKGROUND', (0, 3), (-1, 3), colors.HexColor('#e2e8f0'))
+    # Estilo para la fila separadora con color turquesa
+    table_style.add('BACKGROUND', (0, 3), (-1, 3), colors.HexColor('#ccfbf1'))
     table_style.add('TEXTCOLOR', (0, 3), (-1, 3), colors.HexColor('#64748b'))
     table_style.add('FONTSIZE', (0, 3), (-1, 3), 6)
     
     odontograma_table.setStyle(table_style)
     story.append(odontograma_table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 12))
     
-    # Leyenda de símbolos mejorada
-    leyenda_title = Paragraph("<b>LEYENDA DE SÍMBOLOS</b>", ParagraphStyle(
+    # Resumen de estado dental
+    estados_count = {}
+    for diente in estados_dientes:
+        estado_val, interactive_data = get_tooth_main_state(diente.numero_diente)
+        estados_count[estado_val] = estados_count.get(estado_val, 0) + 1
+    
+    if estados_count:
+        resumen_title = Paragraph("<b>RESUMEN DEL ESTADO DENTAL</b>", subtitle_style)
+        story.append(resumen_title)
+        
+        resumen_data = [['Estado Dental', 'Cantidad', 'Explicación']]
+        estado_descriptions = {
+            'sano': 'Diente en perfecto estado, sin problemas',
+            'caries': 'Diente con caries que necesita tratamiento',
+            'obturado': 'Diente ya tratado con empaste',
+            'corona': 'Diente con corona o funda protectora',
+            'ausente': 'Diente que falta o fue extraído',
+            'endodoncia': 'Diente con tratamiento de conducto (nervio tratado)',
+            'protesis': 'Diente con prótesis o funda',
+            'implante': 'Diente reemplazado con implante dental',
+            'sellante': 'Diente con sellante preventivo',
+            'fractura': 'Diente con fractura o grieta',
+        }
+        
+        for estado, cantidad in sorted(estados_count.items(), key=lambda x: x[1], reverse=True):
+            desc = estado_descriptions.get(estado, 'Estado dental')
+            # Capitalizar primera letra y el resto en minúsculas
+            estado_display = estado.capitalize().replace('_', ' ')
+            resumen_data.append([estado_display, str(cantidad), desc])
+        
+        resumen_table = Table(resumen_data, colWidths=[1.8*inch, 1*inch, 3.7*inch])
+        resumen_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#14b8a6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccfbf1')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (1, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdfa')]),
+        ])
+        
+        # Colorear la columna de cantidad según el estado
+        row_idx = 1
+        for estado, cantidad in sorted(estados_count.items(), key=lambda x: x[1], reverse=True):
+            color = get_tooth_color(estado)
+            resumen_style.add('BACKGROUND', (1, row_idx), (1, row_idx), color)
+            if estado in ['ausente', 'perdido', 'caries', 'cariado', 'fractura', 'extraccion']:
+                resumen_style.add('TEXTCOLOR', (1, row_idx), (1, row_idx), colors.white)
+            else:
+                resumen_style.add('TEXTCOLOR', (1, row_idx), (1, row_idx), colors.HexColor('#1e293b'))
+            row_idx += 1
+        
+        resumen_table.setStyle(resumen_style)
+        story.append(resumen_table)
+        story.append(Spacer(1, 12))
+    
+    # Sección: Detalle de Caras de Dientes (si hay datos interactivos)
+    dientes_con_caras = []
+    for diente in estados_dientes:
+        interactive_data = get_tooth_interactive_data(diente)
+        if interactive_data and isinstance(interactive_data, dict):
+            caras_afectadas = {}
+            for cara, condicion in interactive_data.items():
+                if isinstance(condicion, str) and condicion != 'sano':
+                    caras_afectadas[cara] = condicion
+            
+            if caras_afectadas:
+                dientes_con_caras.append({
+                    'numero': diente.numero_diente,
+                    'caras': caras_afectadas
+                })
+    
+    if dientes_con_caras:
+        detalle_caras_title = Paragraph("<b>DETALLE DE CARAS DE DIENTES</b>", subtitle_style)
+        story.append(detalle_caras_title)
+        
+        # Explicación sobre las caras
+        explicacion_caras = Paragraph(
+            "Esta sección muestra qué cara específica de cada diente tiene una condición. "
+            "Las caras son: Oclusal (O) - superficie de masticación, Vestibular (V) - lado externo, "
+            "Lingual (L) - lado interno, Mesial (M) - lado anterior, Distal (D) - lado posterior.",
+            ParagraphStyle(
+                'ExplicacionCaras',
+                parent=styles['Normal'],
+                fontSize=8,
+                spaceAfter=6,
+                alignment=TA_LEFT,
+                textColor=colors.HexColor('#64748b'),
+                leading=11
+            )
+        )
+        story.append(explicacion_caras)
+        story.append(Spacer(1, 4))
+        
+        # Crear tabla de detalles de caras (solo 3 columnas, sin duplicar)
+        detalle_caras_data = [['Diente', 'Cara', 'Condición']]
+        
+        cara_nombres_completos = {
+            'oclusal': 'Oclusal (O)',
+            'vestibular': 'Vestibular (V)',
+            'lingual': 'Lingual (L)',
+            'mesial': 'Mesial (M)',
+            'distal': 'Distal (D)'
+        }
+        
+        estado_nombres = {
+            'sano': 'Sano',
+            'caries': 'Caries',
+            'cariado': 'Cariado',
+            'obturado': 'Obturado',
+            'corona': 'Corona',
+            'ausente': 'Ausente',
+            'endodoncia': 'Endodoncia',
+            'protesis': 'Prótesis',
+            'implante': 'Implante',
+            'sellante': 'Sellante',
+            'fractura': 'Fractura',
+            'perdido': 'Perdido',
+            'extraccion': 'Extracción'
+        }
+        
+        # Crear filas con información de caras (una fila por cara afectada)
+        for diente_info in dientes_con_caras:
+            numero_diente = diente_info['numero']
+            for cara, condicion in diente_info['caras'].items():
+                cara_nombre = cara_nombres_completos.get(cara, cara.capitalize())
+                condicion_nombre = estado_nombres.get(condicion, condicion.capitalize())
+                detalle_caras_data.append([str(numero_diente), cara_nombre, condicion_nombre])
+        
+        if len(detalle_caras_data) > 1:  # Si hay al menos una fila de datos
+            detalle_caras_table = Table(detalle_caras_data, colWidths=[0.8*inch, 1.8*inch, 2.9*inch])
+            detalle_caras_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#14b8a6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Número de diente centrado
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccfbf1')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('ROWBACKGROUNDS', (1, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdfa')]),
+            ])
+            
+            # Colorear la columna de condición según el estado
+            row_idx = 1
+            for fila in detalle_caras_data[1:]:
+                if len(fila) >= 3 and fila[2]:
+                    condicion = fila[2].lower()
+                    color = get_tooth_color(condicion)
+                    detalle_caras_style.add('BACKGROUND', (2, row_idx), (2, row_idx), color)
+                    if condicion in ['ausente', 'perdido', 'caries', 'cariado', 'fractura', 'extraccion']:
+                        detalle_caras_style.add('TEXTCOLOR', (2, row_idx), (2, row_idx), colors.white)
+                    else:
+                        detalle_caras_style.add('TEXTCOLOR', (2, row_idx), (2, row_idx), colors.HexColor('#1e293b'))
+                row_idx += 1
+            
+            detalle_caras_table.setStyle(detalle_caras_style)
+            story.append(detalle_caras_table)
+            story.append(Spacer(1, 12))
+    
+    # Leyenda de símbolos resumida y compacta
+    leyenda_title = Paragraph("<b>GUÍA DE SÍMBOLOS</b>", ParagraphStyle(
         'LeyendaTitle',
         parent=styles['Normal'],
         fontSize=9,
-        spaceAfter=6,
+        spaceAfter=4,
         alignment=TA_LEFT,
         textColor=colors.HexColor('#1e293b'),
         fontName='Helvetica-Bold'
     ))
     story.append(leyenda_title)
     
-    leyenda_data = [
-        ['Estado', 'Símbolo', 'Descripción', 'Estado', 'Símbolo', 'Descripción'],
-        ['Sano', '✓', 'Diente sano', 'Endodoncia', '◐', 'Tratamiento endodóncico'],
-        ['Caries', '●', 'Diente cariado', 'Prótesis', '◈', 'Prótesis dental'],
-        ['Obturado', '■', 'Diente obturado', 'Implante', '◉', 'Implante dental'],
-        ['Corona', '◊', 'Corona dental', 'Sellante', '◯', 'Sellante dental'],
-        ['Ausente', '✕', 'Diente ausente/perdido', 'Fractura', '◢', 'Fractura dental']
-    ]
+    # Leyenda compacta en formato de lista simple
+    leyenda_texto = (
+        "<b>✓</b> Sano | <b>●</b> Caries | <b>■</b> Obturado | <b>◊</b> Corona | <b>✕</b> Ausente | "
+        "<b>◐</b> Endodoncia | <b>◈</b> Prótesis | <b>◉</b> Implante | <b>◯</b> Sellante | <b>◢</b> Fractura"
+    )
     
-    leyenda_table = Table(leyenda_data, colWidths=[1*inch, 0.5*inch, 1.5*inch, 1*inch, 0.5*inch, 1.5*inch])
-    leyenda_style = TableStyle([
-        # Encabezado
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e293b')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('TOPPADDING', (0, 0), (-1, 0), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        # Filas de datos
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('TOPPADDING', (0, 1), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
-        ('LEFTPADDING', (0, 1), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 1), (-1, -1), 6),
-        ('ROWBACKGROUNDS', (1, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
-    ])
-    # Colorear símbolos de la leyenda
-    leyenda_style.add('TEXTCOLOR', (1, 1), (1, 1), colors.HexColor('#10b981'))  # Sano
-    leyenda_style.add('TEXTCOLOR', (1, 2), (1, 2), colors.HexColor('#dc2626'))  # Caries
-    leyenda_style.add('TEXTCOLOR', (1, 3), (1, 3), colors.HexColor('#f59e0b'))  # Obturado
-    leyenda_style.add('TEXTCOLOR', (1, 4), (1, 4), colors.HexColor('#fbbf24'))  # Corona
-    leyenda_style.add('TEXTCOLOR', (1, 5), (1, 5), colors.HexColor('#6b7280'))  # Ausente
-    leyenda_style.add('TEXTCOLOR', (4, 1), (4, 1), colors.HexColor('#0ea5e9'))  # Endodoncia
-    leyenda_style.add('TEXTCOLOR', (4, 2), (4, 2), colors.HexColor('#8b5cf6'))  # Prótesis
-    leyenda_style.add('TEXTCOLOR', (4, 3), (4, 3), colors.HexColor('#06b6d4'))  # Implante
-    leyenda_style.add('TEXTCOLOR', (4, 4), (4, 4), colors.HexColor('#84cc16'))  # Sellante
-    leyenda_style.add('TEXTCOLOR', (4, 5), (4, 5), colors.HexColor('#ef4444'))  # Fractura
-    leyenda_table.setStyle(leyenda_style)
-    
-    story.append(leyenda_table)
-    story.append(Spacer(1, 12))
+    leyenda_parrafo = Paragraph(
+        leyenda_texto,
+        ParagraphStyle(
+            'LeyendaCompacta',
+            parent=styles['Normal'],
+            fontSize=7,
+            spaceAfter=6,
+            alignment=TA_LEFT,
+            textColor=colors.HexColor('#374151'),
+            leading=10,
+            backColor=colors.HexColor('#f0fdfa'),
+            borderPadding=6,
+            borderColor=colors.HexColor('#ccfbf1'),
+            borderWidth=1
+        )
+    )
+    story.append(leyenda_parrafo)
+    story.append(Spacer(1, 8))
     
     # Sección: Plan de Tratamiento y Observaciones
-    if odontograma.plan_tratamiento or odontograma.proxima_cita or odontograma.observaciones:
-        plan_title = Paragraph("<b>📋 PLAN DE TRATAMIENTO Y OBSERVACIONES</b>", subtitle_style)
+    if odontograma.plan_tratamiento or odontograma.observaciones:
+        plan_title = Paragraph("<b>PLAN DE TRATAMIENTO Y RECOMENDACIONES</b>", subtitle_style)
         story.append(plan_title)
+        
+        # Nota breve sobre el plan de tratamiento
+        nota_plan = Paragraph(
+            "Plan de tratamiento y recomendaciones:",
+            ParagraphStyle(
+                'NotaPlan',
+                parent=styles['Normal'],
+                fontSize=8,
+                spaceAfter=4,
+                alignment=TA_LEFT,
+                textColor=colors.HexColor('#64748b'),
+                leading=11
+            )
+        )
+        story.append(nota_plan)
+        story.append(Spacer(1, 2))
         
         plan_data = []
         if odontograma.plan_tratamiento:
             plan_data.append(['Plan de Tratamiento:', odontograma.plan_tratamiento])
-        
-        if odontograma.proxima_cita:
-            plan_data.append(['Próxima Cita:', odontograma.proxima_cita.strftime('%d/%m/%Y %H:%M')])
         
         if odontograma.observaciones:
             plan_data.append(['Observaciones:', odontograma.observaciones])
@@ -4138,7 +6735,7 @@ def exportar_odontograma_pdf(request, odontograma_id):
         if plan_data:
             plan_table = Table(plan_data, colWidths=[2*inch, 4.5*inch])
             plan_table_style = TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f1f5f9')),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0fdfa')),
                 ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1e293b')),
                 ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151')),
                 ('ALIGN', (0, 0), (0, -1), 'LEFT'),
@@ -4146,7 +6743,7 @@ def exportar_odontograma_pdf(request, odontograma_id):
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
                 ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccfbf1')),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('LEFTPADDING', (0, 0), (-1, -1), 8),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 8),
@@ -4180,12 +6777,2121 @@ def exportar_odontograma_pdf(request, odontograma_id):
     pdf_content = buffer.getvalue()
     buffer.close()
     
+    # Crear o actualizar el documento en la base de datos
+    try:
+        # Buscar cliente por email si no está asociado directamente
+        cliente_doc = odontograma.cliente
+        if not cliente_doc and odontograma.paciente_email:
+            try:
+                cliente_doc = Cliente.objects.get(email=odontograma.paciente_email, activo=True)
+            except Cliente.DoesNotExist:
+                cliente_doc = None
+            except Cliente.MultipleObjectsReturned:
+                cliente_doc = Cliente.objects.filter(email=odontograma.paciente_email, activo=True).first()
+        
+        documento, created = DocumentoCliente.objects.get_or_create(
+            odontograma=odontograma,
+            tipo='odontograma',
+            defaults={
+                'cliente': cliente_doc,
+                'titulo': f'Ficha Odontológica - {odontograma.paciente_nombre}',
+                'descripcion': f'Ficha odontológica del paciente {odontograma.paciente_nombre}',
+                'generado_por': perfil,
+            }
+        )
+        if not created:
+            # Actualizar fecha de generación y cliente si cambió
+            documento.fecha_generacion = timezone.now()
+            documento.generado_por = perfil
+            if not documento.cliente and cliente_doc:
+                documento.cliente = cliente_doc
+            documento.save()
+    except Exception as e:
+        logger.error(f"Error al crear documento de odontograma: {str(e)}")
+    
     # Crear respuesta HTTP
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="ficha_odontologica_{odontograma.paciente_nombre.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf"'
     response.write(pdf_content)
     
     return response
+
+
+# Vista para exportar presupuesto/tratamiento a PDF
+@login_required
+def exportar_presupuesto_pdf(request, plan_id):
+    """Vista para exportar un plan de tratamiento (presupuesto) a PDF"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_dentista() or perfil.es_administrativo()):
+            messages.error(request, 'No tienes permisos para exportar presupuestos.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    # Obtener información de la clínica
+    try:
+        from configuracion.models import InformacionClinica
+        info_clinica = InformacionClinica.obtener()
+        nombre_clinica = info_clinica.nombre_clinica
+        direccion_clinica = info_clinica.direccion
+        telefono_clinica = info_clinica.telefono
+        email_clinica = info_clinica.email
+    except:
+        nombre_clinica = "Clínica Dental"
+        direccion_clinica = ""
+        telefono_clinica = ""
+        email_clinica = ""
+    
+    # Crear el buffer para el PDF
+    buffer = BytesIO()
+    
+    # Crear el documento PDF
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=40,
+        bottomMargin=30
+    )
+    
+    # Estilos base de ReportLab
+    styles = getSampleStyleSheet()
+    
+    # Paleta de colores (turquesa)
+    primary_color = colors.HexColor('#14b8a6')  # turquesa principal
+    primary_dark = colors.HexColor('#0f766e')
+    soft_bg = colors.HexColor('#ecfeff')
+    soft_bg_alt = colors.HexColor('#e0f2f1')
+    gray_text = colors.HexColor('#64748b')
+    dark_text = colors.HexColor('#0f172a')
+    
+    # Estilo para el título principal
+    title_style = ParagraphStyle(
+        'PresupuestoTitle',
+        parent=styles['Heading1'],
+        fontSize=20,
+        spaceAfter=12,
+        alignment=TA_CENTER,
+        textColor=primary_dark,
+        fontName='Helvetica-Bold'
+    )
+    
+    # Estilo para subtítulos
+    subtitle_style = ParagraphStyle(
+        'PresupuestoSubtitle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        spaceAfter=8,
+        spaceBefore=12,
+        alignment=TA_LEFT,
+        textColor=primary_dark,
+        fontName='Helvetica-Bold'
+    )
+    
+    # Estilo para información de la clínica
+    clinic_info_style = ParagraphStyle(
+        'ClinicInfo',
+        parent=styles['Normal'],
+        fontSize=9,
+        alignment=TA_CENTER,
+        textColor=gray_text
+    )
+    
+    # Estilo para texto normal
+    normal_style = ParagraphStyle(
+        'NormalPresupuesto',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=4,
+        alignment=TA_LEFT,
+        leading=14
+    )
+    
+    # Contenido del PDF
+    story = []
+    
+    # Encabezado con información de la clínica
+    header_text = f"<b>{nombre_clinica}</b><br/>"
+    if direccion_clinica:
+        header_text += f"{direccion_clinica}<br/>"
+    if telefono_clinica:
+        header_text += f"Tel: {telefono_clinica} | "
+    if email_clinica:
+        header_text += f"Email: {email_clinica}"
+    header = Paragraph(header_text, clinic_info_style)
+    story.append(header)
+    story.append(Spacer(1, 12))
+    
+    # Título principal
+    title = Paragraph("<b>PRESUPUESTO DE TRATAMIENTO</b>", title_style)
+    story.append(title)
+    
+    # Información de fecha y número
+    fecha_info = Paragraph(
+        f"Fecha de Emisión: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Presupuesto N° {plan.id}",
+        clinic_info_style
+    )
+    story.append(fecha_info)
+    story.append(Spacer(1, 16))
+    
+    # Sección: Información del Paciente
+    paciente_title = Paragraph("<b>INFORMACIÓN DEL PACIENTE</b>", subtitle_style)
+    story.append(paciente_title)
+    
+    paciente_data = [
+        ['Nombre Completo:', plan.cliente.nombre_completo],
+        ['RUT:', plan.cliente.rut or 'No especificado'],
+        ['Email:', plan.cliente.email or 'No especificado'],
+        ['Teléfono:', plan.cliente.telefono or 'No especificado'],
+    ]
+    
+    paciente_table = Table(paciente_data, colWidths=[2 * inch, 4.5 * inch])
+    paciente_table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), soft_bg),
+        ('TEXTCOLOR', (0, 0), (0, -1), primary_dark),
+        ('TEXTCOLOR', (1, 0), (1, -1), dark_text),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ])
+    paciente_table.setStyle(paciente_table_style)
+    story.append(paciente_table)
+    story.append(Spacer(1, 12))
+    
+    # Sección: Información del Tratamiento
+    tratamiento_title = Paragraph("<b>INFORMACIÓN DEL TRATAMIENTO</b>", subtitle_style)
+    story.append(tratamiento_title)
+    
+    tratamiento_info = [
+        ['Nombre del Plan:', plan.nombre],
+        ['Dentista:', plan.dentista.nombre_completo],
+        ['Estado:', plan.get_estado_display()],
+    ]
+    
+    if plan.fecha_inicio_estimada:
+        tratamiento_info.append(['Fecha Inicio Estimada:', plan.fecha_inicio_estimada.strftime('%d/%m/%Y')])
+    if plan.fecha_fin_estimada:
+        tratamiento_info.append(['Fecha Fin Estimada:', plan.fecha_fin_estimada.strftime('%d/%m/%Y')])
+    if plan.citas_estimadas:
+        tratamiento_info.append(['Citas Estimadas:', str(plan.citas_estimadas)])
+    
+    tratamiento_table = Table(tratamiento_info, colWidths=[2 * inch, 4.5 * inch])
+    tratamiento_table.setStyle(paciente_table_style)
+    story.append(tratamiento_table)
+    story.append(Spacer(1, 12))
+    
+    # Diagnóstico y Objetivo
+    if plan.diagnostico:
+        diagnostico_text = Paragraph(f"<b>Diagnóstico:</b><br/>{plan.diagnostico}", normal_style)
+        story.append(diagnostico_text)
+        story.append(Spacer(1, 8))
+    
+    if plan.objetivo:
+        objetivo_text = Paragraph(f"<b>Objetivo del Tratamiento:</b><br/>{plan.objetivo}", normal_style)
+        story.append(objetivo_text)
+        story.append(Spacer(1, 12))
+    
+    # Sección: Detalle del Tratamiento (Fases e Items)
+    # Nota: la gestión de fases y pagos se ha simplificado en el sistema,
+    # por lo que esta sección se omite del PDF para mantener un diseño limpio.
+    # Sección: Resumen Financiero
+    resumen_title = Paragraph("<b>RESUMEN FINANCIERO</b>", subtitle_style)
+    story.append(resumen_title)
+    
+    resumen_data = [
+        ['Presupuesto Total:', f"${plan.presupuesto_total:,.0f}"],
+        ['Descuento:', f"${plan.descuento:,.0f}"],
+        ['Precio Final:', f"${plan.precio_final:,.0f}"],
+        ['Total Pagado:', f"${plan.total_pagado:,.0f}"],
+        ['Saldo Pendiente:', f"${plan.saldo_pendiente:,.0f}"],
+    ]
+    
+    resumen_table = Table(resumen_data, colWidths=[2.5 * inch, 4 * inch])
+    resumen_table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), soft_bg_alt),
+        ('TEXTCOLOR', (0, 0), (0, -1), primary_dark),
+        ('TEXTCOLOR', (1, 0), (1, -1), dark_text),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BACKGROUND', (0, 2), (1, 2), soft_bg),  # Precio Final
+        ('BACKGROUND', (0, 4), (1, 4), colors.HexColor('#fef2f2')),  # Saldo Pendiente
+    ])
+    resumen_table.setStyle(resumen_table_style)
+    story.append(resumen_table)
+    story.append(Spacer(1, 12))
+    
+    # Historial de Pagos (se omite en la versión actual del presupuesto para mantener el enfoque en el resumen financiero)
+    
+    # Notas
+    if plan.notas_paciente:
+        notas_title = Paragraph("<b>NOTAS PARA EL PACIENTE</b>", subtitle_style)
+        story.append(notas_title)
+        notas_text = Paragraph(plan.notas_paciente, normal_style)
+        story.append(notas_text)
+        story.append(Spacer(1, 12))
+    
+    # Footer
+    footer_text = f"<b>Generado por:</b> {perfil.nombre_completo} | <b>Fecha:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    footer = Paragraph(footer_text, clinic_info_style)
+    story.append(footer)
+    
+    # Construir el PDF
+    doc.build(story)
+    
+    # Obtener el contenido del buffer
+    pdf_content = buffer.getvalue()
+    buffer.close()
+    
+    # Crear o actualizar el documento en la base de datos
+    documento, created = DocumentoCliente.objects.get_or_create(
+        plan_tratamiento=plan,
+        tipo='presupuesto',
+        defaults={
+            'cliente': plan.cliente,
+            'titulo': f'Presupuesto - {plan.nombre}',
+            'descripcion': f'Presupuesto del tratamiento {plan.nombre}',
+            'generado_por': perfil,
+        }
+    )
+    
+    # Crear respuesta HTTP
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response.write(pdf_content)
+    
+    return response
+
+
+# ============================================================================
+# GESTIÓN DE DOCUMENTOS
+# ============================================================================
+
+@login_required
+def gestor_documentos(request):
+    """Vista para gestionar documentos de clientes (solo administradores)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'Solo los administrativos pueden gestionar documentos.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    # Obtener parámetros de búsqueda
+    tipo_filtro = request.GET.get('tipo', '')
+    cliente_busqueda = request.GET.get('cliente', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    
+    # Obtener todos los documentos
+    documentos = DocumentoCliente.objects.all().select_related('cliente', 'generado_por', 'plan_tratamiento', 'odontograma')
+    
+    # Aplicar filtros
+    if tipo_filtro:
+        documentos = documentos.filter(tipo=tipo_filtro)
+    
+    if cliente_busqueda:
+        documentos = documentos.filter(
+            Q(cliente__nombre_completo__icontains=cliente_busqueda) |
+            Q(cliente__email__icontains=cliente_busqueda) |
+            Q(cliente__rut__icontains=cliente_busqueda) |
+            Q(odontograma__paciente_nombre__icontains=cliente_busqueda) |
+            Q(odontograma__paciente_email__icontains=cliente_busqueda) |
+            Q(plan_tratamiento__cliente__nombre_completo__icontains=cliente_busqueda) |
+            Q(plan_tratamiento__cliente__email__icontains=cliente_busqueda)
+        )
+    
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            documentos = documentos.filter(fecha_generacion__date__gte=fecha_desde_obj)
+        except:
+            pass
+    
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            documentos = documentos.filter(fecha_generacion__date__lte=fecha_hasta_obj)
+        except:
+            pass
+    
+    # Ordenar por fecha de generación (más recientes primero)
+    documentos = documentos.order_by('-fecha_generacion')
+    
+    # Paginación
+    paginator = Paginator(documentos, 20)
+    page = request.GET.get('page', 1)
+    try:
+        documentos_pag = paginator.page(page)
+    except PageNotAnInteger:
+        documentos_pag = paginator.page(1)
+    except EmptyPage:
+        documentos_pag = paginator.page(paginator.num_pages)
+    
+    # Estadísticas
+    total_documentos = DocumentoCliente.objects.count()
+    documentos_por_tipo = {}
+    
+    # Tipos de documentos a excluir del selector
+    tipos_excluidos = ['receta', 'factura', 'nota_medica', 'otro']
+    
+    # Filtrar tipos de documentos (excluir los especificados)
+    tipos_documento_filtrados = [
+        (tipo, nombre) for tipo, nombre in DocumentoCliente.TIPO_DOCUMENTO_CHOICES 
+        if tipo not in tipos_excluidos
+    ]
+    
+    # Solo contar documentos de los tipos que se mostrarán
+    for tipo, nombre in tipos_documento_filtrados:
+        documentos_por_tipo[tipo] = DocumentoCliente.objects.filter(tipo=tipo).count()
+    
+    # Obtener clientes para el filtro
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')[:50]
+    
+    context = {
+        'perfil': perfil,
+        'documentos': documentos_pag,
+        'tipos_documento': tipos_documento_filtrados,
+        'tipo_filtro': tipo_filtro,
+        'cliente_busqueda': cliente_busqueda,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'total_documentos': total_documentos,
+        'documentos_por_tipo': documentos_por_tipo,
+        'clientes': clientes,
+    }
+    
+    return render(request, 'citas/documentos/gestor_documentos.html', context)
+
+
+@login_required
+def descargar_documento(request, documento_id):
+    """Vista para descargar un documento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'No tienes permisos para descargar documentos.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    documento = get_object_or_404(DocumentoCliente, id=documento_id)
+    
+    # Generar el PDF según el tipo de documento
+    if documento.tipo == 'presupuesto' and documento.plan_tratamiento:
+        return exportar_presupuesto_pdf(request, documento.plan_tratamiento.id)
+    elif documento.tipo == 'odontograma' and documento.odontograma:
+        return exportar_odontograma_pdf(request, documento.odontograma.id)
+    elif documento.tipo == 'consentimiento':
+        # Buscar el consentimiento asociado
+        consentimiento = ConsentimientoInformado.objects.filter(
+            cliente=documento.cliente,
+            cita=documento.cita,
+            plan_tratamiento=documento.plan_tratamiento
+        ).first()
+        if consentimiento:
+            return exportar_consentimiento_pdf(request, consentimiento.id)
+    elif documento.archivo_pdf:
+        # Si tiene archivo PDF guardado, servirlo
+        response = HttpResponse(documento.archivo_pdf.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{documento.titulo}.pdf"'
+        return response
+    
+    messages.error(request, 'El documento no está disponible para descarga.')
+    return redirect('gestor_documentos')
+
+
+@login_required
+def enviar_documento_correo(request, documento_id):
+    """Vista para enviar un documento por correo"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'error': 'No tienes permisos para acceder a esta función.'}, status=403)
+    
+    documento = get_object_or_404(DocumentoCliente, id=documento_id)
+    email_destino = request.POST.get('email', documento.cliente.email)
+    
+    if not email_destino:
+        return JsonResponse({'error': 'No se especificó un email de destino.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+        import os
+        
+        # Generar el PDF según el tipo
+        pdf_content = None
+        filename = f"{documento.titulo}.pdf"
+        
+        if documento.tipo == 'presupuesto' and documento.plan_tratamiento:
+            # Generar PDF del presupuesto
+            buffer = BytesIO()
+            # Reutilizar la lógica de exportar_presupuesto_pdf pero sin crear respuesta HTTP
+            # Por ahora, redirigimos a generar el PDF
+            response = exportar_presupuesto_pdf(request, documento.plan_tratamiento.id)
+            pdf_content = response.content
+            filename = f"presupuesto_{documento.cliente.nombre_completo.replace(' ', '_')}.pdf"
+        elif documento.tipo == 'odontograma' and documento.odontograma:
+            # Generar PDF del odontograma
+            response = exportar_odontograma_pdf(request, documento.odontograma.id)
+            pdf_content = response.content
+            filename = f"ficha_odontologica_{documento.cliente.nombre_completo.replace(' ', '_')}.pdf"
+        elif documento.tipo == 'consentimiento':
+            # Buscar el consentimiento asociado
+            consentimiento = ConsentimientoInformado.objects.filter(
+                cliente=documento.cliente,
+                cita=documento.cita,
+                plan_tratamiento=documento.plan_tratamiento
+            ).first()
+            if consentimiento:
+                response = exportar_consentimiento_pdf(request, consentimiento.id)
+                pdf_content = response.content
+                filename = f"consentimiento_{documento.cliente.nombre_completo.replace(' ', '_')}.pdf"
+            else:
+                return JsonResponse({'error': 'Consentimiento no encontrado.'}, status=400)
+        elif documento.archivo_pdf:
+            # Usar archivo PDF existente
+            pdf_content = documento.archivo_pdf.read()
+            filename = documento.archivo_pdf.name.split('/')[-1]
+        else:
+            return JsonResponse({'error': 'El documento no está disponible para envío.'}, status=400)
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'DEFAULT_FROM_EMAIL', 'miclinicacontacto@gmail.com')
+            direccion_clinica = info_clinica.direccion or ''
+            telefono_clinica = info_clinica.telefono or ''
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'DEFAULT_FROM_EMAIL', 'miclinicacontacto@gmail.com')
+            direccion_clinica = ''
+            telefono_clinica = ''
+        
+        # Renderizar template HTML
+        from django.template.loader import render_to_string
+        mensaje_html = render_to_string('citas/emails/documento_enviado.html', {
+            'cliente_nombre': documento.cliente.nombre_completo,
+            'tipo_documento': documento.get_tipo_display(),
+            'titulo': documento.titulo,
+            'fecha_generacion': documento.fecha_generacion,
+            'nombre_clinica': nombre_clinica,
+            'direccion_clinica': direccion_clinica,
+            'telefono_clinica': telefono_clinica,
+            'email_clinica': email_clinica,
+        })
+        
+        # Crear el email con contenido HTML
+        asunto = f"{documento.get_tipo_display()} - {nombre_clinica}"
+        email = EmailMessage(
+            asunto,
+            mensaje_html,
+            email_clinica,
+            [email_destino],
+        )
+        email.content_subtype = "html"  # Indicar que es HTML
+        
+        # Adjuntar PDF
+        email.attach(filename, pdf_content, 'application/pdf')
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar documento
+        documento.enviado_por_correo = True
+        documento.fecha_envio = timezone.now()
+        documento.email_destinatario = email_destino
+        documento.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documento enviado exitosamente a {email_destino}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documento por correo: {str(e)}")
+        return JsonResponse({'error': f'Error al enviar el documento: {str(e)}'}, status=500)
+
+
+@login_required
+def enviar_consentimiento_por_correo(request, consentimiento_id):
+    """Vista para enviar un consentimiento por correo con enlace de firma"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'error': 'No tienes permisos para enviar consentimientos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'error': 'No tienes permisos para acceder a esta función.'}, status=403)
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    if consentimiento.esta_firmado:
+        return JsonResponse({'error': 'Este consentimiento ya está firmado.'}, status=400)
+    
+    email_destino = request.POST.get('email', consentimiento.cliente.email)
+    
+    if not email_destino:
+        return JsonResponse({'error': 'No se especificó un email de destino.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+        
+        # Generar token de firma si no existe
+        if not consentimiento.token_firma or not consentimiento.token_es_valido():
+            consentimiento.generar_token_firma()
+        
+        # Generar PDF del consentimiento
+        response = exportar_consentimiento_pdf(request, consentimiento.id)
+        pdf_content = response.content
+        filename = f"consentimiento_{consentimiento.cliente.nombre_completo.replace(' ', '_')}.pdf"
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'DEFAULT_FROM_EMAIL', 'miclinicacontacto@gmail.com')
+            direccion_clinica = info_clinica.direccion or ''
+            telefono_clinica = info_clinica.telefono or ''
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'DEFAULT_FROM_EMAIL', 'miclinicacontacto@gmail.com')
+            direccion_clinica = ''
+            telefono_clinica = ''
+        
+        # Construir URL de firma (pública con token)
+        dominio = request.get_host()
+        # URL para firma en sistema de gestión (pública con token)
+        url_firma_gestion = f"{request.scheme}://{dominio}/trabajadores/consentimientos/firmar-publico/{consentimiento.token_firma}/"
+        
+        # URL para firma en cliente_web (requiere login)
+        # Asumiendo que cliente_web está en el mismo dominio o subdominio
+        url_firma_web = f"{request.scheme}://{dominio.replace('gestion', 'web')}/consentimientos/{consentimiento.id}/firmar/"
+        
+        # Renderizar template HTML
+        from django.template.loader import render_to_string
+        mensaje_html = render_to_string('citas/emails/consentimiento_enviado.html', {
+            'cliente_nombre': consentimiento.cliente.nombre_completo,
+            'titulo': consentimiento.titulo,
+            'tipo_procedimiento': consentimiento.get_tipo_procedimiento_display(),
+            'fecha_creacion': consentimiento.fecha_creacion,
+            'url_firma_gestion': url_firma_gestion,
+            'url_firma_web': url_firma_web,
+            'nombre_clinica': nombre_clinica,
+            'direccion_clinica': direccion_clinica,
+            'telefono_clinica': telefono_clinica,
+            'email_clinica': email_clinica,
+        })
+        
+        # Crear el email con contenido HTML
+        asunto = f"Consentimiento Informado - {nombre_clinica}"
+        email = EmailMessage(
+            asunto,
+            mensaje_html,
+            email_clinica,
+            [email_destino],
+        )
+        email.content_subtype = "html"  # Indicar que es HTML
+        
+        # Adjuntar PDF
+        email.attach(filename, pdf_content, 'application/pdf')
+        
+        # Enviar email
+        email.send()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Consentimiento enviado exitosamente a {email_destino}. Se ha incluido un enlace para firmar.'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar consentimiento por correo: {str(e)}")
+        return JsonResponse({'error': f'Error al enviar el consentimiento: {str(e)}'}, status=500)
+
+
+# ============================================================================
+# GESTIÓN DE CONSENTIMIENTOS INFORMADOS
+# ============================================================================
+
+@login_required
+def gestor_consentimientos(request):
+    """Vista principal para gestionar consentimientos informados"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'Solo los administrativos pueden gestionar consentimientos.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    # Obtener parámetros de búsqueda
+    estado_filtro = request.GET.get('estado', '')
+    cliente_busqueda = request.GET.get('cliente', '')
+    tipo_filtro = request.GET.get('tipo', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    
+    # Obtener todos los consentimientos
+    consentimientos = ConsentimientoInformado.objects.all().select_related(
+        'cliente', 'dentista', 'cita', 'plan_tratamiento', 'plantilla'
+    )
+    
+    # Aplicar filtros
+    if estado_filtro:
+        consentimientos = consentimientos.filter(estado=estado_filtro)
+    
+    if tipo_filtro:
+        consentimientos = consentimientos.filter(tipo_procedimiento=tipo_filtro)
+    
+    if cliente_busqueda:
+        consentimientos = consentimientos.filter(
+            Q(cliente__nombre_completo__icontains=cliente_busqueda) |
+            Q(cliente__email__icontains=cliente_busqueda) |
+            Q(cliente__rut__icontains=cliente_busqueda)
+        )
+    
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            consentimientos = consentimientos.filter(fecha_creacion__date__gte=fecha_desde_obj)
+        except:
+            pass
+    
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            consentimientos = consentimientos.filter(fecha_creacion__date__lte=fecha_hasta_obj)
+        except:
+            pass
+    
+    # Ordenar por fecha de creación (más recientes primero)
+    consentimientos = consentimientos.order_by('-fecha_creacion')
+    
+    # Paginación
+    paginator = Paginator(consentimientos, 20)
+    page = request.GET.get('page', 1)
+    try:
+        consentimientos_pag = paginator.page(page)
+    except PageNotAnInteger:
+        consentimientos_pag = paginator.page(1)
+    except EmptyPage:
+        consentimientos_pag = paginator.page(paginator.num_pages)
+    
+    # Estadísticas
+    total_consentimientos = ConsentimientoInformado.objects.count()
+    consentimientos_por_estado = {}
+    for estado, nombre in ConsentimientoInformado.ESTADO_CHOICES:
+        consentimientos_por_estado[estado] = ConsentimientoInformado.objects.filter(estado=estado).count()
+    
+    # Obtener plantillas activas
+    plantillas = PlantillaConsentimiento.objects.filter(activo=True).order_by('tipo_procedimiento', 'nombre')
+    
+    context = {
+        'perfil': perfil,
+        'consentimientos': consentimientos_pag,
+        'estados': ConsentimientoInformado.ESTADO_CHOICES,
+        'tipos_procedimiento': PlantillaConsentimiento.TIPO_PROCEDIMIENTO_CHOICES,
+        'estado_filtro': estado_filtro,
+        'tipo_filtro': tipo_filtro,
+        'cliente_busqueda': cliente_busqueda,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'total_consentimientos': total_consentimientos,
+        'consentimientos_por_estado': consentimientos_por_estado,
+        'plantillas': plantillas,
+    }
+    
+    return render(request, 'citas/consentimientos/gestor_consentimientos.html', context)
+
+
+@login_required
+def crear_consentimiento(request):
+    """Vista para crear un nuevo consentimiento informado"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'Solo los administrativos pueden crear consentimientos.')
+            return redirect('gestor_consentimientos')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    # Obtener datos necesarios
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+    plantillas = PlantillaConsentimiento.objects.filter(activo=True).order_by('tipo_procedimiento', 'nombre')
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).order_by('nombre_completo')
+    
+    if request.method == 'POST':
+        try:
+            cliente_id = request.POST.get('cliente')
+            plantilla_id = request.POST.get('plantilla', '')
+            tipo_procedimiento = request.POST.get('tipo_procedimiento')
+            titulo = request.POST.get('titulo')
+            diagnostico = request.POST.get('diagnostico', '')
+            justificacion = request.POST.get('justificacion', '')
+            naturaleza_procedimiento = request.POST.get('naturaleza_procedimiento', '')
+            objetivos_tratamiento = request.POST.get('objetivos_tratamiento', '')
+            contenido = request.POST.get('contenido', '')
+            riesgos = request.POST.get('riesgos', '')
+            beneficios = request.POST.get('beneficios', '')
+            alternativas = request.POST.get('alternativas', '')
+            pronostico = request.POST.get('pronostico', '')
+            cuidados_postoperatorios = request.POST.get('cuidados_postoperatorios', '')
+            dentista_id = request.POST.get('dentista', '')
+            rut_dentista = request.POST.get('rut_dentista', '')
+            registro_superintendencia = request.POST.get('registro_superintendencia', '')
+            explicado_por_id = request.POST.get('explicado_por', '')
+            rut_explicado_por = request.POST.get('rut_explicado_por', '')
+            cita_id = request.POST.get('cita', '')
+            plan_id = request.POST.get('plan_tratamiento', '')
+            fecha_vencimiento = request.POST.get('fecha_vencimiento', '')
+            
+            cliente = get_object_or_404(Cliente, id=cliente_id)
+            
+            # Si se seleccionó una plantilla, usar su contenido
+            plantilla = None
+            if plantilla_id:
+                plantilla = get_object_or_404(PlantillaConsentimiento, id=plantilla_id)
+                if not diagnostico and plantilla.diagnostico_base:
+                    diagnostico = plantilla.diagnostico_base.replace('{nombre_paciente}', cliente.nombre_completo)
+                if not naturaleza_procedimiento and plantilla.naturaleza_procedimiento:
+                    naturaleza_procedimiento = plantilla.naturaleza_procedimiento
+                if not objetivos_tratamiento and plantilla.objetivos_tratamiento:
+                    objetivos_tratamiento = plantilla.objetivos_tratamiento
+                if not contenido and plantilla.contenido:
+                    # Reemplazar variables en el contenido
+                    contenido = plantilla.contenido.replace('{nombre_paciente}', cliente.nombre_completo)
+                    contenido = contenido.replace('{fecha}', datetime.now().strftime('%d/%m/%Y'))
+                if plantilla.riesgos and not riesgos:
+                    riesgos = plantilla.riesgos
+                if plantilla.beneficios and not beneficios:
+                    beneficios = plantilla.beneficios
+                if plantilla.alternativas and not alternativas:
+                    alternativas = plantilla.alternativas
+                if plantilla.pronostico and not pronostico:
+                    pronostico = plantilla.pronostico
+                if plantilla.cuidados_postoperatorios and not cuidados_postoperatorios:
+                    cuidados_postoperatorios = plantilla.cuidados_postoperatorios
+            
+            # Obtener dentista
+            dentista = None
+            if dentista_id:
+                dentista = get_object_or_404(Perfil, id=dentista_id)
+            elif perfil.es_dentista():
+                dentista = perfil
+            
+            # Obtener profesional informante
+            explicado_por = perfil
+            if explicado_por_id:
+                explicado_por = get_object_or_404(Perfil, id=explicado_por_id)
+            
+            # Crear consentimiento
+            consentimiento = ConsentimientoInformado.objects.create(
+                cliente=cliente,
+                plantilla=plantilla,
+                tipo_procedimiento=tipo_procedimiento,
+                titulo=titulo,
+                diagnostico=diagnostico or None,
+                justificacion=justificacion or None,
+                naturaleza_procedimiento=naturaleza_procedimiento or None,
+                objetivos_tratamiento=objetivos_tratamiento or None,
+                contenido=contenido or None,
+                riesgos=riesgos or None,
+                beneficios=beneficios or None,
+                alternativas=alternativas or None,
+                pronostico=pronostico or None,
+                cuidados_postoperatorios=cuidados_postoperatorios or None,
+                dentista=dentista,
+                rut_dentista=rut_dentista or None,
+                registro_superintendencia=registro_superintendencia or None,
+                explicado_por=explicado_por,
+                rut_explicado_por=rut_explicado_por or None,
+                estado='pendiente',
+                fecha_vencimiento=datetime.strptime(fecha_vencimiento, '%Y-%m-%d').date() if fecha_vencimiento else None,
+            )
+            
+            # Asociar con cita si se proporciona
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id)
+                    consentimiento.cita = cita
+                    consentimiento.save()
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Asociar con plan de tratamiento si se proporciona
+            if plan_id:
+                try:
+                    plan = PlanTratamiento.objects.get(id=plan_id)
+                    consentimiento.plan_tratamiento = plan
+                    consentimiento.save()
+                except PlanTratamiento.DoesNotExist:
+                    pass
+            
+            # Crear documento asociado
+            DocumentoCliente.objects.create(
+                cliente=cliente,
+                tipo='consentimiento',
+                titulo=f'Consentimiento - {titulo}',
+                descripcion=f'Consentimiento informado para {tipo_procedimiento}',
+                cita=consentimiento.cita,
+                plan_tratamiento=consentimiento.plan_tratamiento,
+                generado_por=perfil,
+            )
+            
+            messages.success(request, 'Consentimiento creado exitosamente.')
+            return redirect('gestor_consentimientos')
+            
+        except Exception as e:
+            logger.error(f"Error al crear consentimiento: {str(e)}")
+            messages.error(request, f'Error al crear el consentimiento: {str(e)}')
+    
+    context = {
+        'perfil': perfil,
+        'clientes': clientes,
+        'plantillas': plantillas,
+        'dentistas': dentistas,
+        'tipos_procedimiento': PlantillaConsentimiento.TIPO_PROCEDIMIENTO_CHOICES,
+    }
+    
+    return render(request, 'citas/consentimientos/crear_consentimiento.html', context)
+
+
+@login_required
+def crear_consentimiento_desde_plan(request, plan_id):
+    """Vista para crear un consentimiento informado desde un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        messages.error(request, 'No tienes permisos para crear consentimientos.')
+        return redirect('detalle_plan_tratamiento', plan_id=plan_id)
+    
+    # Obtener datos necesarios
+    plantillas = PlantillaConsentimiento.objects.filter(activo=True).order_by('tipo_procedimiento', 'nombre')
+    dentistas = Perfil.objects.filter(rol='dentista', activo=True).order_by('nombre_completo')
+    
+    if request.method == 'POST':
+        try:
+            plantilla_id = request.POST.get('plantilla', '')
+            tipo_procedimiento = request.POST.get('tipo_procedimiento')
+            titulo = request.POST.get('titulo')
+            diagnostico = request.POST.get('diagnostico', '')
+            justificacion = request.POST.get('justificacion', '')
+            naturaleza_procedimiento = request.POST.get('naturaleza_procedimiento', '')
+            objetivos_tratamiento = request.POST.get('objetivos_tratamiento', '')
+            contenido = request.POST.get('contenido', '')
+            riesgos = request.POST.get('riesgos', '')
+            beneficios = request.POST.get('beneficios', '')
+            alternativas = request.POST.get('alternativas', '')
+            pronostico = request.POST.get('pronostico', '')
+            cuidados_postoperatorios = request.POST.get('cuidados_postoperatorios', '')
+            dentista_id = request.POST.get('dentista', '')
+            rut_dentista = request.POST.get('rut_dentista', '')
+            registro_superintendencia = request.POST.get('registro_superintendencia', '')
+            explicado_por_id = request.POST.get('explicado_por', '')
+            rut_explicado_por = request.POST.get('rut_explicado_por', '')
+            fecha_vencimiento = request.POST.get('fecha_vencimiento', '')
+            
+            cliente = plan.cliente
+            
+            # Si se seleccionó una plantilla, usar su contenido
+            plantilla = None
+            if plantilla_id:
+                plantilla = get_object_or_404(PlantillaConsentimiento, id=plantilla_id)
+                if not diagnostico and plantilla.diagnostico_base:
+                    diagnostico = plantilla.diagnostico_base.replace('{nombre_paciente}', cliente.nombre_completo)
+                if not naturaleza_procedimiento and plantilla.naturaleza_procedimiento:
+                    naturaleza_procedimiento = plantilla.naturaleza_procedimiento
+                if not objetivos_tratamiento and plantilla.objetivos_tratamiento:
+                    objetivos_tratamiento = plantilla.objetivos_tratamiento
+                if not contenido and plantilla.contenido:
+                    contenido = plantilla.contenido.replace('{nombre_paciente}', cliente.nombre_completo)
+                    contenido = contenido.replace('{fecha}', datetime.now().strftime('%d/%m/%Y'))
+                if plantilla.riesgos and not riesgos:
+                    riesgos = plantilla.riesgos
+                if plantilla.beneficios and not beneficios:
+                    beneficios = plantilla.beneficios
+                if plantilla.alternativas and not alternativas:
+                    alternativas = plantilla.alternativas
+                if plantilla.pronostico and not pronostico:
+                    pronostico = plantilla.pronostico
+                if plantilla.cuidados_postoperatorios and not cuidados_postoperatorios:
+                    cuidados_postoperatorios = plantilla.cuidados_postoperatorios
+            
+            # Usar el dentista del plan por defecto
+            dentista = plan.dentista
+            if dentista_id:
+                dentista = get_object_or_404(Perfil, id=dentista_id)
+            
+            # Obtener profesional informante
+            explicado_por = perfil
+            if explicado_por_id:
+                explicado_por = get_object_or_404(Perfil, id=explicado_por_id)
+            
+            # Si no hay diagnóstico, usar el del plan
+            if not diagnostico and plan.diagnostico:
+                diagnostico = plan.diagnostico
+            
+            # Crear consentimiento
+            consentimiento = ConsentimientoInformado.objects.create(
+                cliente=cliente,
+                plantilla=plantilla,
+                plan_tratamiento=plan,
+                tipo_procedimiento=tipo_procedimiento,
+                titulo=titulo,
+                diagnostico=diagnostico or None,
+                justificacion=justificacion or None,
+                naturaleza_procedimiento=naturaleza_procedimiento or None,
+                objetivos_tratamiento=objetivos_tratamiento or None,
+                contenido=contenido or None,
+                riesgos=riesgos or None,
+                beneficios=beneficios or None,
+                alternativas=alternativas or None,
+                pronostico=pronostico or None,
+                cuidados_postoperatorios=cuidados_postoperatorios or None,
+                dentista=dentista,
+                rut_dentista=rut_dentista or None,
+                registro_superintendencia=registro_superintendencia or None,
+                explicado_por=explicado_por,
+                rut_explicado_por=rut_explicado_por or None,
+                estado='pendiente',
+                fecha_vencimiento=datetime.strptime(fecha_vencimiento, '%Y-%m-%d').date() if fecha_vencimiento else None,
+            )
+            
+            # Crear documento asociado
+            DocumentoCliente.objects.create(
+                cliente=cliente,
+                tipo='consentimiento',
+                titulo=f'Consentimiento - {titulo}',
+                descripcion=f'Consentimiento informado para {tipo_procedimiento}',
+                plan_tratamiento=plan,
+                generado_por=perfil,
+            )
+            
+            messages.success(request, 'Consentimiento creado exitosamente.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan_id)
+            
+        except Exception as e:
+            logger.error(f"Error al crear consentimiento desde plan: {str(e)}")
+            messages.error(request, f'Error al crear el consentimiento: {str(e)}')
+    
+    # Prellenar datos del plan
+    context = {
+        'perfil': perfil,
+        'plan': plan,
+        'cliente': plan.cliente,
+        'plantillas': plantillas,
+        'dentistas': dentistas,
+        'dentista_plan': plan.dentista,
+        'tipos_procedimiento': PlantillaConsentimiento.TIPO_PROCEDIMIENTO_CHOICES,
+        'diagnostico_plan': plan.diagnostico,
+    }
+    
+    return render(request, 'citas/consentimientos/crear_consentimiento_desde_plan.html', context)
+
+
+@login_required
+def editar_consentimiento(request, consentimiento_id):
+    """Vista para editar un consentimiento informado"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'Solo los administrativos pueden editar consentimientos.')
+            return redirect('gestor_consentimientos')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    # No permitir editar si ya está firmado
+    if consentimiento.esta_firmado:
+        messages.warning(request, 'No se puede editar un consentimiento que ya está firmado.')
+        return redirect('detalle_consentimiento', consentimiento_id=consentimiento_id)
+    
+    if request.method == 'POST':
+        try:
+            tipo_procedimiento = request.POST.get('tipo_procedimiento')
+            titulo = request.POST.get('titulo')
+            contenido = request.POST.get('contenido')
+            riesgos = request.POST.get('riesgos', '')
+            beneficios = request.POST.get('beneficios', '')
+            alternativas = request.POST.get('alternativas', '')
+            fecha_vencimiento = request.POST.get('fecha_vencimiento', '')
+            
+            consentimiento.tipo_procedimiento = tipo_procedimiento
+            consentimiento.titulo = titulo
+            consentimiento.contenido = contenido
+            consentimiento.riesgos = riesgos or None
+            consentimiento.beneficios = beneficios or None
+            consentimiento.alternativas = alternativas or None
+            consentimiento.fecha_vencimiento = datetime.strptime(fecha_vencimiento, '%Y-%m-%d').date() if fecha_vencimiento else None
+            consentimiento.save()
+            
+            messages.success(request, 'Consentimiento actualizado exitosamente.')
+            # Si el consentimiento tiene un plan de tratamiento, redirigir al plan
+            if consentimiento.plan_tratamiento:
+                return redirect('detalle_plan_tratamiento', plan_id=consentimiento.plan_tratamiento.id)
+            return redirect('gestor_consentimientos')
+            
+        except Exception as e:
+            logger.error(f"Error al editar consentimiento: {str(e)}")
+            messages.error(request, f'Error al actualizar el consentimiento: {str(e)}')
+    
+    context = {
+        'perfil': perfil,
+        'consentimiento': consentimiento,
+        'tipos_procedimiento': PlantillaConsentimiento.TIPO_PROCEDIMIENTO_CHOICES,
+    }
+    
+    # Si el consentimiento tiene un plan de tratamiento, agregarlo al contexto
+    if consentimiento.plan_tratamiento:
+        context['plan_tratamiento'] = consentimiento.plan_tratamiento
+    
+    return render(request, 'citas/consentimientos/editar_consentimiento.html', context)
+
+
+@login_required
+def detalle_consentimiento(request, consentimiento_id):
+    """Vista para ver el detalle de un consentimiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            messages.error(request, 'No tienes permisos para ver consentimientos.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    # Los dentistas solo pueden ver sus propios consentimientos
+    if perfil.es_dentista() and consentimiento.dentista != perfil:
+        messages.error(request, 'No tienes permisos para ver este consentimiento.')
+        return redirect('gestor_consentimientos')
+    
+    context = {
+        'perfil': perfil,
+        'consentimiento': consentimiento,
+        'puede_editar': perfil.es_administrativo() and not consentimiento.esta_firmado,
+        'puede_firmar': perfil.es_administrativo() and consentimiento.estado == 'pendiente',
+    }
+    
+    return render(request, 'citas/consentimientos/detalle_consentimiento.html', context)
+
+
+def firmar_consentimiento_publico(request, token):
+    """Vista pública para firmar un consentimiento usando token (sin autenticación)"""
+    consentimiento = get_object_or_404(ConsentimientoInformado, token_firma=token)
+    
+    # Verificar que el token sea válido
+    if not consentimiento.token_es_valido():
+        return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+            'error': 'El enlace de firma ha expirado o ya no es válido. Por favor, contacte a la clínica para obtener un nuevo enlace.',
+            'consentimiento': None
+        })
+    
+    if consentimiento.esta_firmado:
+        return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+            'error': 'Este consentimiento ya ha sido firmado.',
+            'consentimiento': consentimiento
+        })
+    
+    if request.method == 'POST':
+        try:
+            firma_paciente = request.POST.get('firma_paciente', '')
+            nombre_firmante = request.POST.get('nombre_firmante', consentimiento.cliente.nombre_completo)
+            rut_firmante = request.POST.get('rut_firmante', consentimiento.cliente.rut or '')
+            nombre_testigo = request.POST.get('nombre_testigo', '')
+            rut_testigo = request.POST.get('rut_testigo', '')
+            firma_testigo = request.POST.get('firma_testigo', '')
+            declaracion_comprension = request.POST.get('declaracion_comprension') == 'on'
+            derecho_revocacion = request.POST.get('derecho_revocacion') == 'on'
+            
+            if not firma_paciente:
+                return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+                    'error': 'La firma del paciente es obligatoria.',
+                    'consentimiento': consentimiento
+                })
+            
+            if not declaracion_comprension:
+                return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+                    'error': 'Debe confirmar la declaración de comprensión.',
+                    'consentimiento': consentimiento
+                })
+            
+            if not derecho_revocacion:
+                return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+                    'error': 'Debe confirmar que conoce su derecho de revocación.',
+                    'consentimiento': consentimiento
+                })
+            
+            consentimiento.firma_paciente = firma_paciente
+            consentimiento.nombre_firmante = nombre_firmante
+            consentimiento.rut_firmante = rut_firmante
+            consentimiento.nombre_testigo = nombre_testigo if nombre_testigo else None
+            consentimiento.rut_testigo = rut_testigo if rut_testigo else None
+            consentimiento.firma_testigo = firma_testigo if firma_testigo else None
+            consentimiento.declaracion_comprension = declaracion_comprension
+            consentimiento.derecho_revocacion = derecho_revocacion
+            consentimiento.estado = 'firmado'
+            consentimiento.fecha_firma = timezone.now()
+            consentimiento.save()
+            
+            return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+                'success': True,
+                'message': 'Consentimiento firmado exitosamente. Gracias por su tiempo.',
+                'consentimiento': consentimiento
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al firmar consentimiento público: {str(e)}")
+            return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+                'error': f'Error al firmar el consentimiento: {str(e)}',
+                'consentimiento': consentimiento
+            })
+    
+    # GET: Mostrar formulario de firma
+    return render(request, 'citas/consentimientos/firmar_consentimiento_publico.html', {
+        'consentimiento': consentimiento,
+        'cliente': consentimiento.cliente
+    })
+
+
+@login_required
+def firmar_consentimiento(request, consentimiento_id):
+    """Vista para firmar un consentimiento informado (presencial o desde sistema)"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        # Permitir tanto administrativos como dentistas para firma presencial
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'error': 'No tienes permisos para firmar consentimientos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'error': 'No tienes permisos para acceder a esta función.'}, status=403)
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    if consentimiento.esta_firmado:
+        return JsonResponse({'error': 'Este consentimiento ya está firmado.'}, status=400)
+    
+    try:
+        firma_paciente = request.POST.get('firma_paciente', '')
+        nombre_firmante = request.POST.get('nombre_firmante', consentimiento.cliente.nombre_completo)
+        rut_firmante = request.POST.get('rut_firmante', consentimiento.cliente.rut or '')
+        nombre_testigo = request.POST.get('nombre_testigo', '')
+        rut_testigo = request.POST.get('rut_testigo', '')
+        firma_testigo = request.POST.get('firma_testigo', '')
+        declaracion_comprension = request.POST.get('declaracion_comprension') == 'on'
+        derecho_revocacion = request.POST.get('derecho_revocacion') == 'on'
+        
+        if not firma_paciente:
+            return JsonResponse({'error': 'La firma del paciente es obligatoria.'}, status=400)
+        
+        if not declaracion_comprension:
+            return JsonResponse({'error': 'Debe confirmar la declaración de comprensión.'}, status=400)
+        
+        if not derecho_revocacion:
+            return JsonResponse({'error': 'Debe confirmar que conoce su derecho de revocación.'}, status=400)
+        
+        consentimiento.firma_paciente = firma_paciente
+        consentimiento.nombre_firmante = nombre_firmante
+        consentimiento.rut_firmante = rut_firmante
+        consentimiento.nombre_testigo = nombre_testigo if nombre_testigo else None
+        consentimiento.rut_testigo = rut_testigo if rut_testigo else None
+        consentimiento.firma_testigo = firma_testigo if firma_testigo else None
+        consentimiento.declaracion_comprension = declaracion_comprension
+        consentimiento.derecho_revocacion = derecho_revocacion
+        consentimiento.estado = 'firmado'
+        consentimiento.fecha_firma = timezone.now()
+        consentimiento.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Consentimiento firmado exitosamente.'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al firmar consentimiento: {str(e)}")
+        return JsonResponse({'error': f'Error al firmar el consentimiento: {str(e)}'}, status=500)
+
+
+@login_required
+def exportar_consentimiento_pdf(request, consentimiento_id):
+    """Vista para exportar un consentimiento informado a PDF"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_dentista() or perfil.es_administrativo()):
+            messages.error(request, 'No tienes permisos para exportar consentimientos.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    # Obtener información de la clínica
+    try:
+        from configuracion.models import InformacionClinica
+        info_clinica = InformacionClinica.obtener()
+        nombre_clinica = info_clinica.nombre_clinica
+        direccion_clinica = info_clinica.direccion
+        telefono_clinica = info_clinica.telefono
+        email_clinica = info_clinica.email
+    except:
+        nombre_clinica = "Clínica Dental"
+        direccion_clinica = ""
+        telefono_clinica = ""
+        email_clinica = ""
+    
+    # Crear el buffer para el PDF
+    buffer = BytesIO()
+    
+    # Función para convertir firma base64 a imagen de ReportLab
+    def convertir_firma_base64_a_imagen(firma_base64, max_width=3*inch, max_height=1*inch):
+        """Convierte una firma en formato base64 a una imagen de ReportLab"""
+        if not firma_base64:
+            return None
+        
+        try:
+            import base64
+            from io import BytesIO
+            from PIL import Image as PILImage
+            
+            # Verificar si es una cadena base64
+            if not isinstance(firma_base64, str):
+                return None
+            
+            # Si no empieza con data:image, asumir que es solo base64
+            if firma_base64.startswith('data:image'):
+                # Extraer solo la parte base64
+                firma_base64 = firma_base64.split(',')[1] if ',' in firma_base64 else firma_base64
+            
+            # Decodificar base64
+            imagen_bytes = base64.b64decode(firma_base64)
+            imagen_pil = PILImage.open(BytesIO(imagen_bytes))
+            
+            # Convertir a RGB si es necesario (para PNG con transparencia)
+            if imagen_pil.mode in ('RGBA', 'LA', 'P'):
+                fondo = PILImage.new('RGB', imagen_pil.size, (255, 255, 255))
+                if imagen_pil.mode == 'P':
+                    imagen_pil = imagen_pil.convert('RGBA')
+                fondo.paste(imagen_pil, mask=imagen_pil.split()[-1] if imagen_pil.mode in ('RGBA', 'LA') else None)
+                imagen_pil = fondo
+            elif imagen_pil.mode != 'RGB':
+                imagen_pil = imagen_pil.convert('RGB')
+            
+            # Redimensionar si es muy grande
+            # Asumir que las imágenes del canvas tienen aproximadamente 96 DPI (estándar web)
+            ancho_px, alto_px = imagen_pil.size
+            # Convertir max_width y max_height de pulgadas a píxeles (asumiendo 96 DPI para web)
+            max_width_px = (float(max_width) / inch) * 96
+            max_height_px = (float(max_height) / inch) * 96
+            
+            # Calcular ratio para mantener proporción
+            ratio_ancho = max_width_px / ancho_px if ancho_px > max_width_px else 1
+            ratio_alto = max_height_px / alto_px if alto_px > max_height_px else 1
+            ratio = min(ratio_ancho, ratio_alto)
+            
+            if ratio < 1:
+                nuevo_ancho = int(ancho_px * ratio)
+                nuevo_alto = int(alto_px * ratio)
+                imagen_pil = imagen_pil.resize((nuevo_ancho, nuevo_alto), PILImage.Resampling.LANCZOS)
+            
+            # Guardar en BytesIO
+            img_buffer = BytesIO()
+            imagen_pil.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            
+            # Crear Image de ReportLab
+            # ReportLab usa puntos (72 puntos = 1 pulgada)
+            # Convertir píxeles a pulgadas (asumiendo 96 DPI) y luego a puntos
+            ancho_final, alto_final = imagen_pil.size
+            # Convertir píxeles a pulgadas (96 píxeles = 1 pulgada para imágenes web)
+            width_inches = ancho_final / 96.0
+            height_inches = alto_final / 96.0
+            
+            # Limitar al máximo permitido y convertir a puntos
+            width_final = min(width_inches * inch, max_width)
+            height_final = min(height_inches * inch, max_height)
+            
+            return Image(img_buffer, width=width_final, height=height_final)
+        except Exception as e:
+            logger.error(f"Error al convertir firma base64 a imagen: {str(e)}")
+            return None
+    
+    # Función para agregar marca de agua con logo de diente
+    def add_watermark(canvas_obj, doc_obj):
+        """Agregar marca de agua con logo de diente en todas las páginas"""
+        canvas_obj.saveState()
+        # Color turquesa transparente para la marca de agua
+        canvas_obj.setFillColor(colors.HexColor('#14b8a6'), alpha=0.06)
+        canvas_obj.setFont('Helvetica-Bold', 150)
+        # Rotar el texto 45 grados
+        canvas_obj.rotate(45)
+        # Posicionar en el centro de la página (ajustado para A4)
+        # A4: 8.27 x 11.69 pulgadas
+        canvas_obj.drawCentredString(4.5*inch, -2.5*inch, '🦷')
+        canvas_obj.restoreState()
+    
+    # Crear el documento PDF
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=35,
+        leftMargin=35,
+        topMargin=50,
+        bottomMargin=40,
+        onFirstPage=add_watermark,
+        onLaterPages=add_watermark
+    )
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    
+    # Estilo para el título principal
+    title_style = ParagraphStyle(
+        'ConsentimientoTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=12,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#1e293b'),
+        fontName='Helvetica-Bold'
+    )
+    
+    # Estilo para subtítulos con color turquesa
+    subtitle_style = ParagraphStyle(
+        'ConsentimientoSubtitle',
+        parent=styles['Heading2'],
+        fontSize=13,
+        spaceAfter=10,
+        spaceBefore=14,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor('#14b8a6'),  # Color turquesa
+        fontName='Helvetica-Bold',
+        borderWidth=0,
+        borderPadding=0,
+        leftIndent=0,
+        rightIndent=0,
+    )
+    
+    # Estilo para subtítulos de secciones (B.1, B.2, etc.)
+    section_subtitle_style = ParagraphStyle(
+        'SectionSubtitle',
+        parent=styles['Heading3'],
+        fontSize=11,
+        spaceAfter=6,
+        spaceBefore=10,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor('#0d9488'),  # Turquesa más oscuro
+        fontName='Helvetica-Bold'
+    )
+    
+    # Estilo para encabezado de clínica
+    clinic_header_style = ParagraphStyle(
+        'ClinicHeader',
+        parent=styles['Heading1'],
+        fontSize=16,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#14b8a6'),  # Color turquesa
+        fontName='Helvetica-Bold',
+        spaceAfter=8
+    )
+    
+    # Estilo para información de la clínica
+    clinic_info_style = ParagraphStyle(
+        'ClinicInfo',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#64748b'),
+        spaceAfter=12
+    )
+    
+    # Estilo para texto normal
+    normal_style = ParagraphStyle(
+        'NormalConsentimiento',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=6,
+        alignment=TA_LEFT,
+        leading=14
+    )
+    
+    # Contenido del PDF - Estructura según Ley 20.584
+    story = []
+    
+    # A. ENCABEZADO - Información de la Clínica (mejorado)
+    clinic_header = Paragraph(f"<b>{nombre_clinica}</b>", clinic_header_style)
+    story.append(clinic_header)
+    
+    header_info = []
+    if direccion_clinica:
+        header_info.append(direccion_clinica)
+    contact_info = []
+    if telefono_clinica:
+        contact_info.append(f"Teléfono: {telefono_clinica}")
+    if email_clinica:
+        contact_info.append(f"Email: {email_clinica}")
+    
+    if header_info or contact_info:
+        header_text = ""
+        if header_info:
+            header_text += "<br/>".join(header_info)
+        if contact_info:
+            if header_text:
+                header_text += "<br/>"
+            header_text += " | ".join(contact_info)
+        header_text += f"<br/><b>Fecha de Generación:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        header = Paragraph(header_text, clinic_info_style)
+        story.append(header)
+    
+    story.append(Spacer(1, 20))
+    
+    # Título principal con línea decorativa
+    title = Paragraph(f"<b>CONSENTIMIENTO INFORMADO</b>", title_style)
+    story.append(title)
+    story.append(Spacer(1, 8))
+    
+    # Subtítulo del procedimiento
+    if consentimiento.titulo:
+        subtitle_proc = Paragraph(f"<i>{consentimiento.titulo}</i>", ParagraphStyle(
+            'SubtitleProc',
+            parent=styles['Normal'],
+            fontSize=12,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#14b8a6'),
+            fontName='Helvetica-Oblique',
+            spaceAfter=16
+        ))
+        story.append(subtitle_proc)
+    else:
+        story.append(Spacer(1, 16))
+    
+    # A. IDENTIFICACIÓN Y ANTECEDENTES
+    identificacion_title = Paragraph("<b>A. IDENTIFICACIÓN Y ANTECEDENTES</b>", subtitle_style)
+    story.append(identificacion_title)
+    
+    # Limpiar RUT para evitar símbolos extraños (como '$' de datos antiguos)
+    rut_paciente = (consentimiento.cliente.rut or 'No especificado').replace('$', '')
+    
+    paciente_data = [
+        ['Nombre Completo del Paciente:', consentimiento.cliente.nombre_completo],
+        ['RUT:', rut_paciente],
+        ['Email:', consentimiento.cliente.email or 'No especificado'],
+        ['Teléfono:', consentimiento.cliente.telefono or 'No especificado'],
+    ]
+    
+    paciente_table = Table(paciente_data, colWidths=[2.2*inch, 4.3*inch])
+    paciente_table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecfeff')),  # Fondo turquesa muy claro
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#0d9488')),  # Texto turquesa oscuro
+        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151')),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#14b8a6')),  # Borde turquesa
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor('#14b8a6')),  # Línea inferior turquesa
+    ])
+    paciente_table.setStyle(paciente_table_style)
+    story.append(paciente_table)
+    story.append(Spacer(1, 16))
+    
+    # B. INFORMACIÓN DETALLADA DEL PROCEDIMIENTO
+    info_title = Paragraph("<b>B. INFORMACIÓN DETALLADA DEL PROCEDIMIENTO</b>", subtitle_style)
+    story.append(info_title)
+    story.append(Spacer(1, 8))
+    
+    # B.1. Diagnóstico y Justificación
+    if consentimiento.diagnostico:
+        diagnostico_title = Paragraph("<b>B.1. Diagnóstico y Justificación del Tratamiento</b>", section_subtitle_style)
+        story.append(diagnostico_title)
+        diagnostico_text = Paragraph(consentimiento.diagnostico or 'No especificado', normal_style)
+        story.append(diagnostico_text)
+        if consentimiento.justificacion:
+            justificacion_text = Paragraph(consentimiento.justificacion or 'No especificado', normal_style)
+            story.append(justificacion_text)
+        story.append(Spacer(1, 12))
+    
+    # B.2. Naturaleza y Objetivos del Tratamiento
+    if consentimiento.naturaleza_procedimiento or consentimiento.objetivos_tratamiento:
+        naturaleza_title = Paragraph("<b>B.2. Naturaleza y Objetivos del Tratamiento</b>", section_subtitle_style)
+        story.append(naturaleza_title)
+        if consentimiento.naturaleza_procedimiento:
+            naturaleza_text = Paragraph(f"<b>Naturaleza del Procedimiento:</b><br/>{consentimiento.naturaleza_procedimiento or 'No especificado'}", normal_style)
+            story.append(naturaleza_text)
+        if consentimiento.objetivos_tratamiento:
+            objetivos_text = Paragraph(f"<b>Objetivos del Tratamiento:</b><br/>{consentimiento.objetivos_tratamiento or 'No especificado'}", normal_style)
+            story.append(objetivos_text)
+        story.append(Spacer(1, 12))
+    
+    # B.3. Contenido General del Consentimiento
+    if consentimiento.contenido:
+        contenido_title = Paragraph("<b>B.3. Información General del Procedimiento</b>", section_subtitle_style)
+        story.append(contenido_title)
+        contenido_text = Paragraph(consentimiento.contenido or 'No especificado', normal_style)
+        story.append(contenido_text)
+        story.append(Spacer(1, 12))
+    
+    # B.4. Alternativas de Tratamiento (OBLIGATORIO - Ley 20.584)
+    if consentimiento.alternativas:
+        alternativas_title = Paragraph("<b>B.4. Alternativas de Tratamiento</b>", section_subtitle_style)
+        story.append(alternativas_title)
+        alternativas_text = Paragraph(consentimiento.alternativas or 'No especificado', normal_style)
+        story.append(alternativas_text)
+        story.append(Spacer(1, 12))
+    
+    # B.5. Riesgos y Complicaciones Relevantes (OBLIGATORIO - Ley 20.584)
+    if consentimiento.riesgos:
+        riesgos_title = Paragraph("<b>B.5. Riesgos y Complicaciones Relevantes</b>", section_subtitle_style)
+        story.append(riesgos_title)
+        riesgos_text = Paragraph(consentimiento.riesgos or 'No especificado', normal_style)
+        story.append(riesgos_text)
+        story.append(Spacer(1, 12))
+    
+    # B.6. Beneficios Esperados
+    if consentimiento.beneficios:
+        beneficios_title = Paragraph("<b>B.6. Beneficios Esperados</b>", section_subtitle_style)
+        story.append(beneficios_title)
+        beneficios_text = Paragraph(consentimiento.beneficios or 'No especificado', normal_style)
+        story.append(beneficios_text)
+        story.append(Spacer(1, 12))
+    
+    # B.7. Pronóstico
+    if consentimiento.pronostico:
+        pronostico_title = Paragraph("<b>B.7. Pronóstico</b>", section_subtitle_style)
+        story.append(pronostico_title)
+        pronostico_text = Paragraph(consentimiento.pronostico or 'No especificado', normal_style)
+        story.append(pronostico_text)
+        story.append(Spacer(1, 12))
+    
+    # B.8. Cuidados Postoperatorios
+    if consentimiento.cuidados_postoperatorios:
+        cuidados_title = Paragraph("<b>B.8. Cuidados Postoperatorios</b>", section_subtitle_style)
+        story.append(cuidados_title)
+        cuidados_text = Paragraph(consentimiento.cuidados_postoperatorios or 'No especificado', normal_style)
+        story.append(cuidados_text)
+        story.append(Spacer(1, 16))
+    
+    # C. DECLARACIÓN DEL PACIENTE Y FIRMAS (Ley 20.584)
+    declaracion_title = Paragraph("<b>C. DECLARACIÓN DEL PACIENTE Y FIRMAS</b>", subtitle_style)
+    story.append(declaracion_title)
+    story.append(Spacer(1, 10))
+    
+    # Declaración de Comprensión (Ley 20.584) - con fondo turquesa
+    declaracion_box_style = ParagraphStyle(
+        'DeclaracionBox',
+        parent=normal_style,
+        backColor=colors.HexColor('#ecfeff'),  # Fondo turquesa muy claro
+        borderColor=colors.HexColor('#14b8a6'),  # Borde turquesa
+        borderWidth=1,
+        borderPadding=10,
+        leftIndent=0,
+        rightIndent=0,
+    )
+    declaracion_text = Paragraph(
+        "<b>DECLARACIÓN DE COMPRENSIÓN:</b><br/>"
+        "Yo, el paciente o su representante legal, declaro que he sido informado de forma clara, comprensible y oportuna "
+        "sobre mi diagnóstico, los riesgos, beneficios y alternativas del procedimiento propuesto, de acuerdo con lo "
+        "establecido en la <b>Ley N° 20.584</b> sobre Derechos y Deberes de las Personas en relación con las Acciones vinculadas "
+        "a su Atención en Salud.",
+        declaracion_box_style
+    )
+    story.append(declaracion_text)
+    story.append(Spacer(1, 10))
+    
+    # Derecho de Revocación (Ley 20.584) - con fondo turquesa
+    revocacion_text = Paragraph(
+        "<b>DERECHO DE REVOCACIÓN:</b><br/>"
+        "Conozco que tengo el derecho a revocar libremente este consentimiento en cualquier momento previo al inicio del tratamiento.",
+        declaracion_box_style
+    )
+    story.append(revocacion_text)
+    story.append(Spacer(1, 16))
+    
+    # Espacios para Firmas
+    firmas_title = Paragraph("<b>FIRMAS</b>", subtitle_style)
+    story.append(firmas_title)
+    story.append(Spacer(1, 12))
+    
+    # Estilo para títulos de sección de firmas
+    firma_section_title_style = ParagraphStyle(
+        'FirmaSectionTitle',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=colors.HexColor('#14b8a6'),
+        fontName='Helvetica-Bold',
+        spaceAfter=6,
+        spaceBefore=0
+    )
+    
+    # Tabla de firmas - Estructura mejorada y organizada
+    firmas_data = []
+    row_idx = 0
+    title_rows = []  # Filas que son títulos de sección (para aplicar SPAN)
+    
+    # Paciente
+    if consentimiento.esta_firmado:
+        # Título de sección que ocupará ambas columnas
+        firmas_data.append([Paragraph('<b>PACIENTE</b>', firma_section_title_style), ''])
+        title_rows.append(row_idx)
+        row_idx += 1
+        
+        firmas_data.append(['Nombre:', consentimiento.nombre_firmante or consentimiento.cliente.nombre_completo])
+        row_idx += 1
+        
+        if consentimiento.rut_firmante:
+            firmas_data.append(['RUT:', consentimiento.rut_firmante])
+            row_idx += 1
+        
+        # Convertir firma base64 a imagen si es necesario
+        firma_paciente_img = convertir_firma_base64_a_imagen(consentimiento.firma_paciente, max_width=2.5*inch, max_height=0.8*inch)
+        if firma_paciente_img:
+            firmas_data.append(['Firma:', firma_paciente_img])
+        else:
+            firmas_data.append(['Firma:', consentimiento.firma_paciente or '_________________________'])
+        row_idx += 1
+        
+        firmas_data.append(['Fecha y Hora:', consentimiento.fecha_firma.strftime('%d/%m/%Y %H:%M') if consentimiento.fecha_firma else ''])
+        row_idx += 1
+    else:
+        firmas_data.append([Paragraph('<b>PACIENTE</b>', firma_section_title_style), Paragraph('<i>Pendiente de firma</i>', normal_style)])
+        title_rows.append(row_idx)
+        row_idx += 1
+    
+    # Separador visual
+    firmas_data.append(['', ''])
+    row_idx += 1
+    
+    # Profesional Tratante
+    if consentimiento.dentista:
+        # Título de sección que ocupará ambas columnas
+        firmas_data.append([Paragraph('<b>PROFESIONAL TRATANTE</b>', firma_section_title_style), ''])
+        title_rows.append(row_idx)
+        row_idx += 1
+        
+        firmas_data.append(['Nombre:', consentimiento.dentista.nombre_completo])
+        row_idx += 1
+        
+        if consentimiento.rut_dentista:
+            firmas_data.append(['RUT:', consentimiento.rut_dentista])
+            row_idx += 1
+        
+        if consentimiento.registro_superintendencia:
+            firmas_data.append(['Registro Superintendencia de Salud:', consentimiento.registro_superintendencia])
+            row_idx += 1
+        
+        firmas_data.append(['Firma:', '_________________________'])
+        row_idx += 1
+        
+        # Espacio
+        firmas_data.append(['', ''])
+        row_idx += 1
+    
+    # Testigo (opcional pero recomendado)
+    if consentimiento.nombre_testigo:
+        firmas_data.append([Paragraph('<b>TESTIGO</b>', firma_section_title_style), ''])
+        title_rows.append(row_idx)
+        row_idx += 1
+        
+        firmas_data.append(['Nombre:', consentimiento.nombre_testigo])
+        row_idx += 1
+        
+        if consentimiento.rut_testigo:
+            firmas_data.append(['RUT:', consentimiento.rut_testigo])
+            row_idx += 1
+        
+        # Convertir firma testigo base64 a imagen si es necesario
+        firma_testigo_img = convertir_firma_base64_a_imagen(consentimiento.firma_testigo, max_width=2.5*inch, max_height=0.8*inch)
+        if firma_testigo_img:
+            firmas_data.append(['Firma:', firma_testigo_img])
+        else:
+            firmas_data.append(['Firma:', consentimiento.firma_testigo or '_________________________'])
+        row_idx += 1
+    
+    if firmas_data:
+        firmas_table = Table(firmas_data, colWidths=[2.4*inch, 4.1*inch])
+        
+        # Construir lista de estilos
+        style_list = [
+            # Estilo base para la primera columna (etiquetas)
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecfeff')),  # Fondo turquesa muy claro
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#0d9488')),  # Texto turquesa oscuro
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (0, -1), 10),
+            
+            # Estilo para la segunda columna (valores)
+            ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#374151')),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (1, 0), (1, -1), 10),
+            
+            # Alineación
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            
+            # Bordes
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#14b8a6')),  # Borde turquesa
+            ('LINEBELOW', (0, 0), (-1, 0), 1.5, colors.HexColor('#14b8a6')),  # Línea superior más gruesa
+            
+            # Padding base
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]
+        
+        # Aplicar SPAN a los títulos de sección para que ocupen ambas columnas
+        for title_row in title_rows:
+            style_list.append(('SPAN', (0, title_row), (1, title_row)))  # Ocupar ambas columnas
+            style_list.append(('BACKGROUND', (0, title_row), (1, title_row), colors.HexColor('#b2f5ea')))  # Fondo turquesa más destacado
+            style_list.append(('ALIGN', (0, title_row), (1, title_row), 'LEFT'))
+            style_list.append(('TOPPADDING', (0, title_row), (1, title_row), 12))
+            style_list.append(('BOTTOMPADDING', (0, title_row), (1, title_row), 12))
+        
+        # Aplicar estilos a filas vacías (separadores)
+        for i, row in enumerate(firmas_data):
+            if len(row) >= 2 and (row[0] == '' or row[0] is None) and (row[1] == '' or row[1] is None):
+                style_list.append(('BACKGROUND', (0, i), (1, i), colors.HexColor('#ffffff')))
+                style_list.append(('TOPPADDING', (0, i), (1, i), 4))
+                style_list.append(('BOTTOMPADDING', (0, i), (1, i), 4))
+        
+        firmas_table_style = TableStyle(style_list)
+        firmas_table.setStyle(firmas_table_style)
+        story.append(firmas_table)
+        story.append(Spacer(1, 16))
+    
+    # Footer con información legal (mejorado)
+    story.append(Spacer(1, 12))
+    footer_text = f"<b>Documento generado el:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    if consentimiento.fecha_vencimiento:
+        footer_text += f" | <b>Válido hasta:</b> {consentimiento.fecha_vencimiento.strftime('%d/%m/%Y')}"
+    footer_text += "<br/><i>Este documento cumple con los requisitos de la <b>Ley N° 20.584</b> sobre Derechos y Deberes de las Personas en relación con las Acciones vinculadas a su Atención en Salud.</i>"
+    
+    footer_style = ParagraphStyle(
+        'FooterStyle',
+        parent=clinic_info_style,
+        fontSize=8,
+        textColor=colors.HexColor('#14b8a6'),  # Color turquesa para el footer
+        spaceBefore=8,
+        borderColor=colors.HexColor('#14b8a6'),
+        borderWidth=1,
+        borderPadding=8,
+        backColor=colors.HexColor('#f0fdfa'),  # Fondo turquesa muy claro
+    )
+    footer = Paragraph(footer_text, footer_style)
+    story.append(footer)
+    
+    # Construir el PDF
+    try:
+        doc.build(story)
+    except Exception as e:
+        logger.error(f"Error al construir PDF del consentimiento {consentimiento_id}: {str(e)}")
+        buffer.close()
+        messages.error(request, f'Error al generar el PDF: {str(e)}')
+        return redirect('gestor_consentimientos')
+    
+    # Obtener el contenido del buffer
+    pdf_content = buffer.getvalue()
+    buffer.close()
+    
+    # Crear o actualizar el documento en la base de datos (usando consentimiento como referencia única)
+    try:
+        documento = DocumentoCliente.objects.get(
+            tipo='consentimiento',
+            cliente=consentimiento.cliente,
+            cita=consentimiento.cita,
+            plan_tratamiento=consentimiento.plan_tratamiento
+        )
+        # Actualizar si existe
+        documento.titulo = f'Consentimiento - {consentimiento.titulo}'
+        documento.descripcion = f'Consentimiento informado para {consentimiento.get_tipo_procedimiento_display()}'
+        documento.generado_por = perfil
+        documento.fecha_generacion = timezone.now()
+        documento.save()
+    except DocumentoCliente.DoesNotExist:
+        # Crear nuevo si no existe
+        documento = DocumentoCliente.objects.create(
+            tipo='consentimiento',
+            cliente=consentimiento.cliente,
+            titulo=f'Consentimiento - {consentimiento.titulo}',
+            descripcion=f'Consentimiento informado para {consentimiento.get_tipo_procedimiento_display()}',
+            cita=consentimiento.cita,
+            plan_tratamiento=consentimiento.plan_tratamiento,
+            generado_por=perfil,
+        )
+    except DocumentoCliente.MultipleObjectsReturned:
+        # Si hay múltiples, tomar el más reciente
+        documento = DocumentoCliente.objects.filter(
+            tipo='consentimiento',
+            cliente=consentimiento.cliente,
+            cita=consentimiento.cita,
+            plan_tratamiento=consentimiento.plan_tratamiento
+        ).order_by('-fecha_generacion').first()
+        documento.titulo = f'Consentimiento - {consentimiento.titulo}'
+        documento.descripcion = f'Consentimiento informado para {consentimiento.get_tipo_procedimiento_display()}'
+        documento.generado_por = perfil
+        documento.fecha_generacion = timezone.now()
+        documento.save()
+    
+    # Crear respuesta HTTP
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"consentimiento_{consentimiento.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response.write(pdf_content)
+    
+    return response
+
+
+@login_required
+def eliminar_consentimiento(request, consentimiento_id):
+    """Elimina un consentimiento informado (solo administrativos, vía AJAX)."""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para eliminar consentimientos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para acceder a esta función.'}, status=403)
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    titulo = consentimiento.titulo or 'Consentimiento'
+    try:
+        consentimiento.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f'El consentimiento \"{titulo}\" fue eliminado correctamente.'
+        })
+    except Exception as e:
+        logger.error(f"Error al eliminar consentimiento {consentimiento_id}: {e}")
+        return JsonResponse({'success': False, 'error': 'Error al eliminar el consentimiento.'}, status=500)
+
+
+@login_required
+def firmar_consentimiento_recepcion(request, plan_id, consentimiento_id):
+    """Sube un documento firmado físicamente por el paciente para un consentimiento informado (solo administrativos, vía AJAX)."""
+    from django.http import JsonResponse
+    from django.core.files.storage import default_storage
+    import os
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para subir documentos de consentimientos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para acceder a esta función.'}, status=403)
+    
+    # Verificar que el plan existe y el consentimiento pertenece al plan
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id, plan_tratamiento=plan)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el consentimiento no esté ya firmado
+    if consentimiento.estado == 'firmado':
+        return JsonResponse({'success': False, 'error': 'Este consentimiento ya está firmado.'}, status=400)
+    
+    # Obtener el archivo del formulario
+    documento_firmado = request.FILES.get('documento_firmado_fisico')
+    
+    # Validaciones
+    if not documento_firmado:
+        return JsonResponse({'success': False, 'error': 'Debes subir el documento firmado físicamente por el paciente.'}, status=400)
+    
+    # Validar tipo de archivo
+    extensiones_permitidas = ['.pdf', '.jpg', '.jpeg', '.png', '.heic', '.heif']
+    nombre_archivo = documento_firmado.name.lower()
+    extension_valida = any(nombre_archivo.endswith(ext) for ext in extensiones_permitidas)
+    
+    if not extension_valida:
+        return JsonResponse({
+            'success': False, 
+            'error': 'Formato de archivo no válido. Se aceptan: PDF, JPG, PNG, HEIC.'
+        }, status=400)
+    
+    # Validar tamaño (máx 10MB)
+    if documento_firmado.size > 10 * 1024 * 1024:
+        return JsonResponse({
+            'success': False, 
+            'error': 'El archivo es demasiado grande. El tamaño máximo es 10MB.'
+        }, status=400)
+    
+    try:
+        # Si ya existe un documento, eliminarlo antes de subir el nuevo
+        if consentimiento.documento_firmado_fisico:
+            try:
+                if os.path.isfile(consentimiento.documento_firmado_fisico.path):
+                    os.remove(consentimiento.documento_firmado_fisico.path)
+            except Exception as e:
+                logger.warning(f"No se pudo eliminar el archivo anterior del consentimiento {consentimiento_id}: {e}")
+        
+        # Actualizar el consentimiento con el documento
+        consentimiento.documento_firmado_fisico = documento_firmado
+        consentimiento.subido_por = perfil
+        consentimiento.fecha_subida = timezone.now()
+        consentimiento.nombre_firmante = plan.cliente.nombre_completo
+        consentimiento.rut_firmante = plan.cliente.rut or ''
+        consentimiento.firmado_por_recepcion = True
+        consentimiento.recepcionista_firmante = perfil
+        consentimiento.declaracion_comprension = True  # Se asume que el paciente firmó, por lo tanto comprendió
+        consentimiento.derecho_revocacion = True  # Se asume que el paciente firmó, por lo tanto conoce su derecho
+        consentimiento.estado = 'firmado'
+        consentimiento.fecha_firma = timezone.now()
+        consentimiento.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'El documento firmado del consentimiento "{consentimiento.titulo}" fue subido exitosamente.'
+        })
+    except Exception as e:
+        logger.error(f"Error al subir documento firmado para consentimiento {consentimiento_id}: {e}")
+        return JsonResponse({'success': False, 'error': 'Error al subir el documento. Por favor, intenta nuevamente.'}, status=500)
+
+
+@login_required
+def descargar_documento_firmado_consentimiento(request, consentimiento_id):
+    """Descarga el documento firmado físicamente de un consentimiento (solo administrativos)."""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'No tienes permisos para descargar documentos de consentimientos.')
+            return redirect('gestor_consentimientos')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    consentimiento = get_object_or_404(ConsentimientoInformado, id=consentimiento_id)
+    
+    if not consentimiento.documento_firmado_fisico:
+        messages.error(request, 'Este consentimiento no tiene un documento firmado subido.')
+        return redirect('detalle_consentimiento', consentimiento_id=consentimiento.id)
+    
+    try:
+        from django.http import FileResponse
+        import os
+        
+        if os.path.exists(consentimiento.documento_firmado_fisico.path):
+            response = FileResponse(
+                open(consentimiento.documento_firmado_fisico.path, 'rb'),
+                content_type='application/pdf' if consentimiento.documento_firmado_fisico.name.endswith('.pdf') else 'image/jpeg'
+            )
+            nombre_archivo = os.path.basename(consentimiento.documento_firmado_fisico.name)
+            response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+            return response
+        else:
+            messages.error(request, 'El archivo no se encuentra en el servidor.')
+            return redirect('detalle_consentimiento', consentimiento_id=consentimiento.id)
+    except Exception as e:
+        logger.error(f"Error al descargar documento firmado del consentimiento {consentimiento_id}: {e}")
+        messages.error(request, 'Error al descargar el documento.')
+        return redirect('detalle_consentimiento', consentimiento_id=consentimiento.id)
+
+
+@login_required
+def obtener_plantilla_consentimiento(request, plantilla_id):
+    """Vista AJAX para obtener datos de una plantilla de consentimiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'error': 'No tienes permisos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'error': 'No tienes permisos.'}, status=403)
+    
+    plantilla = get_object_or_404(PlantillaConsentimiento, id=plantilla_id)
+    
+    return JsonResponse({
+        'success': True,
+        'plantilla': {
+            'nombre': plantilla.nombre,
+            'tipo_procedimiento': plantilla.tipo_procedimiento,
+            'diagnostico_base': plantilla.diagnostico_base or '',
+            'naturaleza_procedimiento': plantilla.naturaleza_procedimiento or '',
+            'objetivos_tratamiento': plantilla.objetivos_tratamiento or '',
+            'contenido': plantilla.contenido,
+            'riesgos': plantilla.riesgos or '',
+            'beneficios': plantilla.beneficios or '',
+            'alternativas': plantilla.alternativas or '',
+            'pronostico': plantilla.pronostico or '',
+            'cuidados_postoperatorios': plantilla.cuidados_postoperatorios or '',
+        }
+    })
 
 
 # ============================================================================
@@ -4463,7 +9169,9 @@ def gestor_finanzas(request):
     # Agregar ingresos manuales
     for ingreso_manual in ingresos_manuales:
         from datetime import datetime
-        fecha_ingreso = datetime.combine(ingreso_manual.fecha, datetime.min.time())
+        # Crear datetime aware para que sea compatible con los otros
+        fecha_naive = datetime.combine(ingreso_manual.fecha, datetime.min.time())
+        fecha_ingreso = timezone.make_aware(fecha_naive)
         todos_ingresos_list.append({
             'ingreso_manual': ingreso_manual,
             'monto': float(ingreso_manual.monto),
@@ -4480,14 +9188,20 @@ def gestor_finanzas(request):
     
     # ===== EGRESOS (Gastos) =====
     # Obtener movimientos de insumos tipo "entrada" (compras) como egresos
+    # Excluir movimientos creados por recepción de solicitudes (para evitar duplicación)
     from inventario.models import MovimientoInsumo
     from proveedores.models import SolicitudInsumo
-    movimientos_entrada = MovimientoInsumo.objects.filter(tipo='entrada').select_related('insumo', 'realizado_por').order_by('-fecha_movimiento')
+    movimientos_entrada = MovimientoInsumo.objects.filter(
+        tipo='entrada'
+    ).exclude(
+        motivo__startswith='Recepción de solicitud'
+    ).select_related('insumo', 'realizado_por').order_by('-fecha_movimiento')
     
     # Obtener solicitudes de insumos marcadas como egreso automático
+    # Solo mostrar solicitudes que NO han sido recibidas (para evitar duplicación con egresos manuales)
     solicitudes_egreso = SolicitudInsumo.objects.filter(
-        registrar_como_egreso=True,
-        monto_egreso__isnull=False
+        monto_egreso__isnull=False,
+        estado__in=['pendiente', 'enviada']  # Solo pendientes o enviadas, no recibidas
     ).select_related('insumo', 'proveedor', 'solicitado_por').order_by('-fecha_solicitud')
     
     # Obtener egresos manuales
@@ -4640,7 +9354,10 @@ def gestor_finanzas(request):
             return item['solicitud'].fecha_solicitud
         else:  # egreso_manual
             from datetime import datetime
-            return datetime.combine(item['egreso_manual'].fecha, datetime.min.time())
+            # Crear datetime aware para que sea compatible con los otros
+            fecha_naive = datetime.combine(item['egreso_manual'].fecha, datetime.min.time())
+            # Convertir a aware usando timezone.now() como referencia
+            return timezone.make_aware(fecha_naive)
     
     todos_egresos_list.sort(key=get_fecha, reverse=True)
     movimientos_recientes = todos_egresos_list[:50]  # Mostrar los últimos 50
@@ -4680,7 +9397,7 @@ def gestor_finanzas(request):
         'balance_año': balance_año,
     }
     
-    return render(request, 'citas/gestor_finanzas.html', context)
+    return render(request, 'citas/finanzas/gestor_finanzas.html', context)
 
 
 # Vistas para Ingresos y Egresos Manuales
@@ -4722,12 +9439,24 @@ def agregar_ingreso_manual(request):
             return redirect('gestor_finanzas')
         
         # Crear ingreso manual
-        IngresoManual.objects.create(
+        ingreso = IngresoManual.objects.create(
             monto=monto,
             descripcion=descripcion,
             fecha=fecha_obj,
             notas=notas if notas else None,
             creado_por=perfil
+        )
+        
+        # Registrar en auditoría
+        registrar_auditoria(
+            usuario=perfil,
+            accion='crear',
+            modulo='finanzas',
+            descripcion=f'Ingreso manual creado: {descripcion}',
+            detalles=f'Monto: ${monto:,}, Fecha: {fecha_obj.strftime("%d/%m/%Y")}',
+            objeto_id=ingreso.id,
+            tipo_objeto='IngresoManual',
+            request=request
         )
         
         messages.success(request, f'Ingreso manual de ${monto:,} agregado correctamente.')
@@ -4748,6 +9477,20 @@ def eliminar_ingreso_manual(request, ingreso_id):
     
     ingreso = get_object_or_404(IngresoManual, id=ingreso_id)
     monto = ingreso.monto
+    descripcion = ingreso.descripcion
+    
+    # Registrar en auditoría ANTES de eliminar
+    registrar_auditoria(
+        usuario=perfil,
+        accion='eliminar',
+        modulo='finanzas',
+        descripcion=f'Ingreso manual eliminado: {descripcion}',
+        detalles=f'Monto: ${monto:,}, Fecha: {ingreso.fecha.strftime("%d/%m/%Y")}',
+        objeto_id=ingreso_id,
+        tipo_objeto='IngresoManual',
+        request=request
+    )
+    
     ingreso.delete()
     
     messages.success(request, f'Ingreso manual de ${monto:,} eliminado correctamente.')
@@ -4792,12 +9535,24 @@ def agregar_egreso_manual(request):
             return redirect('gestor_finanzas')
         
         # Crear egreso manual
-        EgresoManual.objects.create(
+        egreso = EgresoManual.objects.create(
             monto=monto,
             descripcion=descripcion,
             fecha=fecha_obj,
             notas=notas if notas else None,
             creado_por=perfil
+        )
+        
+        # Registrar en auditoría
+        registrar_auditoria(
+            usuario=perfil,
+            accion='crear',
+            modulo='finanzas',
+            descripcion=f'Egreso manual creado: {descripcion}',
+            detalles=f'Monto: ${monto:,}, Fecha: {fecha_obj.strftime("%d/%m/%Y")}',
+            objeto_id=egreso.id,
+            tipo_objeto='EgresoManual',
+            request=request
         )
         
         messages.success(request, f'Egreso manual de ${monto:,} agregado correctamente.')
@@ -4818,6 +9573,20 @@ def eliminar_egreso_manual(request, egreso_id):
     
     egreso = get_object_or_404(EgresoManual, id=egreso_id)
     monto = egreso.monto
+    descripcion = egreso.descripcion
+    
+    # Registrar en auditoría ANTES de eliminar
+    registrar_auditoria(
+        usuario=perfil,
+        accion='eliminar',
+        modulo='finanzas',
+        descripcion=f'Egreso manual eliminado: {descripcion}',
+        detalles=f'Monto: ${monto:,}, Fecha: {egreso.fecha.strftime("%d/%m/%Y")}',
+        objeto_id=egreso_id,
+        tipo_objeto='EgresoManual',
+        request=request
+    )
+    
     egreso.delete()
     
     messages.success(request, f'Egreso manual de ${monto:,} eliminado correctamente.')
@@ -4848,10 +9617,23 @@ def eliminar_ingreso_cita(request, cita_id):
     
     # Guardar el monto para el mensaje
     monto_anterior = cita.precio_cobrado or (cita.tipo_servicio.precio_base if cita.tipo_servicio else 0)
+    servicio_nombre = cita.tipo_servicio.nombre if cita.tipo_servicio else 'Sin servicio'
     
     # Marcar precio_cobrado como None para que no aparezca en los cálculos financieros
     cita.precio_cobrado = None
     cita.save()
+    
+    # Registrar en auditoría
+    registrar_auditoria(
+        usuario=perfil,
+        accion='eliminar',
+        modulo='finanzas',
+        descripcion=f'Ingreso de cita eliminado del historial financiero',
+        detalles=f'Cita ID: {cita.id}, Servicio: {servicio_nombre}, Monto: ${monto_anterior:,.0f}',
+        objeto_id=cita.id,
+        tipo_objeto='Cita',
+        request=request
+    )
     
     messages.success(request, f'Ingreso de cita eliminado correctamente del historial financiero.')
     return redirect('gestor_finanzas')
@@ -4885,6 +9667,18 @@ def eliminar_egreso_compra(request, movimiento_id):
     cantidad = movimiento.cantidad
     monto = float(movimiento.insumo.precio_unitario) * cantidad if movimiento.insumo and movimiento.insumo.precio_unitario else 0
     
+    # Registrar en auditoría ANTES de eliminar
+    registrar_auditoria(
+        usuario=perfil,
+        accion='eliminar',
+        modulo='finanzas',
+        descripcion=f'Egreso de compra eliminado: {insumo_nombre}',
+        detalles=f'Cantidad: {cantidad}, Monto: ${monto:,.0f}, Fecha: {movimiento.fecha_movimiento.strftime("%d/%m/%Y")}',
+        objeto_id=movimiento_id,
+        tipo_objeto='MovimientoInsumo',
+        request=request
+    )
+    
     # Eliminar el movimiento
     movimiento.delete()
     
@@ -4896,7 +9690,7 @@ def eliminar_egreso_compra(request, movimiento_id):
 def eliminar_egreso_solicitud(request, solicitud_id):
     """
     Vista para eliminar un egreso de solicitud de insumo del historial financiero
-    Desmarca el flag registrar_como_egreso y pone monto_egreso a None
+    Elimina el monto_egreso de la solicitud
     SOLO DISPONIBLE PARA ADMINISTRATIVOS
     """
     try:
@@ -4910,18 +9704,30 @@ def eliminar_egreso_solicitud(request, solicitud_id):
     from proveedores.models import SolicitudInsumo
     solicitud = get_object_or_404(SolicitudInsumo, id=solicitud_id)
     
-    # Solo permitir eliminar si estaba marcada como egreso
-    if not solicitud.registrar_como_egreso:
-        messages.error(request, 'Esta solicitud no está registrada como egreso.')
+    # Solo permitir eliminar si tiene monto_egreso
+    if not solicitud.monto_egreso:
+        messages.error(request, 'Esta solicitud no tiene un egreso registrado.')
         return redirect('gestor_finanzas')
     
     # Guardar el monto para el mensaje
     monto_anterior = solicitud.monto_egreso or 0
+    insumo_nombre = solicitud.insumo.nombre if solicitud.insumo else "Sin nombre"
     
-    # Desmarcar como egreso
-    solicitud.registrar_como_egreso = False
+    # Eliminar el monto de egreso
     solicitud.monto_egreso = None
     solicitud.save()
+    
+    # Registrar en auditoría
+    registrar_auditoria(
+        usuario=perfil,
+        accion='eliminar',
+        modulo='finanzas',
+        descripcion=f'Egreso de solicitud eliminado: {insumo_nombre}',
+        detalles=f'Solicitud ID: {solicitud.id}, Monto: ${monto_anterior:,.0f}, Proveedor: {solicitud.proveedor.nombre if solicitud.proveedor else "N/A"}',
+        objeto_id=solicitud_id,
+        tipo_objeto='SolicitudInsumo',
+        request=request
+    )
     
     messages.success(request, f'Egreso de solicitud eliminado correctamente del historial financiero.')
     return redirect('gestor_finanzas')
@@ -5029,7 +9835,7 @@ def editar_informacion_clinica(request):
         'info': info
     }
     
-    return render(request, 'citas/editar_informacion_clinica.html', context)
+    return render(request, 'citas/perfil/editar_informacion_clinica.html', context)
 
 
 # =====================================================
@@ -5039,7 +9845,8 @@ def editar_informacion_clinica(request):
 @login_required
 def validar_username(request):
     """
-    Vista AJAX para validar si un username ya existe
+    Vista AJAX para validar si un username ya existe y tiene un Cliente activo asociado
+    Solo bloquea si el username tiene un Cliente activo, no si es un User huérfano
     """
     username = request.GET.get('username', '').strip()
     
@@ -5047,7 +9854,138 @@ def validar_username(request):
         return JsonResponse({'existe': False})
     
     from django.contrib.auth.models import User
-    existe = User.objects.filter(username=username).exists()
+    
+    # Verificar si el username existe
+    try:
+        user = User.objects.get(username=username)
+        
+        # Verificar si este User tiene un Cliente activo asociado
+        # Buscar por email del User en Clientes activos
+        existe_cliente_activo = Cliente.objects.filter(
+            email__iexact=user.email, 
+            activo=True
+        ).exists()
+        
+        # Si no hay Cliente activo, el User es huérfano y el username puede reutilizarse
+        return JsonResponse({'existe': existe_cliente_activo})
+    except User.DoesNotExist:
+        # El username no existe, está disponible
+        return JsonResponse({'existe': False})
+
+
+@login_required
+def buscar_cliente_por_email(request):
+    """
+    Vista AJAX para buscar un cliente por email y devolver sus datos
+    """
+    email = request.GET.get('email', '').strip()
+    
+    if not email:
+        return JsonResponse({'existe': False})
+    
+    try:
+        cliente = Cliente.objects.get(email__iexact=email, activo=True)
+        return JsonResponse({
+            'existe': True,
+            'cliente': {
+                'nombre_completo': cliente.nombre_completo,
+                'telefono': cliente.telefono or '',
+                'fecha_nacimiento': cliente.fecha_nacimiento.strftime('%Y-%m-%d') if cliente.fecha_nacimiento else '',
+                'alergias': cliente.alergias or ''
+            }
+        })
+    except Cliente.DoesNotExist:
+        return JsonResponse({'existe': False})
+    except Cliente.MultipleObjectsReturned:
+        cliente = Cliente.objects.filter(email__iexact=email, activo=True).first()
+        if cliente:
+            return JsonResponse({
+                'existe': True,
+                'cliente': {
+                    'nombre_completo': cliente.nombre_completo,
+                    'telefono': cliente.telefono or '',
+                    'fecha_nacimiento': cliente.fecha_nacimiento.strftime('%Y-%m-%d') if cliente.fecha_nacimiento else '',
+                    'alergias': cliente.alergias or ''
+                }
+            })
+        return JsonResponse({'existe': False})
+
+
+@login_required
+def validar_email(request):
+    """
+    Vista AJAX para validar si un email ya existe en Cliente activo
+    Solo verifica en Clientes activos, no en Users sueltos (pueden quedar huérfanos)
+    """
+    email = request.GET.get('email', '').strip().lower()
+    
+    if not email:
+        return JsonResponse({'existe': False})
+    
+    # Validar formato de email básico
+    from django.core.validators import validate_email
+    from django.core.exceptions import ValidationError
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({'existe': False, 'invalido': True})
+    
+    # Verificar si existe en Cliente ACTIVO (solo clientes activos bloquean)
+    # Si un cliente fue eliminado (activo=False), su email puede ser reutilizado
+    # No verificamos Users huérfanos (sin Cliente activo) porque pueden quedar después de eliminar clientes
+    existe = Cliente.objects.filter(email__iexact=email, activo=True).exists()
+    
+    return JsonResponse({'existe': existe})
+
+
+@login_required
+def validar_rut(request):
+    """
+    Vista AJAX para validar si un RUT ya existe en Cliente
+    """
+    rut = request.GET.get('rut', '').strip()
+    
+    if not rut:
+        return JsonResponse({'existe': False})
+    
+    # Limpiar el RUT (quitar puntos y guiones)
+    rut_limpio = rut.replace('.', '').replace('-', '').upper()
+    
+    # Validar formato básico (debe tener al menos 7 dígitos)
+    if not rut_limpio[:-1].isdigit() or len(rut_limpio) < 8:
+        return JsonResponse({'existe': False, 'invalido': True})
+    
+    # Buscar en Cliente (comparar RUTs normalizados)
+    existe = False
+    clientes = Cliente.objects.filter(rut__isnull=False).exclude(rut='')
+    for cliente in clientes:
+        if cliente.rut:
+            rut_cliente_limpio = cliente.rut.replace('.', '').replace('-', '').upper()
+            if rut_cliente_limpio == rut_limpio:
+                existe = True
+                break
+    
+    return JsonResponse({'existe': existe})
+
+
+@login_required
+def validar_telefono(request):
+    """
+    Vista AJAX para validar si un teléfono ya existe en Cliente
+    """
+    telefono = request.GET.get('telefono', '').strip()
+    
+    if not telefono:
+        return JsonResponse({'existe': False})
+    
+    # Normalizar el teléfono (8 dígitos chilenos)
+    telefono_normalizado = normalizar_telefono_chileno(telefono)
+    
+    if not telefono_normalizado:
+        return JsonResponse({'existe': False, 'invalido': True})
+    
+    # Buscar en Cliente
+    existe = Cliente.objects.filter(telefono=telefono_normalizado).exists()
     
     return JsonResponse({'existe': existe})
 
@@ -5070,9 +10008,11 @@ def crear_cliente_presencial(request):
     
     if request.method == 'POST':
         try:
+            import logging
+            logger = logging.getLogger(__name__)
             from django.contrib.auth.models import User
-            from django.core.mail import send_mail
             from django.conf import settings
+            BASE_DIR = settings.BASE_DIR
             
             # Obtener datos del formulario
             nombre_completo = request.POST.get('nombre_completo')
@@ -5111,38 +10051,23 @@ def crear_cliente_presencial(request):
                 )
                 return redirect('gestor_clientes')
             
-            # Validar que el email no exista en Cliente
-            if Cliente.objects.filter(email=email).exists():
-                messages.error(request, 'Ya existe un cliente con ese email en la clínica.')
+            # Usar funciones de validación centralizadas
+            email_existe, email_error = validar_email_cliente(email)
+            if email_existe:
+                messages.error(request, email_error)
                 return redirect('gestor_clientes')
             
-            # Validar que el RUT no exista si se proporcionó
-            if rut and Cliente.objects.filter(rut=rut).exists():
-                messages.error(request, 'Ya existe un cliente con ese RUT en la clínica.')
+            rut_existe, rut_error = validar_rut_cliente(rut) if rut else (False, None)
+            if rut_existe:
+                messages.error(request, rut_error)
                 return redirect('gestor_clientes')
             
-            # Procesar fecha de nacimiento (ahora obligatorio)
-            try:
-                from datetime import datetime
-                fecha_nacimiento = datetime.strptime(fecha_nacimiento_str, '%Y-%m-%d').date()
-            except ValueError:
-                messages.error(request, 'La fecha de nacimiento no tiene un formato válido.')
+            telefono_existe, telefono_error = validar_telefono_cliente(telefono)
+            if telefono_existe:
+                messages.error(request, telefono_error)
                 return redirect('gestor_clientes')
             
-            # Crear el cliente en la clínica
-            # Todos los campos ahora son obligatorios (rut, fecha_nacimiento, alergias)
-            cliente = Cliente.objects.create(
-                nombre_completo=nombre_completo,
-                email=email,
-                telefono=telefono,
-                rut=rut,
-                fecha_nacimiento=fecha_nacimiento,
-                alergias=alergias,
-                notas=notas,
-                activo=True
-            )
-            
-            # Si se solicitó, crear también el usuario en el sistema de citas online
+            # Si se va a crear usuario online, validar ANTES de crear el Cliente
             if crear_usuario_online:
                 # Validar que se hayan proporcionado username y password
                 if not username or not password:
@@ -5154,86 +10079,265 @@ def crear_cliente_presencial(request):
                     messages.error(request, 'La contraseña debe tener al menos 8 caracteres.')
                     return redirect('gestor_clientes')
                 
-                try:
-                    # Validar que el username no exista
-                    if User.objects.filter(username=username).exists():
-                        messages.error(request, f'El nombre de usuario "{username}" ya existe. Por favor elige otro.')
-                        cliente.delete()  # Eliminar el cliente creado
-                        return redirect('gestor_clientes')
-                    
-                    # Validar que el email no exista en User
-                    if User.objects.filter(email=email).exists():
-                        messages.error(request, 'Ya existe un usuario con ese email en el sistema de citas online.')
-                        cliente.delete()
-                        return redirect('gestor_clientes')
-                    
-                    # Crear el usuario de Django con las credenciales proporcionadas
-                    user = User.objects.create_user(
-                        username=username,
-                        email=email,
-                        password=password,
-                        first_name=nombre_completo.split()[0] if nombre_completo.split() else '',
-                        last_name=' '.join(nombre_completo.split()[1:]) if len(nombre_completo.split()) > 1 else ''
-                    )
-                    
-                    # Intentar crear el perfil de cliente si existe el módulo
-                    # IMPORTANTE: Sincronizar TODOS los campos del Cliente al PerfilCliente
-                    try:
-                        from cuentas.models import PerfilCliente
-                        PerfilCliente.objects.create(
-                            user=user,
-                            nombre_completo=nombre_completo,
-                            telefono=telefono,
-                            email=email,
-                            telefono_verificado=False,
-                            rut=rut if rut else None,  # Sincronizar RUT
-                            fecha_nacimiento=fecha_nacimiento,  # Sincronizar fecha de nacimiento
-                            alergias=alergias if alergias else None  # Sincronizar alergias
+                # Usar función de validación centralizada para username
+                username_disponible, username_error = validar_username_disponible(username)
+                if not username_disponible and username_error and "asociado a un cliente activo" in username_error:
+                    messages.error(request, username_error)
+                    return redirect('gestor_clientes')
+                elif username_error and "Se reutilizará" in username_error:
+                    # Advertencia pero permitimos continuar
+                    logger.warning(f"Reutilizando username existente: {username}")
+                
+                # Validar que el email no exista en User que tenga un Cliente activo asociado
+                # Solo bloquear si el User tiene un Cliente activo, no si es un User huérfano
+                # (Ya validamos arriba que no existe Cliente activo con ese email, así que si hay User, es huérfano)
+                # Pero por seguridad, verificamos una vez más
+                usuarios_existentes = User.objects.filter(email__iexact=email)
+                if usuarios_existentes.exists():
+                    # Si ya validamos que no hay Cliente activo con ese email, el User es huérfano
+                    # y podemos reutilizar el email. No bloqueamos.
+                    # Solo mostramos advertencia si realmente hay un Cliente activo (doble verificación)
+                    if Cliente.objects.filter(email__iexact=email, activo=True).exists():
+                        usuarios_lista = ', '.join([u.username for u in usuarios_existentes])
+                        messages.error(
+                            request, 
+                            f'Ya existe un usuario activo con ese email en el sistema de citas online. '
+                            f'Usuarios encontrados: {usuarios_lista}. '
+                            f'Por favor, usa otro email o elimina/edita los usuarios existentes.'
                         )
-                    except ImportError:
-                        # El módulo de cuentas no existe, pero no es problema
-                        # El usuario de Django es suficiente para hacer login
-                        pass
-                    
-                    # Guardar las credenciales en las notas del cliente
-                    notas_completas = f"{notas}\n\n[ACCESO WEB]\nUsuario: {username}\nContraseña: {password}\n(Registrado el {timezone.now().strftime('%d/%m/%Y %H:%M')})"
-                    cliente.notas = notas_completas
-                    cliente.save()
-                    
-                    # Enviar correo si se solicitó
-                    if enviar_email:
+                        return redirect('gestor_clientes')
+                    # Si no hay Cliente activo, el User es huérfano y podemos continuar
+            
+            # Procesar fecha de nacimiento (ahora obligatorio)
+            try:
+                from datetime import datetime
+                fecha_nacimiento = datetime.strptime(fecha_nacimiento_str, '%Y-%m-%d').date()
+            except ValueError:
+                messages.error(request, 'La fecha de nacimiento no tiene un formato válido.')
+                return redirect('gestor_clientes')
+            
+            # Usar transacción atómica para crear Cliente, User y PerfilCliente
+            # Si falla cualquier parte, se revierte todo
+            with transaction.atomic():
+                # Crear el cliente en la clínica
+                # Todos los campos ahora son obligatorios (rut, fecha_nacimiento, alergias)
+                cliente = Cliente.objects.create(
+                    nombre_completo=nombre_completo,
+                    email=email,
+                    telefono=telefono,
+                    rut=rut,
+                    fecha_nacimiento=fecha_nacimiento,
+                    alergias=alergias,
+                    notas=notas,
+                    activo=True
+                )
+                
+                # Si se solicitó, crear también el usuario en el sistema de citas online
+                user = None
+                if crear_usuario_online:
+                    try:
+                        # Ya validamos todo antes, ahora solo crear el usuario
+                        
+                        # Crear el usuario de Django con las credenciales proporcionadas
+                        user = User.objects.create_user(
+                            username=username,
+                            email=email,
+                            password=password,
+                            first_name=nombre_completo.split()[0] if nombre_completo.split() else '',
+                            last_name=' '.join(nombre_completo.split()[1:]) if len(nombre_completo.split()) > 1 else ''
+                        )
+                        
+                        # Establecer la relación explícita entre Cliente y User
+                        cliente.user = user
+                        cliente.save()
+                        logger.info(f"✅ Relación establecida: Cliente {cliente.id} <-> User {user.id}")
+                        
+                        # Crear el PerfilCliente directamente usando el ORM
+                        # Como ambos proyectos comparten la misma base de datos PostgreSQL,
+                        # podemos insertar directamente en la tabla cuentas_perfilcliente
+                        perfil_cliente_creado = False
                         try:
-                            import logging
-                            logger = logging.getLogger(__name__)
+                            from django.db import connection
+                            
+                            # Verificar si ya existe un PerfilCliente para este usuario
+                            with connection.cursor() as cursor:
+                                cursor.execute(
+                                    "SELECT id FROM cuentas_perfilcliente WHERE user_id = %s",
+                                    [user.id]
+                                )
+                                existe = cursor.fetchone()
+                                
+                                if not existe:
+                                    # Crear nuevo PerfilCliente
+                                    cursor.execute("""
+                                        INSERT INTO cuentas_perfilcliente 
+                                        (user_id, nombre_completo, telefono, email, telefono_verificado, rut, fecha_nacimiento, alergias)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                    """, [
+                                        user.id,
+                                        nombre_completo,
+                                        telefono,
+                                        email,
+                                        False,  # telefono_verificado
+                                        rut if rut else None,
+                                        fecha_nacimiento if fecha_nacimiento else None,
+                                        alergias if alergias else None
+                                    ])
+                                    perfil_cliente_creado = True
+                                    logger.info(f"✅ PerfilCliente creado exitosamente para usuario {username} (ID: {user.id})")
+                                else:
+                                    # Actualizar PerfilCliente existente
+                                    cursor.execute("""
+                                        UPDATE cuentas_perfilcliente 
+                                        SET nombre_completo = %s,
+                                            telefono = %s,
+                                            email = %s,
+                                            rut = %s,
+                                            fecha_nacimiento = %s,
+                                            alergias = %s
+                                        WHERE user_id = %s
+                                    """, [
+                                        nombre_completo,
+                                        telefono,
+                                        email,
+                                        rut if rut else None,
+                                        fecha_nacimiento if fecha_nacimiento else None,
+                                        alergias if alergias else None,
+                                        user.id
+                                    ])
+                                    logger.info(f"✅ PerfilCliente actualizado para usuario {username} (ID: {user.id})")
+                        except Exception as e:
+                            # Error al crear el perfil
+                            logger.error(f"❌ Error al crear/actualizar PerfilCliente para usuario {username}: {e}", exc_info=True)
+                            import traceback
+                            logger.error(f"Traceback: {traceback.format_exc()}")
+                            messages.warning(
+                                request,
+                                f'⚠️ Usuario web creado, pero hubo un error al crear el perfil en cliente_web. '
+                                f'Error: {str(e)}. Verifica los logs para más detalles.'
+                            )
+                        
+                        # Actualizar notas solo para indicar que tiene acceso web (SIN guardar credenciales por seguridad)
+                        # Las credenciales se envían por email, no se guardan en texto plano
+                        if notas:
+                            # Si ya hay notas, agregar información de acceso web
+                            if "[ACCESO WEB]" not in notas:
+                                notas_completas = f"{notas}\n\n[ACCESO WEB]\nUsuario web creado el {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+                                cliente.notas = notas_completas
+                        else:
+                            # Si no hay notas, crear una nueva
+                            cliente.notas = f"[ACCESO WEB]\nUsuario web creado el {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+                        cliente.save()
+                        logger.info(f"✅ Notas actualizadas (sin credenciales) para cliente {cliente.id}")
+                    except Exception as e:
+                        logger.error(f"❌ Error al crear usuario web: {e}", exc_info=True)
+                        raise  # Re-lanzar para que la transacción se revierta
+                
+                # Registrar en auditoría (dentro de la transacción)
+                detalles_cliente = f'Email: {email}, Teléfono: {telefono}, RUT: {rut if rut else "N/A"}'
+                if crear_usuario_online:
+                    detalles_cliente += f', Usuario web: {username}'
+                registrar_auditoria(
+                    usuario=perfil,
+                    accion='crear',
+                    modulo='clientes',
+                    descripcion=f'Cliente creado: {nombre_completo}',
+                    detalles=detalles_cliente,
+                    objeto_id=cliente.id,
+                    tipo_objeto='Cliente',
+                    request=request
+                )
+            
+            # Enviar correo si se solicitó (fuera de la transacción, ya que el email puede fallar)
+            if enviar_email and crear_usuario_online:
+                try:
                             logger.info(f"Intentando enviar correo a: {email}")
                             
-                            asunto = f'Credenciales de Acceso - {nombre_completo}'
-                            mensaje = f"""Hola {nombre_completo},
-
-Se ha creado tu cuenta para reservar citas online en nuestra clínica dental.
-
-Tus credenciales de acceso son:
-
-Usuario: {username}
-Contraseña: {password}
-
-Puedes iniciar sesión en nuestro portal de citas online y cambiar tu contraseña en cualquier momento.
-
-Esperamos verte pronto!
-
-Saludos,
-Equipo de la Clinica Dental
-"""
+                            # Verificar configuración de email
+                            email_host_user = getattr(settings, 'EMAIL_HOST_USER', '')
+                            email_host_password = getattr(settings, 'EMAIL_HOST_PASSWORD', '')
                             
-                            send_mail(
+                            logger.info(f"EMAIL_HOST_USER configurado: {'Sí' if email_host_user else 'No'}")
+                            logger.info(f"EMAIL_HOST_PASSWORD configurado: {'Sí' if email_host_password else 'No'}")
+                            
+                            if not email_host_user or not email_host_password:
+                                error_msg = "Configuración de email incompleta. Verifica EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en settings.py o variables de entorno."
+                                logger.error(error_msg)
+                                raise Exception(error_msg)
+                            
+                            # Obtener información de la clínica
+                            try:
+                                from configuracion.models import InformacionClinica
+                                info_clinica = InformacionClinica.obtener()
+                                nombre_clinica = info_clinica.nombre_clinica or "Clínica Dental San Felipe"
+                                direccion_clinica = info_clinica.direccion or ''
+                                telefono_clinica = info_clinica.telefono or ''
+                                email_clinica = info_clinica.email or settings.DEFAULT_FROM_EMAIL
+                                sitio_web_clinica = info_clinica.sitio_web or ''
+                            except Exception as e:
+                                logger.warning(f"Error al obtener información de clínica: {e}")
+                                nombre_clinica = getattr(settings, 'CLINIC_NAME', 'Clínica Dental San Felipe')
+                                direccion_clinica = getattr(settings, 'CLINIC_ADDRESS', '')
+                                telefono_clinica = getattr(settings, 'CLINIC_PHONE', '')
+                                email_clinica = settings.DEFAULT_FROM_EMAIL
+                                sitio_web_clinica = getattr(settings, 'CLINIC_WEBSITE', '')
+                            
+                            # Obtener URL de login del cliente web
+                            # Intentar obtener CLIENTE_WEB_URL si está configurado, sino usar SITE_URL
+                            cliente_web_url = getattr(settings, 'CLIENTE_WEB_URL', None)
+                            if not cliente_web_url:
+                                cliente_web_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                            # Si la URL termina con /, quitar la barra final
+                            if cliente_web_url.endswith('/'):
+                                cliente_web_url = cliente_web_url[:-1]
+                            # Construir URL de login del cliente web (ruta: /cuentas/login/)
+                            url_login = f"{cliente_web_url}/cuentas/login/"
+                            
+                            logger.info(f"URL de login del cliente web: {url_login}")
+                            
+                            # Renderizar template HTML
+                            from django.template.loader import render_to_string
+                            from django.core.mail import EmailMessage
+                            
+                            mensaje_html = render_to_string('citas/emails/credenciales_acceso.html', {
+                                'nombre_completo': nombre_completo,
+                                'username': username,
+                                'password': password,
+                                'nombre_clinica': nombre_clinica,
+                                'direccion_clinica': direccion_clinica,
+                                'telefono_clinica': telefono_clinica,
+                                'email_clinica': email_clinica,
+                                'sitio_web_clinica': sitio_web_clinica,
+                                'url_login': url_login,
+                            })
+                            
+                            asunto = f'Credenciales de Acceso - {nombre_clinica}'
+                            
+                            logger.info(f"Enviando correo desde {email_clinica} a {email}")
+                            logger.info(f"EMAIL_BACKEND: {getattr(settings, 'EMAIL_BACKEND', 'No configurado')}")
+                            logger.info(f"EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'No configurado')}")
+                            logger.info(f"EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'No configurado')}")
+                            logger.info(f"EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'No configurado')}")
+                            
+                            # Crear el email con contenido HTML
+                            email_msg = EmailMessage(
                                 asunto,
-                                mensaje,
-                                settings.DEFAULT_FROM_EMAIL,
+                                mensaje_html,
+                                email_clinica,
                                 [email],
-                                fail_silently=False,
                             )
+                            email_msg.content_subtype = "html"  # Indicar que es HTML
                             
-                            logger.info(f"Correo enviado exitosamente a: {email}")
+                            # Intentar enviar el correo
+                            try:
+                                email_msg.send(fail_silently=False)
+                                logger.info(f"✅ Correo HTML enviado exitosamente a: {email}")
+                            except Exception as send_error:
+                                logger.error(f"❌ Error al enviar correo: {send_error}")
+                                logger.error(f"Tipo de error: {type(send_error).__name__}")
+                                import traceback
+                                logger.error(f"Traceback completo: {traceback.format_exc()}")
+                                raise  # Re-lanzar el error para que se capture en el except externo
                             
                             messages.success(
                                 request,
@@ -5241,34 +10345,29 @@ Equipo de la Clinica Dental
                                 f'Usuario web: {username}. '
                                 f'📧 Correo con credenciales enviado a {email}.'
                             )
-                        except Exception as e:
-                            import logging
-                            logger = logging.getLogger(__name__)
-                            logger.error(f"Error al enviar correo: {str(e)}", exc_info=True)
-                            
-                            messages.error(
-                                request,
-                                f'⚠️ Cliente creado exitosamente, pero NO se pudo enviar el correo. '
-                                f'Error: {str(e)}. '
-                                f'Las credenciales están guardadas en las notas del cliente.'
-                            )
-                    else:
-                        messages.success(
-                            request,
-                            f'✅ Cliente {nombre_completo} creado exitosamente. '
-                            f'Usuario web: {username}. '
-                            f'Las credenciales están guardadas en las notas.'
-                        )
-                    
                 except Exception as e:
-                    # Si falla la creación del usuario web, eliminar el cliente
-                    cliente.delete()
+                    logger.error(f"Error al enviar correo: {str(e)}", exc_info=True)
+                    import traceback
+                    error_detalle = traceback.format_exc()
+                    logger.error(f"Traceback completo: {error_detalle}")
+                    
                     messages.error(
                         request,
-                        f'Error al crear el usuario web: {str(e)}'
+                        f'⚠️ Cliente creado exitosamente, pero NO se pudo enviar el correo. '
+                        f'Error: {str(e)}. '
+                        f'Las credenciales están guardadas en las notas del cliente. '
+                        f'Verifica la configuración de EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en settings.py'
                     )
-                    return redirect('gestor_clientes')
+            elif crear_usuario_online:
+                # Si se creó usuario pero no se envió email
+                messages.success(
+                    request,
+                    f'✅ Cliente {nombre_completo} creado exitosamente. '
+                    f'Usuario web: {username}. '
+                    f'Las credenciales están guardadas en las notas.'
+                )
             else:
+                # Si no se creó usuario web
                 messages.success(request, f'Cliente {nombre_completo} creado exitosamente.')
             
             return redirect('gestor_clientes')
@@ -5278,6 +10377,83 @@ Equipo de la Clinica Dental
             return redirect('gestor_clientes')
     
     return redirect('gestor_clientes')
+
+
+@login_required
+def sincronizar_cliente_web(request):
+    """
+    Vista para sincronizar un cliente de cliente_web con el sistema de gestión.
+    Crea un Cliente en gestion_clinica basado en los datos de PerfilCliente.
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Perfil no encontrado.'}, status=404)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        email = data.get('email', '').strip()
+        username = data.get('username', '').strip()
+        
+        if not email:
+            return JsonResponse({'success': False, 'error': 'Email es requerido.'}, status=400)
+        
+        # Buscar PerfilCliente en cliente_web
+        try:
+            from django.contrib.auth.models import User
+            from cuentas.models import PerfilCliente
+            
+            if username:
+                user = User.objects.get(username=username)
+                perfil_cliente = PerfilCliente.objects.get(user=user)
+            else:
+                perfil_cliente = PerfilCliente.objects.get(email=email)
+            
+            # Verificar que no exista ya un Cliente con ese email
+            if Cliente.objects.filter(email=perfil_cliente.email).exists():
+                return JsonResponse({
+                    'success': False, 
+                    'error': f'Ya existe un cliente con el email {perfil_cliente.email} en el sistema de gestión.'
+                }, status=400)
+            
+            # Crear Cliente en el sistema de gestión
+            cliente = Cliente.objects.create(
+                nombre_completo=perfil_cliente.nombre_completo,
+                email=perfil_cliente.email,
+                telefono=perfil_cliente.telefono or '',
+                rut=perfil_cliente.rut or '',
+                fecha_nacimiento=perfil_cliente.fecha_nacimiento,
+                alergias=perfil_cliente.alergias or 'Ninguna',
+                activo=True,
+                notas=f'Cliente sincronizado desde la web. Usuario: {perfil_cliente.user.username if perfil_cliente.user else "N/A"}'
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Cliente {cliente.nombre_completo} sincronizado exitosamente.',
+                'cliente_id': cliente.id
+            })
+            
+        except User.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Usuario no encontrado.'}, status=404)
+        except PerfilCliente.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Perfil de cliente no encontrado en el sistema web.'}, status=404)
+        except ImportError:
+            return JsonResponse({'success': False, 'error': 'No se puede acceder al sistema de cliente_web.'}, status=500)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Datos JSON inválidos.'}, status=400)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error al sincronizar cliente web: {e}")
+        return JsonResponse({'success': False, 'error': f'Error al sincronizar: {str(e)}'}, status=500)
 
 
 @login_required
@@ -5435,22 +10611,40 @@ def editar_cliente(request, cliente_id):
                 
                 if cambios_credenciales:
                     user_web.save()
-                    # Actualizar las notas con las nuevas credenciales
-                    notas = cliente.notas
-                    # Eliminar la sección antigua de credenciales
+                    # Actualizar las notas solo para indicar que tiene acceso web (SIN guardar credenciales por seguridad)
+                    # Las credenciales se envían por email si se cambian, no se guardan en texto plano
+                    notas = cliente.notas or ""
+                    # Eliminar la sección antigua de credenciales si existe
                     notas = re.sub(r'\[ACCESO WEB\].*?(?=\n\n|\Z)', '', notas, flags=re.DOTALL).strip()
-                    # Agregar nuevas credenciales
-                    info_credenciales = f"\n\n[ACCESO WEB]\nUsuario: {user_web.username}\n"
-                    if nueva_password:
-                        info_credenciales += f"Contraseña: {nueva_password}\n"
+                    # Agregar solo información de que tiene acceso web (sin credenciales)
+                    info_credenciales = f"\n\n[ACCESO WEB]\nUsuario web actualizado el {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+                    if notas:
+                        cliente.notas = notas + info_credenciales
                     else:
-                        info_credenciales += "Contraseña: [sin cambios]\n"
-                    info_credenciales += f"(Actualizado el {timezone.now().strftime('%d/%m/%Y %H:%M')})"
-                    cliente.notas = notas + info_credenciales
+                        cliente.notas = info_credenciales.strip()
+                    logger.info(f"✅ Notas actualizadas (sin credenciales) para cliente {cliente.id}")
             except User.DoesNotExist:
                 pass  # El cliente no tiene usuario web
             
             cliente.save()
+            
+            # Registrar en auditoría
+            cambios_info = []
+            if 'cambios_credenciales' in locals() and cambios_credenciales:
+                cambios_info.extend(cambios_credenciales)
+            detalles_edicion = f'Email: {cliente.email}, RUT: {cliente.rut if cliente.rut else "N/A"}'
+            if cambios_info:
+                detalles_edicion += f', Cambios: {", ".join(cambios_info)}'
+            registrar_auditoria(
+                usuario=perfil,
+                accion='editar',
+                modulo='clientes',
+                descripcion=f'Cliente editado: {cliente.nombre_completo}',
+                detalles=detalles_edicion,
+                objeto_id=cliente.id,
+                tipo_objeto='Cliente',
+                request=request
+            )
             
             if 'cambios_credenciales' in locals() and cambios_credenciales:
                 messages.success(
@@ -5666,33 +10860,155 @@ def eliminar_cliente(request, cliente_id):
             print(f"Error al verificar relaciones: {str(e)}")
         
         # Buscar y eliminar el usuario web asociado si existe
+        # Usar transacción atómica para asegurar consistencia
         usuario_web_eliminado = False
+        
         try:
-            # Usar filter().first() en lugar de get() para evitar errores si hay múltiples usuarios
-            users = User.objects.filter(email=email_cliente)
-            if users.exists():
-                for user in users:
-                    # Eliminar también el perfil de cliente si existe
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # PRIMERO: Intentar usar la relación explícita (nueva mejora)
+            if cliente.user:
+                logger.info(f"Encontrado User asociado directamente: {cliente.user.username} (ID: {cliente.user.id})")
+                user_a_eliminar = cliente.user
+                
+                # Usar transacción atómica para la eliminación de User/PerfilCliente
+                with transaction.atomic():
+                    # Eliminar PerfilCliente primero
                     try:
-                        from cuentas.models import PerfilCliente
-                        try:
-                            perfil_cliente = PerfilCliente.objects.get(user=user)
-                            perfil_cliente.delete()
-                        except PerfilCliente.DoesNotExist:
-                            pass
-                        except PerfilCliente.MultipleObjectsReturned:
-                            # Si hay múltiples perfiles, eliminar todos
-                            PerfilCliente.objects.filter(user=user).delete()
-                    except ImportError:
-                        pass
+                        from django.db import connection
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                "DELETE FROM cuentas_perfilcliente WHERE user_id = %s",
+                                [user_a_eliminar.id]
+                            )
+                            logger.info(f"✅ PerfilCliente eliminado para usuario {user_a_eliminar.id}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ No se pudo eliminar PerfilCliente: {e}")
                     
-                    # Eliminar el usuario de Django
-                    user.delete()
+                    # Eliminar User
+                    user_a_eliminar.delete()
                     usuario_web_eliminado = True
+                    logger.info(f"✅ Usuario {user_a_eliminar.username} eliminado exitosamente usando relación explícita")
+            else:
+                # FALLBACK: Buscar por email/username (método anterior para compatibilidad)
+                # Ya no extraemos el username de las notas (por seguridad, las credenciales no se guardan ahí)
+                username_cliente = None
+                
+                # Usar transacción atómica para la eliminación de User/PerfilCliente
+                with transaction.atomic():
+                    # Buscar User por email
+                    users_por_email = User.objects.filter(email__iexact=email_cliente)
+                    
+                    # Buscar User por username si lo tenemos
+                    users_por_username = User.objects.none()
+                    if username_cliente:
+                        users_por_username = User.objects.filter(username=username_cliente)
+                    
+                    # Combinar ambas búsquedas (sin duplicados)
+                    users = (users_por_email | users_por_username).distinct()
+                    
+                    if users.exists():
+                        logger.info(f"Encontrados {users.count()} usuario(s) asociado(s) al cliente {cliente_id}")
+                        for user in users:
+                            logger.info(f"Eliminando usuario: {user.username} (email: {user.email})")
+                            
+                            # Eliminar también el perfil de cliente si existe (ANTES de eliminar el User)
+                            # Esto es importante porque si eliminamos el User primero, el CASCADE eliminará el PerfilCliente
+                            # pero queremos asegurarnos de que se elimine correctamente
+                            try:
+                                from django.db import connection
+                                with connection.cursor() as cursor:
+                                    # Verificar si existe PerfilCliente
+                                    cursor.execute(
+                                        "SELECT id FROM cuentas_perfilcliente WHERE user_id = %s",
+                                        [user.id]
+                                    )
+                                    perfil_existe = cursor.fetchone()
+                                    
+                                    if perfil_existe:
+                                        cursor.execute(
+                                            "DELETE FROM cuentas_perfilcliente WHERE user_id = %s",
+                                            [user.id]
+                                        )
+                                        logger.info(f"✅ PerfilCliente eliminado para usuario {user.id}")
+                                    else:
+                                        logger.info(f"ℹ️ No se encontró PerfilCliente para usuario {user.id}")
+                            except Exception as e:
+                                logger.error(f"❌ Error al eliminar PerfilCliente: {e}", exc_info=True)
+                                # Continuar con la eliminación del User aunque falle el PerfilCliente
+                            
+                            # Eliminar el usuario de Django
+                            # Si el PerfilCliente no se eliminó antes, el CASCADE lo eliminará automáticamente
+                            try:
+                                user.delete()
+                                usuario_web_eliminado = True
+                                logger.info(f"✅ Usuario {user.username} (ID: {user.id}) eliminado exitosamente")
+                            except Exception as e:
+                                logger.error(f"❌ Error al eliminar User {user.username}: {e}", exc_info=True)
+                                raise  # Re-lanzar el error para que se capture arriba
+                    else:
+                        logger.info(f"ℹ️ No se encontraron usuarios asociados al cliente {cliente_id} (email: {email_cliente}, username: {username_cliente})")
+                        
+                        # Si no encontramos User por email/username, buscar PerfilCliente directamente por email
+                        # y eliminar tanto el PerfilCliente como su User asociado
+                        try:
+                            from django.db import connection
+                            with connection.cursor() as cursor:
+                                # Buscar PerfilCliente por email
+                                cursor.execute(
+                                    "SELECT user_id FROM cuentas_perfilcliente WHERE email = %s",
+                                    [email_cliente]
+                                )
+                                perfil_result = cursor.fetchone()
+                                
+                                if perfil_result:
+                                    user_id_perfil = perfil_result[0]
+                                    logger.info(f"🔍 Encontrado PerfilCliente con user_id={user_id_perfil} para email {email_cliente}")
+                                    
+                                    # Eliminar PerfilCliente
+                                    cursor.execute(
+                                        "DELETE FROM cuentas_perfilcliente WHERE user_id = %s",
+                                        [user_id_perfil]
+                                    )
+                                    logger.info(f"✅ PerfilCliente eliminado (user_id: {user_id_perfil})")
+                                    
+                                    # Eliminar User
+                                    try:
+                                        user_orphan = User.objects.get(id=user_id_perfil)
+                                        user_orphan.delete()
+                                        usuario_web_eliminado = True
+                                        logger.info(f"✅ Usuario huérfano {user_orphan.username} eliminado")
+                                    except User.DoesNotExist:
+                                        logger.warning(f"⚠️ User {user_id_perfil} no existe, solo se eliminó PerfilCliente")
+                        except Exception as e2:
+                            logger.warning(f"⚠️ No se pudo buscar/eliminar PerfilCliente por email: {e2}")
+                    
         except Exception as e:
+            # Si hay un error en la transacción, se revierte automáticamente
             # Si hay un error al eliminar el usuario, continuar con la eliminación del cliente
-            print(f"Advertencia: Error al eliminar usuario web: {str(e)}")
-            pass
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"❌ Error al eliminar usuario web: {str(e)}", exc_info=True)
+            import traceback
+            logger.error(f"Traceback completo: {traceback.format_exc()}")
+        
+        # Registrar en auditoría ANTES de eliminar
+        detalles_eliminacion = f'Email: {email_cliente}, RUT: {cliente.rut if cliente.rut else "N/A"}'
+        if citas_actualizadas > 0:
+            detalles_eliminacion += f', {citas_actualizadas} cita(s) actualizada(s)'
+        if usuario_web_eliminado:
+            detalles_eliminacion += ', Usuario web eliminado'
+        registrar_auditoria(
+            usuario=perfil,
+            accion='eliminar',
+            modulo='clientes',
+            descripcion=f'Cliente eliminado: {nombre_cliente}',
+            detalles=detalles_eliminacion,
+            objeto_id=cliente_id,
+            tipo_objeto='Cliente',
+            request=request
+        )
         
         # Eliminar el cliente
         cliente.delete()
@@ -5717,7 +11033,6 @@ def eliminar_cliente(request, cliente_id):
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error al eliminar cliente {cliente_id}: {error_details}")  # Para debugging
         return JsonResponse({
             'success': False,
             'error': f'Error al eliminar el cliente: {str(e)}',
@@ -5725,11 +11040,202 @@ def eliminar_cliente(request, cliente_id):
         }, status=500)
 
 
+# ========== MIS PACIENTES (Vista Unificada para Dentistas) ==========
+
+@login_required
+def mis_pacientes(request, paciente_id=None, seccion=None):
+    """Vista principal unificada para gestionar pacientes del dentista"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_dentista():
+            messages.error(request, 'Solo los dentistas pueden acceder a esta sección.')
+            return redirect('panel_trabajador')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+
+    # Obtener pacientes vinculados al dentista
+    pacientes_vinculados = perfil.get_pacientes_asignados()
+    clientes_ids = [p['id'] for p in pacientes_vinculados if 'id' in p and isinstance(p['id'], int)]
+    emails_vinculados = [p['email'] for p in pacientes_vinculados if 'email' in p]
+    
+    # Filtros de búsqueda
+    search = request.GET.get('search', '')
+    
+    # Construir lista de pacientes con información consolidada
+    pacientes_lista = []
+    
+    # Obtener clientes del sistema vinculados
+    clientes_sistema = Cliente.objects.filter(
+        id__in=clientes_ids,
+        activo=True
+    ).distinct()
+    
+    for cliente in clientes_sistema:
+        # Contar radiografías y odontogramas
+        radiografias_count = Radiografia.objects.filter(
+            Q(dentista=perfil) & (Q(cliente=cliente) | Q(paciente_email=cliente.email))
+        ).count()
+        
+        odontogramas_count = Odontograma.objects.filter(
+            Q(dentista=perfil) & (Q(cliente=cliente) | Q(paciente_email=cliente.email))
+        ).count()
+        
+        # Aplicar filtro de búsqueda
+        if search:
+            if not (search.lower() in cliente.nombre_completo.lower() or
+                    search.lower() in cliente.email.lower() or
+                    search.lower() in (cliente.telefono or '').lower()):
+                continue
+        
+        pacientes_lista.append({
+            'id': cliente.id,
+            'nombre_completo': cliente.nombre_completo,
+            'email': cliente.email,
+            'telefono': cliente.telefono or '',
+            'total_radiografias': radiografias_count,
+            'total_odontogramas': odontogramas_count,
+            'tiene_radiografias': radiografias_count > 0,
+            'tiene_odontogramas': odontogramas_count > 0,
+        })
+    
+    # Agregar pacientes vinculados que no están en el sistema pero tienen documentos
+    emails_procesados = [p['email'] for p in pacientes_lista]
+    
+    for paciente_vinculado in pacientes_vinculados:
+        email_paciente = paciente_vinculado.get('email', '')
+        if not email_paciente or email_paciente in emails_procesados:
+            continue
+        
+        # Verificar si tiene radiografías u odontogramas
+        radiografias_count = Radiografia.objects.filter(
+            dentista=perfil,
+            paciente_email=email_paciente
+        ).count()
+        
+        odontogramas_count = Odontograma.objects.filter(
+            dentista=perfil,
+            paciente_email=email_paciente
+        ).count()
+        
+        # Solo agregar si tiene documentos o si no hay filtro de búsqueda
+        if radiografias_count == 0 and odontogramas_count == 0:
+            if search:
+                continue
+        
+        # Aplicar filtro de búsqueda
+        if search:
+            nombre = paciente_vinculado.get('nombre_completo', '')
+            if not (search.lower() in nombre.lower() or search.lower() in email_paciente.lower()):
+                continue
+        
+        pacientes_lista.append({
+            'id': paciente_vinculado.get('id'),
+            'nombre_completo': paciente_vinculado.get('nombre_completo', email_paciente),
+            'email': email_paciente,
+            'telefono': paciente_vinculado.get('telefono', ''),
+            'total_radiografias': radiografias_count,
+            'total_odontogramas': odontogramas_count,
+            'tiene_radiografias': radiografias_count > 0,
+            'tiene_odontogramas': odontogramas_count > 0,
+        })
+    
+    # Ordenar por nombre
+    pacientes_lista.sort(key=lambda x: x['nombre_completo'])
+    
+    # Obtener información del paciente seleccionado si existe
+    paciente_seleccionado = None
+    cliente_obj = None
+    if paciente_id:
+        paciente_seleccionado = next((p for p in pacientes_lista if p['id'] == paciente_id), None)
+        if not paciente_seleccionado:
+            # Intentar buscar por email si no se encontró por ID
+            for paciente_vinculado in pacientes_vinculados:
+                if paciente_vinculado.get('id') == paciente_id:
+                    paciente_seleccionado = {
+                        'id': paciente_vinculado.get('id'),
+                        'nombre_completo': paciente_vinculado.get('nombre_completo', paciente_vinculado.get('email', '')),
+                        'email': paciente_vinculado.get('email', ''),
+                        'telefono': paciente_vinculado.get('telefono', ''),
+                        'total_radiografias': 0,
+                        'total_odontogramas': 0,
+                        'tiene_radiografias': False,
+                        'tiene_odontogramas': False,
+                    }
+                    break
+        
+        # Obtener el objeto Cliente completo si existe
+        if paciente_seleccionado and paciente_seleccionado.get('id'):
+            try:
+                cliente_obj = Cliente.objects.get(id=paciente_seleccionado['id'], activo=True)
+            except Cliente.DoesNotExist:
+                cliente_obj = None
+    
+    # Determinar sección por defecto
+    if not seccion:
+        seccion = 'resumen'
+    
+    # Obtener datos adicionales según la sección seleccionada
+    radiografias = None
+    odontogramas = None
+    
+    if paciente_seleccionado and seccion == 'radiografias':
+        # Obtener radiografías del paciente
+        paciente_email = paciente_seleccionado.get('email', '')
+        radiografias = Radiografia.objects.filter(
+            dentista=perfil,
+            paciente_email=paciente_email
+        ).order_by('-fecha_carga')
+        
+    elif paciente_seleccionado and seccion == 'odontogramas':
+        # Obtener odontogramas del paciente
+        paciente_email = paciente_seleccionado.get('email', '')
+        paciente_id_seleccionado = paciente_seleccionado.get('id')
+        
+        # Buscar odontogramas por cliente o por email
+        odontogramas_query = Odontograma.objects.filter(dentista=perfil)
+        
+        if paciente_id_seleccionado:
+            try:
+                cliente_obj = Cliente.objects.get(id=paciente_id_seleccionado, activo=True)
+                odontogramas = odontogramas_query.filter(
+                    Q(cliente=cliente_obj) | Q(paciente_email=cliente_obj.email)
+                ).prefetch_related(
+                    Prefetch('dientes', queryset=EstadoDiente.objects.order_by('numero_diente'))
+                ).order_by('-fecha_creacion')
+            except Cliente.DoesNotExist:
+                odontogramas = odontogramas_query.filter(
+                    paciente_email=paciente_email
+                ).prefetch_related(
+                    Prefetch('dientes', queryset=EstadoDiente.objects.order_by('numero_diente'))
+                ).order_by('-fecha_creacion')
+        else:
+            odontogramas = odontogramas_query.filter(
+                paciente_email=paciente_email
+            ).prefetch_related(
+                Prefetch('dientes', queryset=EstadoDiente.objects.order_by('numero_diente'))
+            ).order_by('-fecha_creacion')
+    
+    context = {
+        'perfil': perfil,
+        'pacientes': pacientes_lista,
+        'paciente_seleccionado': paciente_seleccionado,
+        'cliente': cliente_obj,  # Objeto Cliente completo para mostrar información detallada
+        'seccion_actual': seccion,
+        'search': search,
+        'es_dentista': True,
+        'radiografias': radiografias,
+        'odontogramas': odontogramas,
+    }
+    
+    return render(request, 'citas/mis_pacientes/mis_pacientes.html', context)
+
+
 # ========== GESTIÓN DE RADIOGRAFÍAS ==========
 
 @login_required
 def radiografias_listar(request):
-    """Vista principal para listar pacientes con sus radiografías"""
+    """Vista principal para listar pacientes vinculados con sus radiografías"""
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_dentista():
@@ -5742,14 +11248,24 @@ def radiografias_listar(request):
     # Filtros de búsqueda
     search = request.GET.get('search', '')
     
-    # Obtener todas las radiografías del dentista
-    radiografias = Radiografia.objects.filter(dentista=perfil).select_related('cliente')
+    # Obtener pacientes vinculados al dentista
+    pacientes_vinculados = perfil.get_pacientes_asignados()
+    clientes_ids = [p['id'] for p in pacientes_vinculados if 'id' in p and isinstance(p['id'], int)]
+    emails_vinculados = [p['email'] for p in pacientes_vinculados if 'email' in p]
+    
+    # Obtener solo radiografías de pacientes vinculados
+    radiografias = Radiografia.objects.filter(
+        dentista=perfil
+    ).filter(
+        Q(cliente_id__in=clientes_ids) | Q(paciente_email__in=emails_vinculados)
+    ).select_related('cliente')
 
-    # Obtener todos los emails únicos de pacientes que tienen radiografías
+    # Obtener todos los emails únicos de pacientes vinculados que tienen radiografías
     emails_unicos = radiografias.values_list('paciente_email', flat=True).distinct()
     
-    # También obtener clientes únicos que tienen radiografías asociadas
+    # Obtener clientes vinculados que tienen radiografías asociadas
     clientes_con_radiografias = Cliente.objects.filter(
+        id__in=clientes_ids,
         radiografias__dentista=perfil,
         activo=True
     ).distinct()
@@ -5757,7 +11273,7 @@ def radiografias_listar(request):
     # Crear diccionario de pacientes con radiografías
     pacientes_dict = {}
     
-    # Primero procesar clientes del sistema que tienen radiografías
+    # Primero procesar clientes vinculados del sistema que tienen radiografías
     for cliente in clientes_con_radiografias:
         # Obtener todas las radiografías de este cliente (por relación cliente o por email)
         radiografias_cliente = radiografias.filter(
@@ -5790,15 +11306,19 @@ def radiografias_listar(request):
             'ultima_radiografia': radiografias_cliente.order_by('-fecha_carga').first(),
         }
     
-    # Luego procesar emails que no tienen cliente asociado en el sistema
+    # Luego procesar emails vinculados que no tienen cliente asociado en el sistema
     for email in emails_unicos:
+        # Solo procesar si el email está en la lista de pacientes vinculados
+        if email not in emails_vinculados:
+            continue
+            
         # Si ya procesamos este email (tiene cliente), saltar
         if email in pacientes_dict:
             continue
         
-        # Buscar si existe un cliente en el sistema con este email (por si acaso)
+        # Buscar si existe un cliente vinculado en el sistema con este email
         try:
-            cliente = Cliente.objects.get(email=email, activo=True)
+            cliente = Cliente.objects.get(email=email, id__in=clientes_ids, activo=True)
             nombre_completo = cliente.nombre_completo
             telefono = cliente.telefono or ''
             paciente_id = cliente.id
@@ -5809,8 +11329,9 @@ def radiografias_listar(request):
             if primera_radiografia:
                 nombre_completo = primera_radiografia.paciente_nombre
                 telefono = ''
-                # Usar hash del email como ID temporal
-                paciente_id = hash(email) % 1000000
+                # Buscar en pacientes vinculados para obtener el ID correcto
+                paciente_vinculado = next((p for p in pacientes_vinculados if p.get('email') == email), None)
+                paciente_id = paciente_vinculado['id'] if paciente_vinculado and 'id' in paciente_vinculado else hash(email) % 1000000
                 email_actual = email
             else:
                 continue
@@ -5837,19 +11358,57 @@ def radiografias_listar(request):
     pacientes_con_radiografias = list(pacientes_dict.values())
     pacientes_con_radiografias.sort(key=lambda x: x['nombre_completo'])
     
+    # Obtener pacientes vinculados que aún no tienen radiografías (para mostrar opción de agregar)
+    pacientes_sin_radiografias = []
+    for paciente_vinculado in pacientes_vinculados:
+        email_paciente = paciente_vinculado.get('email', '')
+        if email_paciente and email_paciente not in [p['email'] for p in pacientes_con_radiografias]:
+            pacientes_sin_radiografias.append({
+                'id': paciente_vinculado.get('id'),
+                'nombre_completo': paciente_vinculado.get('nombre_completo', ''),
+                'email': email_paciente,
+                'telefono': paciente_vinculado.get('telefono', ''),
+            })
+    
+    # Aplicar filtro de búsqueda a pacientes sin radiografías
+    if search:
+        pacientes_sin_radiografias = [
+            p for p in pacientes_sin_radiografias
+            if search.lower() in p['nombre_completo'].lower() or search.lower() in p['email'].lower()
+        ]
+    
+    # Calcular estadísticas
+    total_radiografias = radiografias.count()
+    radiografias_mes = radiografias.filter(
+        fecha_carga__month=timezone.now().month,
+        fecha_carga__year=timezone.now().year
+    ).count()
+    radiografias_semana = radiografias.filter(
+        fecha_carga__gte=timezone.now() - timedelta(days=7)
+    ).count()
+    total_pacientes_vinculados = len(pacientes_vinculados)
+    
     context = {
         'perfil': perfil,
         'pacientes': pacientes_con_radiografias,
+        'pacientes_sin_radiografias': pacientes_sin_radiografias,
         'search': search,
-        'es_dentista': True
+        'es_dentista': True,
+        'estadisticas': {
+            'total_radiografias': total_radiografias,
+            'total_pacientes_con_radiografias': len(pacientes_con_radiografias),
+            'total_pacientes_vinculados': total_pacientes_vinculados,
+            'radiografias_mes': radiografias_mes,
+            'radiografias_semana': radiografias_semana,
+        }
     }
     
-    return render(request, 'citas/radiografias_listar.html', context)
+    return render(request, 'citas/radiografias/radiografias_listar.html', context)
 
 
 @login_required
 def radiografias_paciente(request, paciente_id):
-    """Vista para ver y gestionar radiografías de un paciente específico"""
+    """Vista para ver y gestionar radiografías de un paciente vinculado específico"""
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_dentista():
@@ -5859,16 +11418,25 @@ def radiografias_paciente(request, paciente_id):
         messages.error(request, 'No tienes permisos para acceder a esta función.')
         return redirect('login')
 
-    # Obtener todas las radiografías del dentista
-    radiografias_todas = Radiografia.objects.filter(dentista=perfil)
+    # Obtener pacientes vinculados al dentista
+    pacientes_vinculados = perfil.get_pacientes_asignados()
+    clientes_ids = [p['id'] for p in pacientes_vinculados if 'id' in p and isinstance(p['id'], int)]
+    emails_vinculados = [p['email'] for p in pacientes_vinculados if 'email' in p]
     
-    # Intentar encontrar el paciente por ID (puede ser cliente del sistema o hash)
+    # Obtener todas las radiografías del dentista de pacientes vinculados
+    radiografias_todas = Radiografia.objects.filter(
+        dentista=perfil
+    ).filter(
+        Q(cliente_id__in=clientes_ids) | Q(paciente_email__in=emails_vinculados)
+    )
+    
+    # Intentar encontrar el paciente por ID (debe ser paciente vinculado)
     paciente = None
     paciente_email = None
     
-    # Primero intentar buscar como cliente del sistema
+    # Primero intentar buscar como cliente vinculado del sistema
     try:
-        cliente = Cliente.objects.get(id=paciente_id, activo=True)
+        cliente = Cliente.objects.get(id=paciente_id, id__in=clientes_ids, activo=True)
         paciente_email = cliente.email
         paciente = {
             'id': cliente.id,
@@ -5877,15 +11445,15 @@ def radiografias_paciente(request, paciente_id):
             'telefono': cliente.telefono or '',
         }
     except Cliente.DoesNotExist:
-        # Si no es cliente del sistema, buscar por email en las radiografías
+        # Si no es cliente del sistema, buscar por email en las radiografías de pacientes vinculados
         # usando el hash del email
         for radiografia in radiografias_todas:
             email_hash = hash(radiografia.paciente_email) % 1000000
-            if email_hash == int(paciente_id):
+            if email_hash == int(paciente_id) and radiografia.paciente_email in emails_vinculados:
                 paciente_email = radiografia.paciente_email
-                # Buscar si hay un cliente con este email
+                # Buscar si hay un cliente vinculado con este email
                 try:
-                    cliente = Cliente.objects.get(email=paciente_email, activo=True)
+                    cliente = Cliente.objects.get(email=paciente_email, id__in=clientes_ids, activo=True)
                     paciente = {
                         'id': cliente.id,
                         'nombre_completo': cliente.nombre_completo,
@@ -5893,22 +11461,25 @@ def radiografias_paciente(request, paciente_id):
                         'telefono': cliente.telefono or '',
                     }
                 except Cliente.DoesNotExist:
-                    # Si no existe cliente, usar datos de la radiografía
-                    primera_radiografia = radiografias_todas.filter(paciente_email=paciente_email).first()
-                    if primera_radiografia:
-                        paciente = {
-                            'id': int(paciente_id),
-                            'nombre_completo': primera_radiografia.paciente_nombre,
-                            'email': paciente_email,
-                            'telefono': '',
-                        }
+                    # Si no existe cliente, buscar en pacientes vinculados
+                    paciente_vinculado = next((p for p in pacientes_vinculados if p.get('email') == paciente_email), None)
+                    if paciente_vinculado:
+                        primera_radiografia = radiografias_todas.filter(paciente_email=paciente_email).first()
+                        if primera_radiografia:
+                            paciente = {
+                                'id': paciente_vinculado.get('id', int(paciente_id)),
+                                'nombre_completo': primera_radiografia.paciente_nombre,
+                                'email': paciente_email,
+                                'telefono': paciente_vinculado.get('telefono', ''),
+                            }
                 break
     
-    if not paciente or not paciente_email:
-        messages.error(request, 'No tienes permisos para ver este paciente.')
+    # Verificar que el paciente esté vinculado
+    if not paciente or not paciente_email or paciente_email not in emails_vinculados:
+        messages.error(request, 'Solo puedes ver radiografías de tus pacientes vinculados.')
         return redirect('radiografias_listar')
     
-    # Obtener todas las radiografías del paciente
+    # Obtener todas las radiografías del paciente vinculado
     radiografias = Radiografia.objects.filter(
         dentista=perfil,
         paciente_email=paciente_email
@@ -5921,12 +11492,12 @@ def radiografias_paciente(request, paciente_id):
         'es_dentista': True
     }
     
-    return render(request, 'citas/radiografias_paciente.html', context)
+    return render(request, 'citas/radiografias/radiografias_paciente.html', context)
 
 
 @login_required
 def agregar_radiografia(request, paciente_id):
-    """Vista para agregar una nueva radiografía"""
+    """Vista para agregar una nueva radiografía - Solo pacientes vinculados"""
     try:
         perfil = Perfil.objects.get(user=request.user)
         if not perfil.es_dentista():
@@ -5936,13 +11507,18 @@ def agregar_radiografia(request, paciente_id):
         messages.error(request, 'No tienes permisos para acceder a esta función.')
         return redirect('login')
 
-    # Obtener el paciente - puede ser cliente del sistema o paciente externo con radiografías
+    # Obtener pacientes vinculados al dentista
+    pacientes_vinculados = perfil.get_pacientes_asignados()
+    clientes_ids = [p['id'] for p in pacientes_vinculados if 'id' in p and isinstance(p['id'], int)]
+    emails_vinculados = [p['email'] for p in pacientes_vinculados if 'email' in p]
+    
+    # Obtener el paciente - debe ser un paciente vinculado
     paciente = None
     paciente_email = None
     
-    # Primero intentar buscar como cliente del sistema
+    # Primero intentar buscar como cliente vinculado del sistema
     try:
-        cliente = Cliente.objects.get(id=paciente_id, activo=True)
+        cliente = Cliente.objects.get(id=paciente_id, id__in=clientes_ids, activo=True)
         paciente_email = cliente.email
         paciente = {
             'id': cliente.id,
@@ -5951,16 +11527,16 @@ def agregar_radiografia(request, paciente_id):
             'telefono': cliente.telefono or '',
         }
     except Cliente.DoesNotExist:
-        # Si no es cliente del sistema, buscar por email en las radiografías del dentista
+        # Si no es cliente del sistema, buscar por email en pacientes vinculados
         # usando el hash del email
         radiografias_todas = Radiografia.objects.filter(dentista=perfil)
         for radiografia in radiografias_todas:
             email_hash = hash(radiografia.paciente_email) % 1000000
-            if email_hash == int(paciente_id):
+            if email_hash == int(paciente_id) and radiografia.paciente_email in emails_vinculados:
                 paciente_email = radiografia.paciente_email
-                # Buscar si hay un cliente con este email
+                # Buscar si hay un cliente vinculado con este email
                 try:
-                    cliente = Cliente.objects.get(email=paciente_email, activo=True)
+                    cliente = Cliente.objects.get(email=paciente_email, id__in=clientes_ids, activo=True)
                     paciente = {
                         'id': cliente.id,
                         'nombre_completo': cliente.nombre_completo,
@@ -5968,19 +11544,26 @@ def agregar_radiografia(request, paciente_id):
                         'telefono': cliente.telefono or '',
                     }
                 except Cliente.DoesNotExist:
-                    # Si no existe cliente, usar datos de la radiografía
-                    primera_radiografia = radiografias_todas.filter(paciente_email=paciente_email).first()
-                    if primera_radiografia:
-                        paciente = {
-                            'id': int(paciente_id),
-                            'nombre_completo': primera_radiografia.paciente_nombre,
-                            'email': paciente_email,
-                            'telefono': '',
-                        }
+                    # Si no existe cliente, buscar en pacientes vinculados
+                    paciente_vinculado = next((p for p in pacientes_vinculados if p.get('email') == paciente_email), None)
+                    if paciente_vinculado:
+                        primera_radiografia = radiografias_todas.filter(paciente_email=paciente_email).first()
+                        if primera_radiografia:
+                            paciente = {
+                                'id': paciente_vinculado.get('id', int(paciente_id)),
+                                'nombre_completo': primera_radiografia.paciente_nombre,
+                                'email': paciente_email,
+                                'telefono': paciente_vinculado.get('telefono', ''),
+                            }
                 break
     
+    # Verificar que el paciente esté vinculado al dentista
     if not paciente or not paciente_email:
         messages.error(request, 'No tienes permisos para agregar radiografías a este paciente.')
+        return redirect('radiografias_listar')
+    
+    if paciente_email not in emails_vinculados:
+        messages.error(request, 'Solo puedes agregar radiografías a tus pacientes vinculados.')
         return redirect('radiografias_listar')
     
     if request.method == 'POST':
@@ -5992,7 +11575,7 @@ def agregar_radiografia(request, paciente_id):
             
             if not imagen:
                 messages.error(request, 'Debes seleccionar una imagen.')
-                return redirect('radiografias_paciente', paciente_id=paciente_id)
+                return redirect('mis_pacientes_seccion', paciente_id=paciente_id, seccion='radiografias')
             
             # Buscar si existe un cliente con ese email
             cliente_obj = None
@@ -6014,7 +11597,8 @@ def agregar_radiografia(request, paciente_id):
             )
             
             messages.success(request, 'Radiografía agregada correctamente.')
-            return redirect('radiografias_paciente', paciente_id=paciente_id)
+            # Redirigir a la nueva vista de Mis Pacientes con sección de radiografías
+            return redirect('mis_pacientes_seccion', paciente_id=paciente_id, seccion='radiografias')
             
         except Exception as e:
             messages.error(request, f'Error al agregar la radiografía: {str(e)}')
@@ -6026,7 +11610,7 @@ def agregar_radiografia(request, paciente_id):
         'es_dentista': True
     }
     
-    return render(request, 'citas/agregar_radiografia.html', context)
+    return render(request, 'citas/radiografias/agregar_radiografia.html', context)
 
 
 @login_required
@@ -6102,7 +11686,8 @@ def editar_radiografia(request, radiografia_id):
             radiografia.save()
             
             messages.success(request, 'Radiografía actualizada correctamente.')
-            return redirect('radiografias_paciente', paciente_id=paciente_id)
+            # Redirigir a la nueva vista de Mis Pacientes con sección de radiografías
+            return redirect('mis_pacientes_seccion', paciente_id=paciente_id, seccion='radiografias')
             
         except Exception as e:
             messages.error(request, f'Error al actualizar la radiografía: {str(e)}')
@@ -6115,7 +11700,7 @@ def editar_radiografia(request, radiografia_id):
         'citas_paciente': citas_paciente,
     }
     
-    return render(request, 'citas/editar_radiografia.html', context)
+    return render(request, 'citas/radiografias/editar_radiografia.html', context)
 
 
 @login_required
@@ -6197,6 +11782,94 @@ def obtener_anotaciones_radiografia(request, radiografia_id):
 
 
 @login_required
+def obtener_cita(request, cita_id):
+    """
+    Vista AJAX para obtener los datos de una cita
+    """
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Cuenta desactivada'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Perfil no encontrado'}, status=404)
+    
+    try:
+        cita = Cita.objects.select_related('tipo_servicio', 'dentista', 'cliente').get(id=cita_id)
+        
+        # Convertir fecha_hora a zona horaria de Chile
+        from django.utils import timezone
+        import pytz
+        try:
+            chile_tz = pytz.timezone('America/Santiago')
+            if timezone.is_naive(cita.fecha_hora):
+                fecha_hora_chile = timezone.make_aware(cita.fecha_hora, timezone.utc).astimezone(chile_tz)
+            else:
+                fecha_hora_chile = cita.fecha_hora.astimezone(chile_tz)
+        except Exception:
+            fecha_hora_chile = cita.fecha_hora
+        
+        # Formatear fecha y hora en zona horaria de Chile
+        fecha_hora = fecha_hora_chile.strftime('%d/%m/%Y %H:%M')
+        fecha = fecha_hora_chile.strftime('%d/%m/%Y')
+        hora = fecha_hora_chile.strftime('%H:%M')
+        
+        # Obtener paciente
+        paciente = 'Sin asignar'
+        if cita.cliente:
+            paciente = cita.cliente.nombre_completo
+        elif cita.paciente_nombre:
+            paciente = cita.paciente_nombre
+        
+        # Obtener tipo de consulta
+        tipo_consulta = 'Sin especificar'
+        if cita.tipo_servicio:
+            tipo_consulta = cita.tipo_servicio.nombre
+        elif cita.tipo_consulta:
+            tipo_consulta = cita.tipo_consulta
+        
+        # Obtener dentista
+        dentista = 'Sin asignar'
+        if cita.dentista:
+            dentista = cita.dentista.nombre_completo
+        
+        # Obtener precio
+        precio = None
+        if cita.precio_cobrado:
+            precio = float(cita.precio_cobrado)
+        
+        data = {
+            'success': True,
+            'cita': {
+                'id': cita.id,
+                'fecha_hora': fecha_hora,
+                'fecha': fecha,
+                'hora': hora,
+                'paciente': paciente,
+                'paciente_nombre': paciente,  # Alias para compatibilidad
+                'tipo_consulta': tipo_consulta,
+                'paciente': paciente,
+                'dentista': dentista,
+                'estado': cita.estado,
+                'estado_display': cita.get_estado_display(),
+                'notas': cita.notas or '',
+                'precio_cobrado': precio,
+                'motivo_no_asistencia': cita.motivo_no_asistencia or '',
+            }
+        }
+        return JsonResponse(data)
+    except Cita.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Cita no encontrada'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al obtener datos de la cita: {str(e)}'
+        }, status=500)
+
+
+@login_required
 def eliminar_radiografia(request, radiografia_id):
     """Vista para eliminar una radiografía"""
     try:
@@ -6268,13 +11941,22 @@ def perfil_cliente(request, cliente_id):
     
     citas = Cita.objects.filter(cliente=cliente).order_by('-fecha_hora')
     
+    # Obtener planes de tratamiento del cliente
+    planes_tratamiento = PlanTratamiento.objects.filter(cliente=cliente).order_by('-creado_el')
+    
+    # Agregar información de permisos de edición a cada plan
+    for plan in planes_tratamiento:
+        plan.puede_editar = plan.puede_ser_editado_por(perfil)
+    
     # Estadísticas
     estadisticas = {
         'total_citas': citas.count(),
         'citas_completadas': citas.filter(estado='completada').count(),
-        'citas_pendientes': citas.filter(estado='reservada').count(),
+        'citas_no_asistidas': citas.filter(estado='no_show').count(),
+        'citas_pendientes': citas.filter(estado__in=['reservada', 'confirmada', 'en_espera', 'listo_para_atender', 'en_progreso', 'finalizada']).count(),
         'total_odontogramas': odontogramas.count(),
         'total_radiografias': radiografias.count(),
+        'total_planes_tratamiento': planes_tratamiento.count(),
         'ultima_cita': citas.first(),
         'ultimo_odontograma': odontogramas.first(),
         'ultima_radiografia': radiografias.first(),
@@ -6286,11 +11968,12 @@ def perfil_cliente(request, cliente_id):
         'odontogramas': odontogramas,
         'radiografias': radiografias,
         'citas': citas[:10],  # Últimas 10 citas
+        'planes_tratamiento': planes_tratamiento,
         'estadisticas': estadisticas,
         'es_admin': True
     }
     
-    return render(request, 'citas/perfil_cliente.html', context)
+    return render(request, 'citas/clientes/perfil_cliente.html', context)
 
 
 @login_required
@@ -6327,39 +12010,45 @@ def enviar_radiografia_por_correo(request, radiografia_id):
         from django.conf import settings
         from django.utils import timezone
         
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or settings.DEFAULT_FROM_EMAIL
+            direccion_clinica = info_clinica.direccion or ''
+            telefono_clinica = info_clinica.telefono or ''
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = settings.DEFAULT_FROM_EMAIL
+            direccion_clinica = ''
+            telefono_clinica = ''
+        
+        # Renderizar template HTML
+        from django.template.loader import render_to_string
+        mensaje_html = render_to_string('citas/emails/radiografia_enviada.html', {
+            'cliente_nombre': cliente.nombre_completo,
+            'tipo_radiografia': radiografia.get_tipo_display(),
+            'fecha_carga': radiografia.fecha_carga,
+            'dentista_nombre': radiografia.dentista.nombre_completo if radiografia.dentista else 'No especificado',
+            'descripcion': radiografia.descripcion,
+            'nombre_clinica': nombre_clinica,
+            'direccion_clinica': direccion_clinica,
+            'telefono_clinica': telefono_clinica,
+            'email_clinica': email_clinica,
+        })
+        
         # Preparar el mensaje profesional
         asunto = f'Radiografía Dental - {radiografia.get_tipo_display()}'
-        
-        mensaje = f"""
-Estimado/a {cliente.nombre_completo},
-
-Le enviamos su radiografía dental según solicitó. Esta imagen corresponde a su archivo médico y está disponible para su uso cuando la necesite.
-
-Información de la radiografía:
-- Tipo: {radiografia.get_tipo_display()}
-- Fecha: {radiografia.fecha_carga.strftime('%d/%m/%Y')}
-- Dentista: {radiografia.dentista.nombre_completo}
-"""
-        
-        if radiografia.descripcion:
-            mensaje += f"- Descripción: {radiografia.descripcion}\n"
-        
-        mensaje += f"""
-Esta radiografía forma parte de su historial médico en nuestra clínica. Le recomendamos guardarla en un lugar seguro.
-
-Si tiene alguna pregunta o necesita más información, no dude en contactarnos.
-
-Atentamente,
-Clínica Dental
-"""
         
         # Crear el correo con la imagen adjunta
         email = EmailMessage(
             subject=asunto,
-            body=mensaje,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            body=mensaje_html,
+            from_email=email_clinica,
             to=[cliente.email],
         )
+        email.content_subtype = "html"  # Indicar que es HTML
         
         # Adjuntar la imagen de la radiografía
         try:
@@ -6451,7 +12140,7 @@ def gestor_servicios(request):
         'categorias': TipoServicio.CATEGORIA_CHOICES,
     }
     
-    return render(request, 'citas/gestor_servicios.html', context)
+    return render(request, 'citas/servicios/gestor_servicios.html', context)
 
 @login_required
 def crear_servicio(request):
@@ -6476,16 +12165,42 @@ def crear_servicio(request):
             activo = request.POST.get('activo') == 'on'
             
             # Validaciones
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            
             if not nombre:
-                messages.error(request, 'El nombre del servicio es obligatorio.')
+                error_msg = 'El nombre del servicio es obligatorio. Por favor, ingrese un nombre para el servicio.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                messages.error(request, error_msg)
+                return redirect('crear_servicio')
+            
+            if len(nombre) < 3:
+                error_msg = 'El nombre del servicio debe tener al menos 3 caracteres.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                messages.error(request, error_msg)
                 return redirect('crear_servicio')
             
             try:
                 precio_base = float(precio_base)
                 if precio_base < 0:
-                    raise ValueError('El precio debe ser positivo')
-            except ValueError:
-                messages.error(request, 'El precio debe ser un número válido.')
+                    error_msg = 'El precio base debe ser un valor positivo. Por favor, ingrese un precio válido.'
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                    messages.error(request, error_msg)
+                    return redirect('crear_servicio')
+                if precio_base == 0:
+                    warning_msg = 'El precio base es $0. ¿Está seguro de que desea crear un servicio gratuito?'
+                    if is_ajax:
+                        # Permitir continuar pero con advertencia
+                        pass
+                    else:
+                        messages.warning(request, warning_msg)
+            except (ValueError, TypeError):
+                error_msg = 'El precio base debe ser un número válido. Por favor, ingrese un valor numérico (ejemplo: 50000).'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                messages.error(request, error_msg)
                 return redirect('crear_servicio')
             
             duracion_estimada_int = None
@@ -6493,14 +12208,31 @@ def crear_servicio(request):
                 try:
                     duracion_estimada_int = int(duracion_estimada)
                     if duracion_estimada_int < 0:
-                        raise ValueError
-                except ValueError:
-                    messages.error(request, 'La duración estimada debe ser un número válido.')
+                        error_msg = 'La duración estimada no puede ser un número negativo.'
+                        if is_ajax:
+                            return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                        messages.error(request, error_msg)
+                        return redirect('crear_servicio')
+                    if duracion_estimada_int > 1440:
+                        warning_msg = 'La duración estimada es muy alta (más de 24 horas). Verifique que el valor sea correcto.'
+                        if is_ajax:
+                            # Permitir continuar pero con advertencia
+                            pass
+                        else:
+                            messages.warning(request, warning_msg)
+                except (ValueError, TypeError):
+                    error_msg = 'La duración estimada debe ser un número entero válido (en minutos).'
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                    messages.error(request, error_msg)
                     return redirect('crear_servicio')
             
             # Verificar que no exista un servicio con el mismo nombre
-            if TipoServicio.objects.filter(nombre=nombre).exists():
-                messages.error(request, 'Ya existe un servicio con ese nombre.')
+            if TipoServicio.objects.filter(nombre__iexact=nombre).exists():
+                error_msg = f'Ya existe un servicio con el nombre "{nombre}". Por favor, elija un nombre diferente.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': error_msg}, status=400)
+                messages.error(request, error_msg)
                 return redirect('crear_servicio')
             
             # Crear el servicio
@@ -6515,19 +12247,61 @@ def crear_servicio(request):
                 creado_por=perfil
             )
             
-            messages.success(request, f'Servicio "{nombre}" creado correctamente.')
+            # Registrar en auditoría
+            registrar_auditoria(
+                usuario=perfil,
+                accion='crear',
+                modulo='servicios',
+                descripcion=f'Servicio creado: {nombre}',
+                detalles=f'Categoría: {servicio.get_categoria_display()}, Precio: ${precio_base:,.0f}, Activo: {"Sí" if activo else "No"}',
+                objeto_id=servicio.id,
+                tipo_objeto='TipoServicio',
+                request=request
+            )
+            
+            # Si es una petición AJAX, devolver JSON
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'✅ Servicio "{nombre}" creado correctamente con un precio base de ${precio_base:,.0f}.',
+                    'servicio': {
+                        'id': servicio.id,
+                        'nombre': servicio.nombre,
+                        'categoria': servicio.get_categoria_display(),
+                        'precio_base': float(servicio.precio_base),
+                        'activo': servicio.activo,
+                    }
+                })
+            
+            messages.success(request, f'✅ Servicio "{nombre}" creado correctamente con un precio base de ${precio_base:,.0f}.')
             return redirect('gestor_servicios')
             
         except Exception as e:
-            messages.error(request, f'Error al crear el servicio: {str(e)}')
+            error_msg = f'❌ Error inesperado al crear el servicio. Por favor, intente nuevamente. Si el problema persiste, contacte al administrador del sistema. Detalles: {str(e)}'
+            
+            # Si es una petición AJAX, devolver JSON
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': error_msg
+                }, status=400)
+            
+            messages.error(request, error_msg)
             return redirect('crear_servicio')
+    
+    # Si es GET y AJAX, devolver las categorías
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        categorias = [{'code': code, 'name': name} for code, name in TipoServicio.CATEGORIA_CHOICES]
+        return JsonResponse({
+            'categorias': categorias
+        })
     
     context = {
         'perfil': perfil,
         'categorias': TipoServicio.CATEGORIA_CHOICES,
     }
     
-    return render(request, 'citas/crear_servicio.html', context)
+    return render(request, 'citas/servicios/crear_servicio.html', context)
 
 @login_required
 def editar_servicio(request, servicio_id):
@@ -6555,15 +12329,22 @@ def editar_servicio(request, servicio_id):
             
             # Validaciones
             if not nombre:
-                messages.error(request, 'El nombre del servicio es obligatorio.')
+                messages.error(request, 'El nombre del servicio es obligatorio. Por favor, ingrese un nombre para el servicio.')
+                return redirect('editar_servicio', servicio_id=servicio_id)
+            
+            if len(nombre) < 3:
+                messages.error(request, 'El nombre del servicio debe tener al menos 3 caracteres.')
                 return redirect('editar_servicio', servicio_id=servicio_id)
             
             try:
                 precio_base = float(precio_base)
                 if precio_base < 0:
-                    raise ValueError('El precio debe ser positivo')
-            except ValueError:
-                messages.error(request, 'El precio debe ser un número válido.')
+                    messages.error(request, 'El precio base debe ser un valor positivo. Por favor, ingrese un precio válido.')
+                    return redirect('editar_servicio', servicio_id=servicio_id)
+                if precio_base == 0:
+                    messages.warning(request, 'El precio base es $0. ¿Está seguro de que desea que este servicio sea gratuito?')
+            except (ValueError, TypeError):
+                messages.error(request, 'El precio base debe ser un número válido. Por favor, ingrese un valor numérico (ejemplo: 50000).')
                 return redirect('editar_servicio', servicio_id=servicio_id)
             
             duracion_estimada_int = None
@@ -6571,15 +12352,22 @@ def editar_servicio(request, servicio_id):
                 try:
                     duracion_estimada_int = int(duracion_estimada)
                     if duracion_estimada_int < 0:
-                        raise ValueError
-                except ValueError:
-                    messages.error(request, 'La duración estimada debe ser un número válido.')
+                        messages.error(request, 'La duración estimada no puede ser un número negativo.')
+                        return redirect('editar_servicio', servicio_id=servicio_id)
+                    if duracion_estimada_int > 1440:
+                        messages.warning(request, 'La duración estimada es muy alta (más de 24 horas). Verifique que el valor sea correcto.')
+                except (ValueError, TypeError):
+                    messages.error(request, 'La duración estimada debe ser un número entero válido (en minutos).')
                     return redirect('editar_servicio', servicio_id=servicio_id)
             
             # Verificar que no exista otro servicio con el mismo nombre (excepto el actual)
-            if TipoServicio.objects.filter(nombre=nombre).exclude(id=servicio_id).exists():
-                messages.error(request, 'Ya existe otro servicio con ese nombre.')
+            if TipoServicio.objects.filter(nombre__iexact=nombre).exclude(id=servicio_id).exists():
+                messages.error(request, f'Ya existe otro servicio con el nombre "{nombre}". Por favor, elija un nombre diferente.')
                 return redirect('editar_servicio', servicio_id=servicio_id)
+            
+            # Guardar valores anteriores para auditoría
+            nombre_anterior = servicio.nombre
+            precio_anterior = servicio.precio_base
             
             # Actualizar el servicio
             servicio.nombre = nombre
@@ -6591,11 +12379,31 @@ def editar_servicio(request, servicio_id):
             servicio.activo = activo
             servicio.save()
             
-            messages.success(request, f'Servicio "{nombre}" actualizado correctamente.')
+            # Registrar en auditoría
+            detalles_cambio = []
+            if nombre_anterior != nombre:
+                detalles_cambio.append(f'Nombre: {nombre_anterior} → {nombre}')
+            if precio_anterior != precio_base:
+                detalles_cambio.append(f'Precio: ${precio_anterior:,.0f} → ${precio_base:,.0f}')
+            if not detalles_cambio:
+                detalles_cambio.append('Información actualizada')
+            
+            registrar_auditoria(
+                usuario=perfil,
+                accion='editar',
+                modulo='servicios',
+                descripcion=f'Servicio editado: {nombre}',
+                detalles='; '.join(detalles_cambio),
+                objeto_id=servicio.id,
+                tipo_objeto='TipoServicio',
+                request=request
+            )
+            
+            messages.success(request, f'✅ Servicio "{nombre}" actualizado correctamente.')
             return redirect('gestor_servicios')
             
         except Exception as e:
-            messages.error(request, f'Error al actualizar el servicio: {str(e)}')
+            messages.error(request, f'❌ Error inesperado al actualizar el servicio. Por favor, intente nuevamente. Si el problema persiste, contacte al administrador del sistema. Detalles: {str(e)}')
             return redirect('editar_servicio', servicio_id=servicio_id)
     
     context = {
@@ -6604,7 +12412,7 @@ def editar_servicio(request, servicio_id):
         'categorias': TipoServicio.CATEGORIA_CHOICES,
     }
     
-    return render(request, 'citas/editar_servicio.html', context)
+    return render(request, 'citas/servicios/editar_servicio.html', context)
 
 @login_required
 def eliminar_servicio(request, servicio_id):
@@ -6628,16 +12436,33 @@ def eliminar_servicio(request, servicio_id):
         if citas_asociadas > 0:
             messages.warning(
                 request, 
-                f'No se puede eliminar el servicio "{nombre_servicio}" porque tiene {citas_asociadas} cita(s) asociada(s). '
-                'Desactive el servicio en lugar de eliminarlo.'
+                f'⚠️ No se puede eliminar el servicio "{nombre_servicio}" porque tiene {citas_asociadas} cita(s) asociada(s). '
+                f'Para desactivar el servicio, edítelo y desmarque la opción "Servicio Activo".'
             )
             return redirect('gestor_servicios')
         
         try:
+            # Guardar información para auditoría antes de eliminar
+            servicio_id = servicio.id
+            servicio_categoria = servicio.get_categoria_display()
+            servicio_precio = servicio.precio_base
+            
+            # Registrar en auditoría ANTES de eliminar
+            registrar_auditoria(
+                usuario=perfil,
+                accion='eliminar',
+                modulo='servicios',
+                descripcion=f'Servicio eliminado: {nombre_servicio}',
+                detalles=f'Categoría: {servicio_categoria}, Precio: ${servicio_precio:,.0f}',
+                objeto_id=servicio_id,
+                tipo_objeto='TipoServicio',
+                request=request
+            )
+            
             servicio.delete()
-            messages.success(request, f'Servicio "{nombre_servicio}" eliminado correctamente.')
+            messages.success(request, f'✅ Servicio "{nombre_servicio}" eliminado correctamente del sistema.')
         except Exception as e:
-            messages.error(request, f'Error al eliminar el servicio: {str(e)}')
+            messages.error(request, f'❌ Error al eliminar el servicio. Por favor, intente nuevamente. Si el problema persiste, contacte al administrador del sistema. Detalles: {str(e)}')
         
         return redirect('gestor_servicios')
     
@@ -6646,7 +12471,7 @@ def eliminar_servicio(request, servicio_id):
         'servicio': servicio,
     }
     
-    return render(request, 'citas/eliminar_servicio.html', context)
+    return render(request, 'citas/servicios/eliminar_servicio.html', context)
 
 # ==========================================
 # GESTIÓN DE HORARIOS DE DENTISTAS
@@ -6679,7 +12504,7 @@ def gestor_horarios(request):
         'horarios_por_dentista': horarios_por_dentista,
         'dias_semana': HorarioDentista.DIA_SEMANA_CHOICES,
     }
-    return render(request, 'citas/gestor_horarios.html', context)
+    return render(request, 'citas/horarios/gestor_horarios.html', context)
 
 @login_required
 def gestionar_horario_dentista(request, dentista_id):
@@ -6695,34 +12520,6 @@ def gestionar_horario_dentista(request, dentista_id):
     
     dentista = get_object_or_404(Perfil, id=dentista_id, rol='dentista')
     
-    if request.method == 'POST':
-        # Eliminar horarios existentes si se envía el formulario
-        if 'eliminar_horarios' in request.POST:
-            horarios_ids = request.POST.getlist('horarios_a_eliminar')
-            HorarioDentista.objects.filter(id__in=horarios_ids, dentista=dentista).delete()
-            messages.success(request, 'Horarios eliminados correctamente.')
-            return redirect('gestionar_horario_dentista', dentista_id=dentista_id)
-        
-        # Agregar nuevo horario
-        dia_semana = request.POST.get('dia_semana')
-        hora_inicio = request.POST.get('hora_inicio')
-        hora_fin = request.POST.get('hora_fin')
-        
-        if dia_semana and hora_inicio and hora_fin:
-            try:
-                horario = HorarioDentista.objects.create(
-                    dentista=dentista,
-                    dia_semana=int(dia_semana),
-                    hora_inicio=hora_inicio,
-                    hora_fin=hora_fin,
-                    activo=True
-                )
-                messages.success(request, f'Horario agregado: {horario.get_dia_semana_display()} {hora_inicio}-{hora_fin}')
-            except Exception as e:
-                messages.error(request, f'Error al crear horario: {str(e)}')
-        
-        return redirect('gestionar_horario_dentista', dentista_id=dentista_id)
-    
     # Obtener horarios del dentista agrupados por día
     horarios = HorarioDentista.objects.filter(dentista=dentista).order_by('dia_semana', 'hora_inicio')
     horarios_por_dia = {}
@@ -6735,7 +12532,214 @@ def gestionar_horario_dentista(request, dentista_id):
         'horarios_por_dia': horarios_por_dia,
         'dias_semana': HorarioDentista.DIA_SEMANA_CHOICES,
     }
-    return render(request, 'citas/gestionar_horario_dentista.html', context)
+    return render(request, 'citas/horarios/gestionar_horario_dentista.html', context)
+
+# Vista AJAX para agregar horario
+@login_required
+def agregar_horario_ajax(request, dentista_id):
+    """Vista AJAX para agregar un nuevo horario con validaciones"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        dentista = Perfil.objects.get(id=dentista_id, rol='dentista')
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Dentista no encontrado'}, status=404)
+    
+    dia_semana = request.POST.get('dia_semana')
+    hora_inicio = request.POST.get('hora_inicio')
+    hora_fin = request.POST.get('hora_fin')
+    
+    # Validaciones básicas
+    if not dia_semana or not hora_inicio or not hora_fin:
+        return JsonResponse({'success': False, 'error': 'Todos los campos son obligatorios'}, status=400)
+    
+    try:
+        dia_semana = int(dia_semana)
+        if dia_semana < 0 or dia_semana > 6:
+            return JsonResponse({'success': False, 'error': 'Día de la semana inválido'}, status=400)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Día de la semana inválido'}, status=400)
+    
+    # Convertir strings a time
+    try:
+        from datetime import datetime
+        hora_inicio_obj = datetime.strptime(hora_inicio, '%H:%M').time()
+        hora_fin_obj = datetime.strptime(hora_fin, '%H:%M').time()
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Formato de hora inválido'}, status=400)
+    
+    # Validar que hora_fin > hora_inicio
+    if hora_fin_obj <= hora_inicio_obj:
+        return JsonResponse({'success': False, 'error': 'La hora de fin debe ser mayor que la hora de inicio'}, status=400)
+    
+    # Validar solapamiento con otros horarios del mismo día
+    horarios_existentes = HorarioDentista.objects.filter(
+        dentista=dentista,
+        dia_semana=dia_semana,
+        activo=True
+    )
+    
+    for horario_existente in horarios_existentes:
+        # Verificar si hay solapamiento
+        if not (hora_fin_obj <= horario_existente.hora_inicio or hora_inicio_obj >= horario_existente.hora_fin):
+            return JsonResponse({
+                'success': False, 
+                'error': f'El horario se solapa con otro existente: {horario_existente.hora_inicio.strftime("%H:%M")}-{horario_existente.hora_fin.strftime("%H:%M")}'
+            }, status=400)
+    
+    # Crear el horario
+    try:
+        horario = HorarioDentista.objects.create(
+            dentista=dentista,
+            dia_semana=dia_semana,
+            hora_inicio=hora_inicio_obj,
+            hora_fin=hora_fin_obj,
+            activo=True
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Horario agregado: {horario.get_dia_semana_display()} {hora_inicio}-{hora_fin}',
+            'horario': {
+                'id': horario.id,
+                'dia_semana': horario.dia_semana,
+                'dia_nombre': horario.get_dia_semana_display(),
+                'hora_inicio': horario.hora_inicio.strftime('%H:%M'),
+                'hora_fin': horario.hora_fin.strftime('%H:%M'),
+                'activo': horario.activo
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error al crear horario: {str(e)}'}, status=500)
+
+# Vista AJAX para editar horario
+@login_required
+def editar_horario_ajax(request, horario_id):
+    """Vista AJAX para editar un horario existente"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        horario = HorarioDentista.objects.get(id=horario_id)
+    except HorarioDentista.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Horario no encontrado'}, status=404)
+    
+    dia_semana = request.POST.get('dia_semana')
+    hora_inicio = request.POST.get('hora_inicio')
+    hora_fin = request.POST.get('hora_fin')
+    
+    # Validaciones básicas
+    if not dia_semana or not hora_inicio or not hora_fin:
+        return JsonResponse({'success': False, 'error': 'Todos los campos son obligatorios'}, status=400)
+    
+    try:
+        dia_semana = int(dia_semana)
+        if dia_semana < 0 or dia_semana > 6:
+            return JsonResponse({'success': False, 'error': 'Día de la semana inválido'}, status=400)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Día de la semana inválido'}, status=400)
+    
+    # Convertir strings a time
+    try:
+        from datetime import datetime
+        hora_inicio_obj = datetime.strptime(hora_inicio, '%H:%M').time()
+        hora_fin_obj = datetime.strptime(hora_fin, '%H:%M').time()
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Formato de hora inválido'}, status=400)
+    
+    # Validar que hora_fin > hora_inicio
+    if hora_fin_obj <= hora_inicio_obj:
+        return JsonResponse({'success': False, 'error': 'La hora de fin debe ser mayor que la hora de inicio'}, status=400)
+    
+    # Validar solapamiento con otros horarios del mismo día (excluyendo el actual)
+    horarios_existentes = HorarioDentista.objects.filter(
+        dentista=horario.dentista,
+        dia_semana=dia_semana,
+        activo=True
+    ).exclude(id=horario_id)
+    
+    for horario_existente in horarios_existentes:
+        # Verificar si hay solapamiento
+        if not (hora_fin_obj <= horario_existente.hora_inicio or hora_inicio_obj >= horario_existente.hora_fin):
+            return JsonResponse({
+                'success': False, 
+                'error': f'El horario se solapa con otro existente: {horario_existente.hora_inicio.strftime("%H:%M")}-{horario_existente.hora_fin.strftime("%H:%M")}'
+            }, status=400)
+    
+    # Actualizar el horario
+    try:
+        horario.dia_semana = dia_semana
+        horario.hora_inicio = hora_inicio_obj
+        horario.hora_fin = hora_fin_obj
+        horario.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Horario actualizado: {horario.get_dia_semana_display()} {hora_inicio}-{hora_fin}',
+            'horario': {
+                'id': horario.id,
+                'dia_semana': horario.dia_semana,
+                'dia_nombre': horario.get_dia_semana_display(),
+                'hora_inicio': horario.hora_inicio.strftime('%H:%M'),
+                'hora_fin': horario.hora_fin.strftime('%H:%M'),
+                'activo': horario.activo
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error al actualizar horario: {str(e)}'}, status=500)
+
+# Vista AJAX para eliminar horarios
+@login_required
+def eliminar_horarios_ajax(request, dentista_id):
+    """Vista AJAX para eliminar horarios"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        dentista = Perfil.objects.get(id=dentista_id, rol='dentista')
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Dentista no encontrado'}, status=404)
+    
+    import json
+    data = json.loads(request.body)
+    horarios_ids = data.get('horarios_ids', [])
+    
+    if not horarios_ids:
+        return JsonResponse({'success': False, 'error': 'No se seleccionaron horarios para eliminar'}, status=400)
+    
+    try:
+        horarios_eliminados = HorarioDentista.objects.filter(id__in=horarios_ids, dentista=dentista)
+        cantidad = horarios_eliminados.count()
+        horarios_eliminados.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{cantidad} horario(s) eliminado(s) correctamente'
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error al eliminar horarios: {str(e)}'}, status=500)
 
 @login_required
 def ver_mi_horario(request):
@@ -6760,4 +12764,5912 @@ def ver_mi_horario(request):
         'horarios_por_dia': horarios_por_dia,
         'dias_semana': HorarioDentista.DIA_SEMANA_CHOICES,
     }
-    return render(request, 'citas/ver_mi_horario.html', context)
+    return render(request, 'citas/horarios/ver_mi_horario.html', context)
+
+
+# ==========================================
+# GESTIÓN DE PLANES DE TRATAMIENTO
+# ==========================================
+
+@login_required
+def listar_planes_tratamiento(request):
+    """Lista todos los planes de tratamiento según el rol del usuario"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    # FILTRO SEGÚN ROL
+    if perfil.es_administrativo():
+        # ADMINISTRADOR: Ve TODOS los planes
+        planes = PlanTratamiento.objects.all()
+        
+        # Filtros adicionales para admin
+        dentista_filtro = request.GET.get('dentista_id', '')
+        if dentista_filtro:
+            planes = planes.filter(dentista_id=dentista_filtro)
+        
+        # Estadísticas globales
+        from django.db.models import Sum
+        estadisticas = {
+            'total_planes': PlanTratamiento.objects.count(),
+            'planes_activos': PlanTratamiento.objects.filter(estado='en_progreso').count(),
+            'planes_completados': PlanTratamiento.objects.filter(estado='completado').count(),
+            'ingresos_estimados': PlanTratamiento.objects.filter(
+                estado__in=['aprobado', 'en_progreso']
+            ).aggregate(Sum('precio_final'))['precio_final__sum'] or 0,
+        }
+        
+        # Obtener dentistas para el filtro
+        dentistas = Perfil.objects.filter(rol='dentista', activo=True).order_by('nombre_completo')
+        
+    elif perfil.es_dentista():
+        # DENTISTA: Solo ve planes de SUS clientes vinculados
+        # Obtener clientes vinculados al dentista
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        
+        # Filtrar planes por dentista Y por clientes vinculados
+        planes = PlanTratamiento.objects.filter(
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+        
+        # Estadísticas solo de sus planes
+        estadisticas = {
+            'total_planes': planes.count(),
+            'planes_activos': planes.filter(estado='en_progreso').count(),
+            'planes_completados': planes.filter(estado='completado').count(),
+        }
+        
+        dentistas = None
+        dentista_filtro = None
+    else:
+        messages.error(request, 'No tienes permisos para ver planes de tratamiento.')
+        return redirect('panel_trabajador')
+    
+    # Filtros comunes
+    search = request.GET.get('search', '')
+    estado_filtro = request.GET.get('estado', '')
+    
+    if search:
+        planes = planes.filter(
+            Q(nombre__icontains=search) |
+            Q(cliente__nombre_completo__icontains=search) |
+            Q(cliente__email__icontains=search) |
+            Q(cliente__rut__icontains=search)
+        )
+    
+    if estado_filtro:
+        planes = planes.filter(estado=estado_filtro)
+    
+    # Ordenamiento
+    orden = request.GET.get('orden', '-creado_el')
+    ordenamientos_validos = {
+        '-creado_el': '-creado_el',
+        'creado_el': 'creado_el',
+        '-precio_final': '-precio_final',
+        'precio_final': 'precio_final',
+        '-progreso_porcentaje': '-progreso_porcentaje',
+        'progreso_porcentaje': 'progreso_porcentaje',
+        'nombre': 'nombre',
+        '-nombre': '-nombre',
+    }
+    orden_seleccionado = ordenamientos_validos.get(orden, '-creado_el')
+    
+    planes = planes.select_related('cliente', 'dentista', 'odontograma_inicial').prefetch_related('citas', 'consentimientos').order_by(orden_seleccionado)
+    
+    # Paginación
+    paginator = Paginator(planes, 20)
+    page = request.GET.get('page')
+    try:
+        planes_paginados = paginator.page(page)
+    except PageNotAnInteger:
+        planes_paginados = paginator.page(1)
+    except EmptyPage:
+        planes_paginados = paginator.page(paginator.num_pages)
+    
+    # Calcular última y próxima cita para cada plan
+    from django.utils import timezone
+    for plan in planes_paginados:
+        citas_ordenadas = plan.citas.all().order_by('fecha_hora')
+        if citas_ordenadas.exists():
+            # Última cita (la más reciente)
+            plan.ultima_cita_obj = citas_ordenadas.last()
+            # Próxima cita (la primera futura con estado reservada o confirmada)
+            proximas = citas_ordenadas.filter(
+                fecha_hora__gte=timezone.now(),
+                estado__in=['reservada', 'confirmada']
+            ).first()
+            plan.proxima_cita_obj = proximas
+        else:
+            plan.ultima_cita_obj = None
+            plan.proxima_cita_obj = None
+        
+        # Verificar si hay consentimientos pendientes
+        plan.tiene_consentimientos_pendientes = plan.consentimientos.exclude(estado='firmado').exists()
+    
+    context = {
+        'perfil': perfil,
+        'planes': planes_paginados,
+        'estadisticas': estadisticas,
+        'es_admin': perfil.es_administrativo(),
+        'es_dentista': perfil.es_dentista(),
+        'search': search,
+        'estado_filtro': estado_filtro,
+        'dentistas': dentistas,
+        'dentista_filtro': dentista_filtro,
+        'orden': orden,
+    }
+    
+    # Usar template diferente para dentistas
+    if perfil.es_dentista():
+        return render(request, 'citas/planes_tratamiento/mis_tratamientos_dentista.html', context)
+    else:
+        return render(request, 'citas/planes_tratamiento/listar_planes_tratamiento.html', context)
+
+
+@login_required
+def crear_plan_tratamiento(request):
+    """Crea un nuevo plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes de tratamiento.')
+        return redirect('panel_trabajador')
+    
+    if request.method == 'POST':
+        cliente_id = request.POST.get('cliente_id')
+        dentista_id = request.POST.get('dentista_id')
+        
+        # VERIFICACIONES DIFERENTES
+        if perfil.es_dentista():
+            # DENTISTA: Restricciones estrictas
+            pacientes_dentista = perfil.get_pacientes_asignados()
+            clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+            
+            # 1. Solo puede crear para SUS clientes
+            if int(cliente_id) not in clientes_ids:
+                messages.error(request, 'Solo puedes crear planes para tus pacientes.')
+                return redirect('crear_plan_tratamiento')
+            
+            # 2. Solo puede asignarse a sí mismo
+            if int(dentista_id) != perfil.id:
+                messages.error(request, 'Solo puedes crear planes como dentista asignado.')
+                return redirect('crear_plan_tratamiento')
+        
+        # Validar datos
+        nombre = request.POST.get('nombre', '').strip()
+        if not nombre:
+            messages.error(request, 'El nombre del plan es requerido.')
+            return redirect('crear_plan_tratamiento')
+        
+        try:
+            cliente = Cliente.objects.get(id=cliente_id, activo=True)
+            dentista = Perfil.objects.get(id=dentista_id, rol='dentista', activo=True)
+        except (Cliente.DoesNotExist, Perfil.DoesNotExist):
+            messages.error(request, 'Cliente o dentista no válido.')
+            return redirect('crear_plan_tratamiento')
+        
+        # Obtener odontograma inicial si se proporciona
+        odontograma_id = request.POST.get('odontograma_inicial_id', '')
+        odontograma_inicial = None
+        if odontograma_id:
+            try:
+                odontograma_inicial = Odontograma.objects.get(id=odontograma_id)
+            except Odontograma.DoesNotExist:
+                pass
+        
+        # Crear el plan
+        try:
+            # Obtener valores de presupuesto (usar campos _raw si existen, sino procesar el formateado)
+            presupuesto_str = request.POST.get('presupuesto_total_raw') or request.POST.get('presupuesto_total', '0')
+            descuento_str = request.POST.get('descuento_raw') or request.POST.get('descuento', '0')
+            
+            # Remover caracteres no numéricos (por si acaso viene formateado)
+            presupuesto_str = re.sub(r'[^\d]', '', presupuesto_str) or '0'
+            descuento_str = re.sub(r'[^\d]', '', descuento_str) or '0'
+            
+            presupuesto_total = float(presupuesto_str)
+            descuento = float(descuento_str)
+            precio_final = presupuesto_total - descuento
+            
+            citas_estimadas = request.POST.get('citas_estimadas', '').strip()
+            citas_estimadas = int(citas_estimadas) if citas_estimadas and citas_estimadas.isdigit() else None
+            
+            plan = PlanTratamiento.objects.create(
+                cliente=cliente,
+                dentista=dentista,
+                odontograma_inicial=odontograma_inicial,
+                nombre=nombre,
+                descripcion=request.POST.get('descripcion', ''),
+                diagnostico=request.POST.get('diagnostico', ''),
+                objetivo=request.POST.get('objetivo', ''),
+                presupuesto_total=presupuesto_total,
+                descuento=descuento,
+                precio_final=precio_final,
+                estado=request.POST.get('estado', 'borrador'),
+                fecha_inicio_estimada=request.POST.get('fecha_inicio_estimada') or None,
+                fecha_fin_estimada=request.POST.get('fecha_fin_estimada') or None,
+                citas_estimadas=citas_estimadas,
+                notas_internas=request.POST.get('notas_internas', '') if perfil.es_administrativo() else '',
+                notas_paciente=request.POST.get('notas_paciente', ''),
+                creado_por=perfil,
+            )
+            
+            # Registrar en auditoría
+            registrar_auditoria(
+                usuario=perfil,
+                accion='crear',
+                modulo='planes_tratamiento',
+                descripcion=f'Plan de tratamiento creado: {nombre}',
+                detalles=f'Cliente: {cliente.nombre_completo}, Dentista: {dentista.nombre_completo}, Presupuesto: ${presupuesto_total:,.0f}, Estado: {plan.get_estado_display()}',
+                objeto_id=plan.id,
+                tipo_objeto='PlanTratamiento',
+                request=request
+            )
+            
+            # Procesar fases si se enviaron
+            fases_data = request.POST.getlist('fases[]')
+            if fases_data:
+                try:
+                    fases_json = json.loads(fases_data[0]) if fases_data else []
+                    for fase_data in fases_json:
+                        fase = FaseTratamiento.objects.create(
+                            plan=plan,
+                            nombre=fase_data.get('nombre', ''),
+                            descripcion=fase_data.get('descripcion', ''),
+                            orden=fase_data.get('orden', 1),
+                            presupuesto=float(fase_data.get('presupuesto', 0)),
+                        )
+                        
+                        # Procesar items de la fase
+                        items_data = fase_data.get('items', [])
+                        for item_data in items_data:
+                            servicio_id = item_data.get('servicio_id')
+                            servicio = None
+                            if servicio_id:
+                                try:
+                                    servicio = TipoServicio.objects.get(id=servicio_id)
+                                except TipoServicio.DoesNotExist:
+                                    pass
+                            
+                            ItemTratamiento.objects.create(
+                                fase=fase,
+                                servicio=servicio,
+                                descripcion=item_data.get('descripcion', ''),
+                                cantidad=int(item_data.get('cantidad', 1)),
+                                precio_unitario=float(item_data.get('precio_unitario', 0)),
+                            )
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Error al procesar fases: {e}")
+            
+            messages.success(request, f'Plan de tratamiento "{plan.nombre}" creado exitosamente.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+            
+        except ValueError as e:
+            messages.error(request, f'Error en los datos numéricos: {str(e)}')
+            return redirect('crear_plan_tratamiento')
+        except Exception as e:
+            messages.error(request, f'Error al crear el plan: {str(e)}')
+            logger.error(f"Error al crear plan de tratamiento: {e}")
+            return redirect('crear_plan_tratamiento')
+    
+    # GET: Mostrar formulario
+    if perfil.es_administrativo():
+        # ADMINISTRADOR: Ve todos los clientes y dentistas
+        clientes = Cliente.objects.filter(activo=True).order_by('nombre_completo')
+        dentistas = Perfil.objects.filter(rol='dentista', activo=True).order_by('nombre_completo')
+        mostrar_selector_dentista = True
+    else:
+        # DENTISTA: Solo ve SUS clientes y solo puede ser él mismo
+        clientes = obtener_clientes_permitidos(perfil)
+        dentistas = [perfil]
+        mostrar_selector_dentista = False
+    
+    # Obtener cliente pre-seleccionado si viene de otra vista
+    cliente_pre_seleccionado = request.GET.get('cliente_id')
+    
+    # Obtener odontogramas recientes
+    if perfil.es_dentista():
+        odontogramas_recientes = Odontograma.objects.filter(
+            dentista=perfil
+        ).select_related('cliente').order_by('-fecha_creacion')[:10]
+    else:
+        odontogramas_recientes = Odontograma.objects.all().select_related('cliente').order_by('-fecha_creacion')[:10]
+    
+    # Obtener servicios disponibles
+    servicios = TipoServicio.objects.filter(activo=True).order_by('categoria', 'nombre')
+    
+    context = {
+        'perfil': perfil,
+        'clientes': clientes,
+        'dentistas': dentistas,
+        'mostrar_selector_dentista': mostrar_selector_dentista,
+        'odontogramas_recientes': odontogramas_recientes,
+        'cliente_pre_seleccionado': cliente_pre_seleccionado,
+        'servicios': servicios,
+        'es_admin': perfil.es_administrativo(),
+        'es_dentista': perfil.es_dentista(),
+    }
+    
+    return render(request, 'citas/planes_tratamiento/crear_plan_tratamiento.html', context)
+
+
+@login_required
+def detalle_plan_tratamiento(request, plan_id):
+    """Muestra el detalle de un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos para acceder a esta función.')
+        return redirect('login')
+    
+    # FILTRO SEGÚN ROL
+    if perfil.es_administrativo():
+        # ADMINISTRADOR: Puede ver cualquier plan
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        # DENTISTA: Solo puede ver planes de SUS clientes
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        messages.error(request, 'No tienes permisos para ver planes de tratamiento.')
+        return redirect('panel_trabajador')
+    
+    # Obtener citas vinculadas al plan
+    citas = plan.citas.all().order_by('fecha_hora').select_related('tipo_servicio')
+    
+    # Calcular total de precios de citas
+    from decimal import Decimal
+    total_precios_citas = Decimal('0.00')
+    for cita in citas:
+        if cita.precio_cobrado:
+            total_precios_citas += Decimal(str(cita.precio_cobrado))
+    
+    # Calcular saldo disponible (precio_final - total_precios_citas)
+    saldo_disponible_citas = plan.precio_final - total_precios_citas
+    
+    # Contar total de citas
+    total_citas = citas.count()
+    
+    # Obtener servicios activos para los modales
+    from citas.models import TipoServicio
+    servicios_activos = TipoServicio.objects.filter(activo=True).order_by('nombre')
+    
+    # Obtener consentimientos informados asociados al plan
+    consentimientos = plan.consentimientos.all().order_by('-fecha_creacion')
+    
+    # Obtener plantillas de consentimiento para el botón de crear
+    plantillas_consentimiento = PlantillaConsentimiento.objects.filter(activo=True).order_by('tipo_procedimiento', 'nombre')
+    
+    context = {
+        'perfil': perfil,
+        'plan': plan,
+        'citas': citas,
+        'total_precios_citas': total_precios_citas,
+        'saldo_disponible_citas': saldo_disponible_citas,
+        'total_citas': total_citas,
+        'servicios_activos': servicios_activos,
+        'consentimientos': consentimientos,
+        'plantillas_consentimiento': plantillas_consentimiento,
+        'es_admin': perfil.es_administrativo(),
+        'es_dentista': perfil.es_dentista(),
+        'puede_editar': plan.puede_ser_editado_por(perfil),
+        'puede_eliminar': plan.puede_ser_eliminado_por(perfil),
+        'puede_cancelar': plan.puede_ser_cancelado_por(perfil),
+    }
+    
+    # Verificar si puede aprobar el tratamiento
+    tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+    presupuesto_aceptado = plan.presupuesto_aceptado
+    
+    puede_aprobar = False
+    if perfil.es_administrativo() or (perfil.es_dentista() and plan.dentista == perfil):
+        # Verificar condiciones para aprobar
+        puede_aprobar = tiene_consentimiento_firmado and presupuesto_aceptado and plan.estado in ['borrador', 'pendiente_aprobacion']
+    
+    # Verificar si puede finalizar el tratamiento
+    puede_finalizar = False
+    if perfil.es_administrativo() or (perfil.es_dentista() and plan.dentista == perfil):
+        # Solo se puede finalizar si está aprobado o en progreso
+        puede_finalizar = plan.estado in ['aprobado', 'en_progreso']
+    
+    # Verificar si puede crear citas (solo administrativos pueden crear citas)
+    # Los dentistas NO pueden crear citas, eso lo maneja la recepcionista
+    puede_crear_citas = False
+    if perfil.es_administrativo():
+        puede_crear_citas = tiene_consentimiento_firmado and presupuesto_aceptado and plan.estado in ['aprobado', 'en_progreso']
+    
+    # Calcular total de precios de citas (para validar que no exceda el monto total)
+    from decimal import Decimal
+    total_precios_citas = Decimal('0.00')
+    for cita in citas:
+        if cita.precio_cobrado:
+            total_precios_citas += Decimal(str(cita.precio_cobrado))
+    
+    # Calcular saldo disponible para nuevas citas
+    saldo_disponible_citas = plan.precio_final - total_precios_citas
+    
+    context.update({
+        'puede_aprobar': puede_aprobar,
+        'puede_finalizar': puede_finalizar,
+        'puede_crear_citas': puede_crear_citas,
+        'tiene_consentimiento_firmado': tiene_consentimiento_firmado,
+        'presupuesto_aceptado': presupuesto_aceptado,
+        'total_precios_citas': total_precios_citas,
+        'saldo_disponible_citas': saldo_disponible_citas,
+    })
+    
+    return render(request, 'citas/planes_tratamiento/detalle_plan_tratamiento.html', context)
+
+
+@login_required
+def aceptar_presupuesto_tratamiento(request, plan_id):
+    """Marca el presupuesto de un tratamiento como aceptado"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    
+    # Verificar permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    
+    # Marcar presupuesto como aceptado
+    plan.presupuesto_aceptado = True
+    plan.fecha_aceptacion_presupuesto = timezone.now()
+    plan.save()
+    
+    return JsonResponse({
+        'success': True,
+        'message': 'Presupuesto marcado como aceptado correctamente.'
+    })
+
+
+@login_required
+def aprobar_tratamiento(request, plan_id):
+    """Aprueba un tratamiento validando que tenga consentimiento firmado y presupuesto aceptado"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    
+    # Verificar permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    
+    # Validar que el estado permita la aprobación
+    if plan.estado not in ['borrador', 'pendiente_aprobacion']:
+        return JsonResponse({
+                'success': False,
+                'error': f'No se puede aprobar un tratamiento en estado "{plan.get_estado_display()}".'
+            }, status=400)
+    
+    # Validar que tenga consentimiento informado firmado
+    consentimientos_firmados = plan.consentimientos.filter(estado='firmado')
+    if not consentimientos_firmados.exists():
+        return JsonResponse({
+                'success': False,
+                'error': 'No se puede aprobar el tratamiento. Debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+    
+    # Validar que el presupuesto esté aceptado
+    if not plan.presupuesto_aceptado:
+        return JsonResponse({
+                'success': False,
+                'error': 'No se puede aprobar el tratamiento. El presupuesto debe estar aceptado.'
+            }, status=400)
+    
+    # Aprobar el tratamiento
+    plan.estado = 'aprobado'
+    plan.fecha_aprobacion = timezone.now()
+    plan.save()
+    
+    return JsonResponse({
+        'success': True,
+        'message': 'Tratamiento aprobado correctamente. El tratamiento puede comenzar.'
+    })
+
+
+@login_required
+def finalizar_tratamiento(request, plan_id):
+    """Marca un tratamiento como finalizado"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    
+    # Verificar permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
+    
+    # Validar que el estado permita la finalización
+    if plan.estado not in ['aprobado', 'en_progreso']:
+        return JsonResponse({
+                'success': False,
+                'error': f'No se puede finalizar un tratamiento en estado "{plan.get_estado_display()}". Solo se pueden finalizar tratamientos aprobados o en progreso.'
+            }, status=400)
+    
+    # Validar que no esté ya completado
+    if plan.estado == 'completado':
+        return JsonResponse({
+                'success': False,
+                'error': 'Este tratamiento ya está finalizado.'
+            }, status=400)
+    
+    # Obtener motivo de finalización si se proporciona
+    motivo_finalizacion = request.POST.get('motivo_finalizacion', '').strip()
+    
+    # Finalizar el tratamiento
+    plan.estado = 'completado'
+    plan.fecha_completado = timezone.now()
+    if motivo_finalizacion:
+        plan.notas_internas = (plan.notas_internas or '') + f'\n\n[Finalizado el {timezone.now().strftime("%d/%m/%Y %H:%M")}] Motivo: {motivo_finalizacion}'
+    plan.save()
+    
+    return JsonResponse({
+        'success': True,
+        'message': 'Tratamiento finalizado correctamente.'
+    })
+
+
+@login_required
+def crear_cita_desde_plan(request, plan_id):
+    """Crea una cita asociada a un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    # Solo se pueden crear citas si el plan está aprobado o en progreso
+    # Y si tiene consentimiento firmado y presupuesto aceptado
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        precio_cobrado_str = request.POST.get('precio_cobrado', '').strip()
+        
+        errores = []
+        
+        if not fecha_hora_str:
+            errores.append('Debe seleccionar una fecha y hora.')
+        
+        # Validar precio
+        precio_cobrado = None
+        if precio_cobrado_str:
+            try:
+                precio_cobrado = Decimal(str(precio_cobrado_str))
+                if precio_cobrado < 0:
+                    errores.append('El precio no puede ser negativo.')
+            except (ValueError, InvalidOperation):
+                errores.append('El precio ingresado no es válido.')
+        else:
+            errores.append('Debe ingresar un precio para la cita.')
+        
+        if errores:
+            return JsonResponse({'success': False, 'error': errores[0]}, status=400)
+        
+        # Validar que el precio no exceda el saldo disponible del tratamiento
+        total_precios_citas = Decimal('0.00')
+        for cita in plan.citas.all():
+            if cita.precio_cobrado:
+                total_precios_citas += Decimal(str(cita.precio_cobrado))
+        
+        saldo_disponible = plan.precio_final - total_precios_citas
+        
+        if precio_cobrado > saldo_disponible:
+            return JsonResponse({
+                'success': False, 
+                'error': f'El precio de la cita (${precio_cobrado:,.0f}) excede el saldo disponible del tratamiento (${saldo_disponible:,.0f}). El total de precios de citas no puede exceder el precio final del tratamiento (${plan.precio_final:,.0f}).'
+            }, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass  # No es obligatorio
+            
+            # No se usan fases, simplificado
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Verificar que no exista ya una cita en esa fecha/hora exacta
+            if Cita.objects.filter(fecha_hora=fecha_hora).exists():
+                return JsonResponse({'success': False, 'error': 'Ya existe una cita en esa fecha y hora exacta.'}, status=400)
+            
+            # El precio ya fue validado arriba, usar el que viene del formulario
+            # Si no se proporcionó precio en el formulario pero hay tipo_servicio, usar el precio base como fallback
+            if not precio_cobrado and tipo_servicio and tipo_servicio.precio_base:
+                precio_cobrado = Decimal(str(tipo_servicio.precio_base))
+            
+            # Crear la cita asociada al plan (sin fase)
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {plan.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita del plan de tratamiento: {plan.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=None
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            logger.info(f"Intentando enviar notificaciones para cita {cita.id} del plan {plan.id}. Teléfono cliente: {telefono_cliente}, Teléfono cita: {cita.paciente_telefono}, Teléfono paciente (propiedad): {cita.telefono_paciente}")
+            
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                    else:
+                        logger.warning(f"No se pudieron enviar notificaciones para cita {cita.id}. WhatsApp error: {resultado.get('whatsapp', {}).get('error')}, SMS error: {resultado.get('sms', {}).get('error')}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}", exc_info=True)
+            else:
+                logger.warning(f"No hay teléfono del cliente para enviar notificaciones. Cliente: {plan.cliente}, Teléfono: {telefono_cliente}")
+            
+            mensaje = f'Cita creada exitosamente para {plan.cliente.nombre_completo} el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde plan: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    # GET: Devolver información del plan y opciones disponibles
+    tipos_servicio = TipoServicio.objects.filter(activo=True).order_by('nombre')
+    
+    return JsonResponse({
+        'success': True,
+        'plan': {
+            'id': plan.id,
+            'nombre': plan.nombre,
+            'cliente': {
+                'id': plan.cliente.id,
+                'nombre': plan.cliente.nombre_completo,
+                'email': plan.cliente.email,
+                'telefono': plan.cliente.telefono
+            },
+            'dentista': {
+                'id': plan.dentista.id,
+                'nombre': plan.dentista.nombre_completo
+            }
+        },
+        'tipos_servicio': [{'id': t.id, 'nombre': t.nombre, 'duracion': t.duracion_estimada or 30, 'precio': float(t.precio_base) if t.precio_base else 0} for t in tipos_servicio]
+    })
+
+
+@login_required
+def editar_plan_tratamiento(request, plan_id):
+    """Edita un plan de tratamiento existente - FUNCIONALIDAD DESHABILITADA"""
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    messages.warning(
+        request, 
+        'La funcionalidad de editar planes de tratamiento ha sido deshabilitada. '
+        'Si necesita realizar cambios, por favor cancele y elimine el plan actual, '
+        'luego cree uno nuevo con la información correcta.'
+    )
+    return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+
+
+@login_required
+def eliminar_plan_tratamiento(request, plan_id):
+    """Elimina definitivamente un plan (SOLO ADMINISTRADOR)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            messages.error(request, 'Solo los administrativos pueden eliminar planes definitivamente.')
+            return redirect('listar_planes_tratamiento')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    
+    if request.method == 'POST':
+        # Guardar información para auditoría antes de eliminar
+        plan_id = plan.id
+        plan_nombre = plan.nombre
+        plan_cliente = plan.cliente.nombre_completo
+        motivo_eliminacion = request.POST.get('motivo_eliminacion', '')
+        
+        plan.eliminado_por = perfil
+        plan.fecha_eliminacion = timezone.now()
+        plan.motivo_eliminacion = motivo_eliminacion
+        plan.save()
+        
+        # Registrar en auditoría
+        registrar_auditoria(
+            usuario=perfil,
+            accion='eliminar',
+            modulo='planes_tratamiento',
+            descripcion=f'Plan de tratamiento eliminado: {plan_nombre}',
+            detalles=f'Cliente: {plan_cliente}, Motivo: {motivo_eliminacion or "No especificado"}',
+            objeto_id=plan_id,
+            tipo_objeto='PlanTratamiento',
+            request=request
+        )
+        
+        messages.success(request, 'Plan eliminado exitosamente.')
+        return redirect('listar_planes_tratamiento')
+    
+    return render(request, 'citas/planes_tratamiento/eliminar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def agregar_fase_tratamiento(request, plan_id):
+    """Agrega una nueva fase a un plan de tratamiento existente"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes agregar fases a este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre = request.POST.get('nombre', '').strip()
+            descripcion = request.POST.get('descripcion', '').strip()
+            presupuesto_str = request.POST.get('presupuesto', '0').strip()
+            
+            if not nombre:
+                return JsonResponse({'success': False, 'error': 'El nombre de la fase es requerido.'}, status=400)
+            
+            # Obtener el siguiente orden
+            ultima_fase = plan.fases.all().order_by('-orden').first()
+            nuevo_orden = (ultima_fase.orden + 1) if ultima_fase else 1
+            
+            # Procesar presupuesto
+            presupuesto_str = re.sub(r'[^\d.]', '', presupuesto_str) or '0'
+            presupuesto = float(presupuesto_str)
+            
+            # Crear la fase
+            fase = FaseTratamiento.objects.create(
+                plan=plan,
+                nombre=nombre,
+                descripcion=descripcion,
+                orden=nuevo_orden,
+                presupuesto=presupuesto
+            )
+            
+            # Procesar items si se enviaron
+            items_data = request.POST.getlist('items[]')
+            if items_data:
+                try:
+                    items_json = json.loads(items_data[0]) if items_data else []
+                    for item_data in items_json:
+                        servicio_id = item_data.get('servicio_id')
+                        servicio = None
+                        if servicio_id:
+                            try:
+                                servicio = TipoServicio.objects.get(id=servicio_id, activo=True)
+                            except TipoServicio.DoesNotExist:
+                                pass
+                        
+                        ItemTratamiento.objects.create(
+                            fase=fase,
+                            servicio=servicio,
+                            descripcion=item_data.get('descripcion', ''),
+                            cantidad=int(item_data.get('cantidad', 1)),
+                            precio_unitario=float(item_data.get('precio_unitario', 0)),
+                        )
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Error al procesar items de fase: {e}")
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{fase.nombre}" agregada exitosamente.',
+                'fase': {
+                    'id': fase.id,
+                    'nombre': fase.nombre,
+                    'orden': fase.orden,
+                    'presupuesto': str(fase.presupuesto),
+                }
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al agregar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al agregar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def editar_fase_tratamiento(request, plan_id, fase_id):
+    """Edita una fase de un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes editar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre = request.POST.get('nombre', '').strip()
+            descripcion = request.POST.get('descripcion', '').strip()
+            presupuesto_str = request.POST.get('presupuesto', '0').strip()
+            orden_str = request.POST.get('orden', '').strip()
+            
+            if not nombre:
+                return JsonResponse({'success': False, 'error': 'El nombre de la fase es requerido.'}, status=400)
+            
+            # Actualizar campos básicos
+            fase.nombre = nombre
+            fase.descripcion = descripcion
+            
+            # Procesar presupuesto
+            presupuesto_str = re.sub(r'[^\d.]', '', presupuesto_str) or '0'
+            fase.presupuesto = float(presupuesto_str)
+            
+            # Actualizar orden si se proporcionó
+            if orden_str and orden_str.isdigit():
+                nuevo_orden = int(orden_str)
+                # Verificar que no haya conflicto con otra fase
+                fase_existente = plan.fases.filter(orden=nuevo_orden).exclude(id=fase.id).first()
+                if fase_existente:
+                    # Intercambiar órdenes
+                    orden_anterior = fase.orden
+                    fase_existente.orden = orden_anterior
+                    fase_existente.save()
+                fase.orden = nuevo_orden
+            
+            fase.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{fase.nombre}" actualizada exitosamente.',
+                'fase': {
+                    'id': fase.id,
+                    'nombre': fase.nombre,
+                    'orden': fase.orden,
+                    'presupuesto': str(fase.presupuesto),
+                }
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al editar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al editar la fase: {str(e)}'}, status=500)
+    
+    # GET: Devolver datos de la fase
+    items = fase.items.all()
+    items_data = []
+    for item in items:
+        items_data.append({
+            'id': item.id,
+            'descripcion': item.descripcion,
+            'servicio_id': item.servicio.id if item.servicio else None,
+            'servicio_nombre': item.servicio.nombre if item.servicio else '',
+            'cantidad': item.cantidad,
+            'precio_unitario': str(item.precio_unitario),
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'fase': {
+            'id': fase.id,
+            'nombre': fase.nombre,
+            'descripcion': fase.descripcion,
+            'orden': fase.orden,
+            'presupuesto': str(fase.presupuesto),
+            'completada': fase.completada,
+            'items': items_data,
+        }
+    })
+
+
+@login_required
+def eliminar_fase_tratamiento(request, plan_id, fase_id):
+    """Elimina una fase de un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Verificar que el plan puede ser editado
+    if not plan.puede_ser_editado_por(perfil):
+        return JsonResponse({'success': False, 'error': f'No puedes eliminar fases de este plan en estado "{plan.get_estado_display()}".'}, status=400)
+    
+    # Verificar si la fase tiene citas asociadas
+    citas_asociadas = Cita.objects.filter(fase_tratamiento=fase).count()
+    if citas_asociadas > 0:
+        return JsonResponse({
+            'success': False,
+            'error': f'No se puede eliminar la fase porque tiene {citas_asociadas} cita(s) asociada(s).'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            nombre_fase = fase.nombre
+            fase.delete()
+            
+            # Reordenar las fases restantes
+            fases_restantes = plan.fases.all().order_by('orden')
+            for idx, fase_restante in enumerate(fases_restantes, start=1):
+                fase_restante.orden = idx
+                fase_restante.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Fase "{nombre_fase}" eliminada exitosamente.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar la fase: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def crear_cita_desde_fase(request, plan_id, fase_id):
+    """Crea una cita específica para una fase de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener la fase
+    fase = get_object_or_404(FaseTratamiento, id=fase_id, plan=plan)
+    
+    # Validar que el plan esté en un estado que permita crear citas
+    if request.method == 'POST':
+        # Verificar que el plan tenga consentimiento firmado y presupuesto aceptado
+        tiene_consentimiento_firmado = plan.consentimientos.filter(estado='firmado').exists()
+        presupuesto_aceptado = plan.presupuesto_aceptado
+        
+        if not tiene_consentimiento_firmado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El tratamiento debe tener al menos un consentimiento informado firmado.'
+            }, status=400)
+        
+        if not presupuesto_aceptado:
+            return JsonResponse({
+                'success': False, 
+                'error': 'No se pueden crear citas. El presupuesto del tratamiento debe estar aceptado.'
+            }, status=400)
+        
+        # Verificar que el plan esté en un estado válido para crear citas
+        if plan.estado not in ['aprobado', 'en_progreso']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'No se pueden crear citas para un tratamiento en estado "{plan.get_estado_display()}". El tratamiento debe estar aprobado o en progreso.'
+            }, status=400)
+        
+        # Si el plan está aprobado pero no en progreso, cambiarlo automáticamente a en_progreso
+        if plan.estado == 'aprobado':
+            plan.estado = 'en_progreso'
+            plan.save()
+    
+    if request.method == 'POST':
+        fecha_hora_str = request.POST.get('fecha_hora', '')
+        tipo_servicio_id = request.POST.get('tipo_servicio', '').strip()
+        notas = request.POST.get('notas', '').strip()
+        
+        if not fecha_hora_str:
+            return JsonResponse({'success': False, 'error': 'Debe seleccionar una fecha y hora.'}, status=400)
+        
+        try:
+            # Convertir fecha y hacerla timezone-aware
+            fecha_hora_naive = datetime.fromisoformat(fecha_hora_str)
+            fecha_hora = timezone.make_aware(fecha_hora_naive)
+            
+            # Validar que la fecha no sea en el pasado
+            ahora = timezone.now()
+            if fecha_hora < ahora:
+                return JsonResponse({'success': False, 'error': 'No se pueden crear citas en fechas pasadas.'}, status=400)
+            
+            # Obtener tipo de servicio si se proporcionó
+            tipo_servicio = None
+            if tipo_servicio_id:
+                try:
+                    tipo_servicio = TipoServicio.objects.get(id=tipo_servicio_id, activo=True)
+                except TipoServicio.DoesNotExist:
+                    pass
+            
+            # Validar horario del dentista
+            dentista = plan.dentista
+            dia_semana = fecha_hora.weekday()
+            hora_cita = fecha_hora.time()
+            
+            horarios_dia = HorarioDentista.objects.filter(
+                dentista=dentista,
+                dia_semana=dia_semana,
+                activo=True
+            )
+            
+            if not horarios_dia.exists():
+                dias_nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                return JsonResponse({'success': False, 'error': f'El dentista no trabaja los {dias_nombres[dia_semana]}.'}, status=400)
+            
+            hora_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita < horario.hora_fin:
+                    hora_valida = True
+                    break
+            
+            if not hora_valida:
+                return JsonResponse({'success': False, 'error': 'La hora seleccionada no está dentro del horario de trabajo del dentista.'}, status=400)
+            
+            # Validar duración y solapamiento
+            duracion_minutos = tipo_servicio.duracion_estimada if tipo_servicio and tipo_servicio.duracion_estimada else 30
+            fecha_hora_fin = fecha_hora + timedelta(minutes=duracion_minutos)
+            hora_fin_cita = fecha_hora_fin.time()
+            
+            duracion_valida = False
+            for horario in horarios_dia:
+                if horario.hora_inicio <= hora_cita and hora_fin_cita <= horario.hora_fin:
+                    duracion_valida = True
+                    break
+            
+            if not duracion_valida:
+                return JsonResponse({'success': False, 'error': f'La duración del servicio ({duracion_minutos} minutos) no cabe en el horario seleccionado.'}, status=400)
+            
+            # Verificar solapamiento con otras citas
+            citas_existentes = Cita.objects.filter(
+                dentista=dentista,
+                fecha_hora__date=fecha_hora.date(),
+                estado__in=['disponible', 'reservada', 'confirmada', 'en_progreso']
+            )
+            
+            for cita_existente in citas_existentes:
+                fecha_hora_existente_fin = cita_existente.fecha_hora
+                if cita_existente.tipo_servicio and cita_existente.tipo_servicio.duracion_estimada:
+                    fecha_hora_existente_fin += timedelta(minutes=cita_existente.tipo_servicio.duracion_estimada)
+                else:
+                    fecha_hora_existente_fin += timedelta(minutes=30)
+                
+                if (fecha_hora < fecha_hora_existente_fin and fecha_hora_fin > cita_existente.fecha_hora):
+                    return JsonResponse({'success': False, 'error': f'La cita se solapa con otra cita existente a las {cita_existente.fecha_hora.strftime("%H:%M")}.'}, status=400)
+            
+            # Obtener precio del servicio
+            precio_cobrado = None
+            if tipo_servicio:
+                precio_cobrado = tipo_servicio.precio_base
+            
+            # Crear la cita asociada al plan y fase
+            cita = Cita.objects.create(
+                fecha_hora=fecha_hora,
+                tipo_servicio=tipo_servicio,
+                tipo_consulta=tipo_servicio.nombre if tipo_servicio else f"Cita - {fase.nombre}",
+                precio_cobrado=precio_cobrado,
+                notas=notas or f"Cita de la fase: {fase.nombre}",
+                dentista=dentista,
+                cliente=plan.cliente,
+                paciente_nombre=plan.cliente.nombre_completo,
+                paciente_email=plan.cliente.email,
+                paciente_telefono=plan.cliente.telefono,
+                estado='reservada',
+                creada_por=perfil,
+                plan_tratamiento=plan,
+                fase_tratamiento=fase
+            )
+            
+            # Enviar notificaciones (WhatsApp Y SMS) si tiene teléfono
+            # Usar el teléfono del cliente del plan
+            telefono_cliente = plan.cliente.telefono if plan.cliente else None
+            if telefono_cliente:
+                try:
+                    from citas.mensajeria_service import enviar_notificaciones_cita
+                    resultado = enviar_notificaciones_cita(cita, telefono_override=telefono_cliente)
+                    canales_enviados = []
+                    if resultado['whatsapp']['enviado']:
+                        canales_enviados.append('WhatsApp')
+                    if resultado['sms']['enviado']:
+                        canales_enviados.append('SMS')
+                    if canales_enviados:
+                        logger.info(f"Notificaciones enviadas por {', '.join(canales_enviados)} para cita {cita.id} del plan {plan.id}")
+                except Exception as e:
+                    logger.error(f"Error al enviar notificaciones para cita {cita.id}: {e}")
+            
+            mensaje = f'Cita creada exitosamente para la fase "{fase.nombre}" el {fecha_hora.strftime("%d/%m/%Y a las %H:%M")}.'
+            if plan.cliente.telefono:
+                mensaje += ' Se ha enviado un SMS de confirmación.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': mensaje,
+                'cita_id': cita.id
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en el formato de fecha: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al crear cita desde fase: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al crear la cita: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def cancelar_plan_tratamiento(request, plan_id):
+    """Cancela un plan (DENTISTA puede cancelar sus planes)"""
+    from django.http import JsonResponse
+    
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+    except Perfil.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    # Obtener plan con permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+        messages.error(request, 'No tienes permisos.')
+        return redirect('panel_trabajador')
+    
+    if not plan.puede_ser_cancelado_por(perfil):
+        error_msg = f'No puedes cancelar este plan en estado "{plan.get_estado_display()}".'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    if request.method == 'POST':
+        motivo_cancelacion = request.POST.get('motivo_cancelacion', '').strip()
+        
+        if not motivo_cancelacion:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'El motivo de cancelación es obligatorio.'}, status=400)
+            messages.error(request, 'El motivo de cancelación es obligatorio.')
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        
+        try:
+            plan.estado = 'cancelado'
+            plan.motivo_cancelacion = motivo_cancelacion
+            plan.fecha_cancelacion = timezone.now()
+            plan.save()
+            
+            success_msg = f'El tratamiento "{plan.nombre}" ha sido cancelado exitosamente. Quedará registrado como cancelado en el historial del cliente.'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_msg
+                })
+            
+            messages.success(request, success_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+        except Exception as e:
+            logger.error(f"Error al cancelar plan {plan_id}: {e}")
+            error_msg = 'Error al cancelar el plan. Por favor, intenta nuevamente.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=500)
+            messages.error(request, error_msg)
+            return redirect('detalle_plan_tratamiento', plan_id=plan.id)
+    
+    # GET: Mostrar formulario (si se accede directamente)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    return render(request, 'citas/planes_tratamiento/cancelar_plan_tratamiento.html', {'plan': plan, 'perfil': perfil})
+
+
+@login_required
+def crear_plan_desde_odontograma(request, odontograma_id):
+    """Crea un plan de tratamiento basado en un odontograma"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            messages.error(request, 'Tu cuenta está desactivada.')
+            return redirect('login')
+    except Perfil.DoesNotExist:
+        messages.error(request, 'No tienes permisos.')
+        return redirect('login')
+    
+    if not (perfil.es_dentista() or perfil.es_administrativo()):
+        messages.error(request, 'Solo dentistas y administrativos pueden crear planes.')
+        return redirect('panel_trabajador')
+    
+    # Obtener odontograma
+    if perfil.es_administrativo():
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id)
+    else:
+        odontograma = get_object_or_404(Odontograma, id=odontograma_id, dentista=perfil)
+    
+    # Redirigir a crear plan con datos pre-llenados
+    return redirect(f"{reverse('crear_plan_tratamiento')}?odontograma_id={odontograma_id}&cliente_id={odontograma.cliente.id if odontograma.cliente else ''}")
+
+
+@login_required
+def registrar_pago_tratamiento(request, plan_id):
+    """Registra un pago parcial para un plan de tratamiento"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.activo:
+            return JsonResponse({'success': False, 'error': 'Tu cuenta está desactivada.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan con verificación de permisos
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    elif perfil.es_dentista():
+        pacientes_dentista = perfil.get_pacientes_asignados()
+        clientes_ids = [p['id'] for p in pacientes_dentista if 'id' in p and isinstance(p['id'], int)]
+        plan = get_object_or_404(
+            PlanTratamiento,
+            id=plan_id,
+            dentista=perfil,
+            cliente_id__in=clientes_ids
+        )
+    else:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            monto_str = request.POST.get('monto', '0').strip()
+            fecha_pago_str = request.POST.get('fecha_pago', '')
+            metodo_pago = request.POST.get('metodo_pago', '').strip()
+            numero_comprobante = request.POST.get('numero_comprobante', '').strip()
+            notas = request.POST.get('notas', '').strip()
+            cita_id = request.POST.get('cita_id', '').strip()
+            
+            if not monto_str or float(monto_str) <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+            
+            if not fecha_pago_str:
+                return JsonResponse({'success': False, 'error': 'La fecha de pago es requerida.'}, status=400)
+            
+            if not metodo_pago or metodo_pago not in ['efectivo', 'transferencia', 'tarjeta', 'cheque']:
+                return JsonResponse({'success': False, 'error': 'El método de pago es requerido.'}, status=400)
+            
+            # Procesar monto
+            monto_str = re.sub(r'[^\d.]', '', monto_str) or '0'
+            monto = float(monto_str)
+            
+            # Validar que el monto no exceda el saldo pendiente
+            saldo_pendiente = plan.saldo_pendiente
+            if monto > saldo_pendiente:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto excede el saldo pendiente (${saldo_pendiente:,.0f}).'
+                }, status=400)
+            
+            # Procesar fecha
+            fecha_pago = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+            
+            # Obtener cita si se proporcionó
+            cita = None
+            if cita_id:
+                try:
+                    cita = Cita.objects.get(id=cita_id, plan_tratamiento=plan)
+                except Cita.DoesNotExist:
+                    pass
+            
+            # Crear el pago
+            pago = PagoTratamiento.objects.create(
+                plan_tratamiento=plan,
+                monto=monto,
+                fecha_pago=fecha_pago,
+                metodo_pago=metodo_pago,
+                numero_comprobante=numero_comprobante if numero_comprobante else None,
+                notas=notas if notas else None,
+                cita=cita,
+                registrado_por=perfil
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} registrado exitosamente.',
+                'pago': {
+                    'id': pago.id,
+                    'monto': str(pago.monto),
+                    'fecha_pago': pago.fecha_pago.strftime('%d/%m/%Y'),
+                    'metodo_pago': pago.get_metodo_pago_display(),
+                },
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': f'Error en los datos: {str(e)}'}, status=400)
+        except Exception as e:
+            logger.error(f"Error al registrar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al registrar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def eliminar_pago_tratamiento(request, plan_id, pago_id):
+    """Elimina un pago registrado (solo administrativos)"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not perfil.es_administrativo():
+            return JsonResponse({'success': False, 'error': 'Solo los administrativos pueden eliminar pagos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    pago = get_object_or_404(PagoTratamiento, id=pago_id, plan_tratamiento=plan)
+    
+    if request.method == 'POST':
+        try:
+            monto = pago.monto
+            pago.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Pago de ${monto:,.0f} eliminado exitosamente.',
+                'total_pagado': str(plan.total_pagado),
+                'saldo_pendiente': str(plan.saldo_pendiente),
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al eliminar pago: {e}")
+            return JsonResponse({'success': False, 'error': f'Error al eliminar el pago: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def enviar_documentos_tratamiento(request, plan_id):
+    """Vista para enviar presupuesto y consentimientos de un tratamiento por correo"""
+    try:
+        perfil = Perfil.objects.get(user=request.user)
+        if not (perfil.es_administrativo() or perfil.es_dentista()):
+            return JsonResponse({'success': False, 'error': 'No tienes permisos para enviar documentos.'}, status=403)
+    except Perfil.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No tienes permisos.'}, status=403)
+    
+    # Obtener el plan de tratamiento
+    if perfil.es_administrativo():
+        plan = get_object_or_404(PlanTratamiento, id=plan_id)
+    else:
+        plan = get_object_or_404(PlanTratamiento, id=plan_id, dentista=perfil)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+    
+    # Verificar que el cliente tenga email
+    if not plan.cliente.email:
+        return JsonResponse({'success': False, 'error': 'El cliente no tiene un email registrado.'}, status=400)
+    
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        from io import BytesIO
+        from datetime import datetime
+        
+        # Obtener información de la clínica
+        try:
+            from configuracion.models import InformacionClinica
+            info_clinica = InformacionClinica.obtener()
+            nombre_clinica = info_clinica.nombre_clinica
+            email_clinica = info_clinica.email or getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        except:
+            nombre_clinica = "Clínica Dental"
+            email_clinica = getattr(settings, 'EMAIL_FROM', 'noreply@clinica.com')
+        
+        # Generar PDF del presupuesto
+        presupuesto_response = exportar_presupuesto_pdf(request, plan.id)
+        presupuesto_pdf = presupuesto_response.content
+        
+        # Obtener consentimientos pendientes o no firmados
+        consentimientos = plan.consentimientos.filter(estado__in=['pendiente', 'firmado']).order_by('-fecha_creacion')
+        
+        # Crear el email
+        asunto = f"Documentos del Tratamiento - {plan.nombre} - {nombre_clinica}"
+        
+        mensaje_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); min-height: 100vh;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header con logo -->
+                <div style="background: white; border-radius: 12px 12px 0 0; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #14b8a6, #0d9488); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem;">
+                            <span style="font-size: 1.8rem;">🦷</span>
+                        </div>
+                        <h1 style="margin: 0; color: #0f766e; font-size: 1.75rem; font-weight: 700;">Clínica San Felipe</h1>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Victoria, Región de la Araucanía</p>
+                </div>
+                
+                <!-- Contenido del correo -->
+                <div style="background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 1.5rem;">Estimado/a {plan.cliente.nombre_completo},</h2>
+                    
+                    <p style="color: #475569; line-height: 1.6; font-size: 1rem;">Le enviamos los documentos relacionados con su tratamiento: <strong style="color: #0f766e;">{plan.nombre}</strong></p>
+                    
+                    <div style="background: linear-gradient(135deg, #f0fdfa, #e0f2f1); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #14b8a6;">
+                        <h3 style="margin-top: 0; color: #0f766e; font-size: 1.1rem; margin-bottom: 12px;">Documentos adjuntos:</h3>
+                        <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #0f766e;">Presupuesto del Tratamiento</strong></li>
+        """
+        
+        if consentimientos.exists():
+            mensaje_html += f"<li style='margin-bottom: 8px;'><strong style='color: #0f766e;'>Consentimientos Informados</strong> ({consentimientos.count()} documento(s))</li>"
+        
+        mensaje_html += f"""
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.</p>
+                    
+                    <div style="background: #fef3c7; padding: 18px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0 0 12px 0; color: #92400e; font-weight: 600; font-size: 1rem;"><strong>Importante:</strong> Para proceder con el tratamiento, necesitamos que:</p>
+                        <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                            <li style="margin-bottom: 6px;">Acepte el presupuesto</li>
+                            <li style="margin-bottom: 6px;">Firme el consentimiento informado</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6;">Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background: white; border-radius: 0 0 12px 12px; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 1px solid #e0f2f1;">
+                    <p style="margin: 0; color: #64748b; font-size: 0.9rem; line-height: 1.6;">
+                        Saludos cordiales,<br>
+                        <strong style="color: #0f766e; font-size: 1rem;">{nombre_clinica}</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        mensaje_texto = f"""
+        Estimado/a {plan.cliente.nombre_completo},
+        
+        Le enviamos los documentos relacionados con su tratamiento: {plan.nombre}
+        
+        Documentos adjuntos:
+        - Presupuesto del Tratamiento
+        - Consentimientos Informados
+        
+        Por favor, revise cuidadosamente estos documentos. Si tiene alguna consulta, no dude en contactarnos.
+        
+        Importante: Para proceder con el tratamiento, necesitamos que:
+        - Acepte el presupuesto
+        - Firme el consentimiento informado
+        
+        Puede hacerlo desde su panel de cliente en nuestra página web o contactándonos directamente.
+        
+        Saludos cordiales,
+        {nombre_clinica}
+        """
+        
+        # Crear el email
+        email = EmailMultiAlternatives(
+            asunto,
+            mensaje_texto,
+            email_clinica,
+            [plan.cliente.email],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        
+        # Adjuntar presupuesto
+        filename_presupuesto = f"presupuesto_{plan.cliente.nombre_completo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        email.attach(filename_presupuesto, presupuesto_pdf, 'application/pdf')
+        
+        # Adjuntar consentimientos
+        for consentimiento in consentimientos:
+            try:
+                consentimiento_response = exportar_consentimiento_pdf(request, consentimiento.id)
+                consentimiento_pdf = consentimiento_response.content
+                filename_consentimiento = f"consentimiento_{consentimiento.titulo.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_consentimiento, consentimiento_pdf, 'application/pdf')
+            except Exception as e:
+                logger.error(f"Error al generar PDF del consentimiento {consentimiento.id}: {e}")
+                # Continuar con los demás documentos
+        
+        # Enviar email
+        email.send()
+        
+        # Actualizar fecha de envío en documentos relacionados
+        from historial_clinico.models import DocumentoCliente
+        documentos_actualizados = 0
+        for consentimiento in consentimientos:
+            # Actualizar el documento relacionado si existe
+            try:
+                documento = DocumentoCliente.objects.filter(
+                    plan_tratamiento=plan,
+                    tipo='consentimiento',
+                    cliente=plan.cliente
+                ).filter(
+                    titulo__icontains=consentimiento.titulo
+                ).first()
+                
+                if documento:
+                    documento.enviado_por_correo = True
+                    documento.fecha_envio = timezone.now()
+                    documento.email_destinatario = plan.cliente.email
+                    documento.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                    documentos_actualizados += 1
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar documento para consentimiento {consentimiento.id}: {e}")
+        
+        # Actualizar también el documento del presupuesto si existe
+        try:
+            doc_presupuesto = DocumentoCliente.objects.filter(
+                plan_tratamiento=plan,
+                tipo='presupuesto',
+                cliente=plan.cliente
+            ).first()
+            
+            if doc_presupuesto:
+                doc_presupuesto.enviado_por_correo = True
+                doc_presupuesto.fecha_envio = timezone.now()
+                doc_presupuesto.email_destinatario = plan.cliente.email
+                doc_presupuesto.save(update_fields=['enviado_por_correo', 'fecha_envio', 'email_destinatario'])
+                documentos_actualizados += 1
+        except Exception as e:
+            logger.warning(f"No se pudo actualizar documento de presupuesto: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Documentos enviados exitosamente a {plan.cliente.email}. Se enviaron {1 + consentimientos.count()} documento(s).'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al enviar documentos del tratamiento: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Error al enviar los documentos: {str(e)}'}, status=500)

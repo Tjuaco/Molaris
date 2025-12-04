@@ -1,0 +1,2215 @@
+{% extends 'citas/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Consentimientos Informados - Clínica Dental{% endblock %}
+
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<style>
+    .main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Layout con Sidebar */
+    .gestor-layout-container {
+        display: flex;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        align-items: flex-start;
+        width: 100%;
+        position: relative;
+        min-height: calc(100vh - 80px);
+        overflow-x: hidden;
+    }
+
+    /* Sidebar Izquierdo */
+    .gestor-sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 0;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+        padding: 20px 0;
+        min-height: calc(100vh - 80px);
+        position: fixed;
+        top: 80px;
+        left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-right: 2px solid #e5e7eb;
+        z-index: 100;
+        overflow-y: auto;
+        max-height: calc(100vh - 80px);
+    }
+
+    .sidebar-header {
+        padding: 0 20px 20px;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding-top: 12px;
+    }
+
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-header h3 i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 0 12px;
+        margin-top: 8px;
+    }
+
+    .sidebar-section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 20px 8px;
+        margin-top: 8px;
+    }
+
+    .sidebar-divider {
+        height: 1px;
+        background: #e5e7eb;
+        margin: 12px 20px;
+    }
+
+    .sidebar-select, .sidebar-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #1e293b;
+        background: white;
+        transition: all 0.2s;
+    }
+
+    .sidebar-select:focus, .sidebar-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .gestor-content {
+        margin-left: 260px;
+        margin-right: 0;
+        width: calc(100% - 260px);
+        padding: 24px;
+        min-height: calc(100vh - 80px);
+    }
+
+    .header-with-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 24px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .page-header {
+        flex: 1;
+        min-width: 300px;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-title i {
+        color: var(--primary-color);
+    }
+
+    .page-subtitle {
+        font-size: 0.875rem;
+        color: #64748b;
+        margin: 0;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+        min-width: 300px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: white;
+        background: var(--primary-color);
+        flex-shrink: 0;
+    }
+
+    .stat-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+        margin-top: 4px;
+    }
+
+    .section {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        width: 100%;
+        border: 1px solid #e2e8f0;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .data-table thead {
+        background: #f8fafc;
+    }
+
+    .data-table th {
+        padding: 14px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+    }
+
+    .data-table th i {
+        margin-right: 6px;
+        color: var(--primary-color);
+    }
+
+    .data-table tbody tr {
+        border-bottom: 1px solid #e2e8f0;
+        transition: background 0.2s;
+    }
+
+    .data-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .data-table td {
+        padding: 16px;
+        color: #374151;
+        vertical-align: middle;
+    }
+
+    .badge-estado {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .badge-pendiente {
+        background: #fef3c7;
+        color: #f59e0b;
+    }
+
+    .badge-firmado {
+        background: #d1fae5;
+        color: #10b981;
+    }
+
+    .badge-rechazado {
+        background: #fee2e2;
+        color: #ef4444;
+    }
+
+    .badge-vencido {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .badge-tipo {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+
+    .cliente-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .cliente-nombre {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.875rem;
+    }
+
+    .cliente-email {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .btn-action {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        color: white;
+    }
+
+    .btn-view {
+        background: #3b82f6;
+    }
+
+    .btn-view:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-edit {
+        background: #f59e0b;
+    }
+
+    .btn-edit:hover {
+        background: #d97706;
+        transform: translateY(-1px);
+    }
+
+    .btn-sign {
+        background: #10b981;
+    }
+
+    .btn-sign:hover {
+        background: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-pdf {
+        background: #dc2626;
+    }
+
+    .btn-pdf:hover {
+        background: #b91c1c;
+        transform: translateY(-1px);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 24px;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+    }
+
+    .empty-state-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #64748b;
+        margin: 0 0 8px 0;
+    }
+
+    .empty-state-text {
+        font-size: 0.875rem;
+        color: #94a3b8;
+        margin: 0;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        padding: 20px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .pagination a, .pagination span {
+        padding: 8px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .pagination a {
+        background: #3b82f6;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .pagination a:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+    }
+
+    .pagination span {
+        color: #64748b;
+        background: #f8fafc;
+    }
+
+    .btn-create {
+        background: var(--primary-color);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .btn-create:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .gestor-sidebar {
+            display: none;
+        }
+        .gestor-content {
+            margin-left: 0;
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="gestor-layout-container">
+    <!-- Sidebar Izquierdo -->
+    <nav class="gestor-sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-filter"></i> Filtros</h3>
+        </div>
+        <div class="sidebar-nav">
+            <form method="get" action="{% url 'gestor_consentimientos' %}" id="filtrosForm">
+                <div class="sidebar-section-title">Estado</div>
+                <div style="padding: 0 20px 16px;">
+                    <select name="estado" class="sidebar-select" onchange="document.getElementById('filtrosForm').submit();">
+                        <option value="">Todos los estados</option>
+                        {% for estado_val, estado_nombre in estados %}
+                        <option value="{{ estado_val }}" {% if estado_filtro == estado_val %}selected{% endif %}>
+                            {{ estado_nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div class="sidebar-section-title">Tipo de Procedimiento</div>
+                <div style="padding: 0 20px 16px;">
+                    <select name="tipo" class="sidebar-select" onchange="document.getElementById('filtrosForm').submit();">
+                        <option value="">Todos los tipos</option>
+                        {% for tipo_val, tipo_nombre in tipos_procedimiento %}
+                        <option value="{{ tipo_val }}" {% if tipo_filtro == tipo_val %}selected{% endif %}>
+                            {{ tipo_nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div class="sidebar-section-title">Buscar Cliente</div>
+                <div style="padding: 0 20px 16px;">
+                    <input type="text" name="cliente" value="{{ cliente_busqueda }}" 
+                           placeholder="Nombre, email o RUT" 
+                           class="sidebar-input">
+                </div>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div class="sidebar-section-title">Rango de Fechas</div>
+                <div style="padding: 0 20px 16px;">
+                    <label style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px; display: block; font-weight: 500;">Desde:</label>
+                    <input type="date" name="fecha_desde" value="{{ fecha_desde }}" 
+                           class="sidebar-input" style="margin-bottom: 12px;">
+                    <label style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px; display: block; font-weight: 500;">Hasta:</label>
+                    <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" 
+                           class="sidebar-input">
+                </div>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div style="padding: 0 20px;">
+                    <button type="submit" class="btn" style="width: 100%; background: var(--primary-color); color: white; margin-bottom: 8px;">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                    <a href="{% url 'gestor_consentimientos' %}" class="btn" style="width: 100%; background: #6b7280; color: white; display: block; text-align: center; text-decoration: none;">
+                        <i class="fas fa-redo"></i> Limpiar
+                    </a>
+                </div>
+            </form>
+            
+            <div class="sidebar-divider"></div>
+            
+            <div class="sidebar-section-title">Estadísticas</div>
+            <div style="padding: 0 20px 16px;">
+                <div style="font-size: 0.875rem; color: #1e293b; margin-bottom: 12px; font-weight: 600;">
+                    Total: <span style="color: var(--primary-color);">{{ total_consentimientos }}</span>
+                </div>
+                {% for estado_val, estado_nombre in estados %}
+                {% with count=consentimientos_por_estado|get_item:estado_val %}
+                {% if count %}
+                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px; padding-left: 8px;">
+                    <i class="fas fa-circle" style="font-size: 0.5rem; margin-right: 6px;"></i>
+                    {{ estado_nombre }}: <strong>{{ count }}</strong>
+                </div>
+                {% endif %}
+                {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <div class="gestor-content">
+        <!-- Header con Estadísticas -->
+        <div class="header-with-stats">
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="fas fa-file-signature"></i> Consentimientos Informados
+                </h1>
+                <p class="page-subtitle">Gestiona los consentimientos informados de los pacientes</p>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--primary-color);">
+                        <i class="fas fa-file-signature"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ total_consentimientos }}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #10b981;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ consentimientos_por_estado|get_item:'firmado'|default:0 }}</div>
+                        <div class="stat-label">Firmados</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #f59e0b;">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">{{ consentimientos_por_estado|get_item:'pendiente'|default:0 }}</div>
+                        <div class="stat-label">Pendientes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Barra de Acciones -->
+        <div style="margin-bottom: 24px;">
+            <a href="{% url 'crear_consentimiento' %}" class="btn-create">
+                <i class="fas fa-plus"></i> Crear Consentimiento
+            </a>
+        </div>
+        
+        <!-- Lista de Consentimientos -->
+        <div class="section">
+            {% if consentimientos %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-file-signature"></i> Título</th>
+                            <th><i class="fas fa-user"></i> Cliente</th>
+                            <th><i class="fas fa-tag"></i> Tipo</th>
+                            <th><i class="fas fa-info-circle"></i> Estado</th>
+                            <th><i class="fas fa-calendar"></i> Fecha</th>
+                            <th><i class="fas fa-user-tie"></i> Dentista</th>
+                            <th style="text-align: center;"><i class="fas fa-cog"></i> Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for consentimiento in consentimientos %}
+                        <tr>
+                            <td style="font-weight: 500; color: #1e293b;">
+                                {{ consentimiento.titulo }}
+                            </td>
+                            <td>
+                                <div class="cliente-info">
+                                    <div class="cliente-nombre">{{ consentimiento.cliente.nombre_completo }}</div>
+                                    <div class="cliente-email">{{ consentimiento.cliente.email }}</div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge-tipo">
+                                    {{ consentimiento.get_tipo_procedimiento_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-estado badge-{{ consentimiento.estado }}">
+                                    {% if consentimiento.estado == 'firmado' %}
+                                    <i class="fas fa-check-circle"></i>
+                                    {% elif consentimiento.estado == 'pendiente' %}
+                                    <i class="fas fa-clock"></i>
+                                    {% elif consentimiento.estado == 'rechazado' %}
+                                    <i class="fas fa-times-circle"></i>
+                                    {% else %}
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    {% endif %}
+                                    {{ consentimiento.get_estado_display }}
+                                </span>
+                            </td>
+                            <td style="color: #64748b; font-size: 0.8125rem;">
+                                {{ consentimiento.fecha_creacion|date:"d/m/Y" }}<br>
+                                <span style="color: #94a3b8;">{{ consentimiento.fecha_creacion|date:"H:i" }}</span>
+                            </td>
+                            <td style="color: #64748b; font-size: 0.8125rem;">
+                                {{ consentimiento.dentista.nombre_completo|default:"No asignado" }}
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button type="button"
+                                            class="btn-action btn-more"
+                                            title="Opciones"
+                                            onclick="abrirMenuAccionesConsentimientoTabla({{ consentimiento.id }}, '{{ consentimiento.titulo|escapejs }}', '{% url 'exportar_consentimiento_pdf' consentimiento.id %}', {% if not consentimiento.esta_firmado %}'{% url 'editar_consentimiento' consentimiento.id %}'{% else %}null{% endif %});">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginación -->
+            {% if consentimientos.has_other_pages %}
+            <div class="pagination">
+                {% if consentimientos.has_previous %}
+                <a href="?page={{ consentimientos.previous_page_number }}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}{% if cliente_busqueda %}&cliente={{ cliente_busqueda }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </a>
+                {% endif %}
+                
+                <span>
+                    Página {{ consentimientos.number }} de {{ consentimientos.paginator.num_pages }}
+                </span>
+                
+                {% if consentimientos.has_next %}
+                <a href="?page={{ consentimientos.next_page_number }}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}{% if cliente_busqueda %}&cliente={{ cliente_busqueda }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-file-signature"></i>
+                </div>
+                <h3 class="empty-state-title">No se encontraron consentimientos</h3>
+                <p class="empty-state-text">Crea tu primer consentimiento informado para comenzar</p>
+                <a href="{% url 'crear_consentimiento' %}" class="btn-create" style="margin-top: 20px;">
+                    <i class="fas fa-plus"></i> Crear Consentimiento
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Descarga (Tabla) -->
+<div id="modalConfirmarDescargaConsentimientoTabla" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: white; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); margin: auto; overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e2e7f0; background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));">
+            <h3 style="margin: 0; color: white; font-size: 1rem; font-weight: 600;">
+                <i class="fas fa-file-pdf"></i> Confirmar descarga
+            </h3>
+            <button onclick="cerrarModalConfirmarDescargaConsentimientoTabla()" style="background: none; border: none; color: white; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div style="padding: 18px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0f172a; font-weight: 600;">
+                ¿Deseas descargar el PDF del siguiente consentimiento?
+            </p>
+            <p style="margin: 0; font-size: 0.9rem; color: #64748b;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #94a3b8;"></i>
+                <span id="confirmarDescargaConsentimientoTablaTitulo"></span>
+            </p>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #e5e7eb; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarDescargaConsentimientoTabla()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn" style="background: var(--primary-color); color: white;" onclick="confirmarDescargaConsentimientoTabla()">
+                <i class="fas fa-file-download"></i> Descargar PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Eliminación (Tabla) -->
+<div id="modalConfirmarEliminarConsentimientoTabla" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: white; border-radius: 16px; max-width: 500px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); margin: auto; overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #fee2e2; background: linear-gradient(135deg, #ef4444, #b91c1c);">
+            <h3 style="margin: 0; color: white; font-size: 1rem; font-weight: 600;">
+                <i class="fas fa-exclamation-triangle"></i> Confirmar eliminación
+            </h3>
+            <button onclick="cerrarModalConfirmarEliminarConsentimientoTabla()" style="background: none; border: none; color: white; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div style="padding: 18px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0f172a; font-weight: 600;">
+                ¿Estás seguro de que deseas eliminar este consentimiento?
+            </p>
+            <p style="margin: 0 0 12px 0; font-size: 0.9rem; color: #64748b;">
+                <i class="fas fa-quote-left" style="font-size: 0.8rem; color: #f97316;"></i>
+                <span id="confirmarEliminarConsentimientoTablaTitulo"></span>
+            </p>
+            <p style="margin: 0; font-size: 0.8rem; color: #b91c1c;">
+                Esta acción es permanente y no se puede deshacer.
+            </p>
+        </div>
+        <div style="padding: 12px 20px 16px; border-top: 1px solid #fee2e2; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="cerrarModalConfirmarEliminarConsentimientoTabla()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn" style="background: #ef4444; color: white;" onclick="confirmarEliminarConsentimientoTabla()">
+                <i class="fas fa-trash-alt"></i> Sí, eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para firmar consentimiento -->
+<div id="modalFirmar" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px); overflow-y: auto; padding: 20px;">
+    <div style="background: white; border-radius: 16px; max-width: 700px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); margin: auto; max-height: 90vh; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 24px 24px 20px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;">
+            <h3 style="margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 700;">
+                <i class="fas fa-signature" style="color: var(--primary-color); margin-right: 8px;"></i>
+                Firmar Consentimiento
+            </h3>
+            <button onclick="cerrarModalFirmar()" style="background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer; padding: 4px 8px; line-height: 1; transition: color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">&times;</button>
+        </div>
+        <div style="overflow-y: auto; flex: 1; padding: 0 24px;">
+        <form id="formFirmar" onsubmit="firmarConsentimientoSubmit(event)">
+            <input type="hidden" id="consentimientoIdFirmar" name="consentimiento_id">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 600; font-size: 0.875rem;">
+                        <i class="fas fa-user" style="color: var(--primary-color); margin-right: 6px;"></i>Nombre del Firmante <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="text" id="nombreFirmante" name="nombre_firmante" required
+                           style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; transition: border-color 0.2s;"
+                           onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
+                           onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 600; font-size: 0.875rem;">
+                        <i class="fas fa-id-card" style="color: var(--primary-color); margin-right: 6px;"></i>RUT del Firmante
+                    </label>
+                    <input type="text" id="rutFirmante" name="rut_firmante" placeholder="12.345.678-9"
+                           style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; transition: border-color 0.2s;"
+                           onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
+                           onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                </div>
+            </div>
+            <!-- Declaraciones Legales (Ley 20.584) -->
+            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);">
+                <h4 style="margin: 0 0 16px 0; color: #1e40af; font-size: 0.9375rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-gavel" style="font-size: 1rem;"></i> Declaraciones Legales (Ley 20.584)
+                </h4>
+                <div style="margin-bottom: 16px; padding: 12px; background: white; border-radius: 8px; border-left: 3px solid #3b82f6;">
+                    <label style="display: flex; align-items: start; gap: 10px; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="declaracionComprension" name="declaracion_comprension" required
+                               style="margin-top: 2px; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+                        <span style="font-size: 0.8125rem; color: #374151; line-height: 1.6; flex: 1;">
+                            <strong style="color: #1e40af;">Declaración de Comprensión:</strong> Declaro que he sido informado de forma clara, comprensible y oportuna 
+                            sobre mi diagnóstico, los riesgos, beneficios y alternativas del procedimiento propuesto, de acuerdo con la 
+                            <strong>Ley N° 20.584</strong> sobre Derechos y Deberes de las Personas en relación con las Acciones vinculadas 
+                            a su Atención en Salud.
+                        </span>
+                    </label>
+                </div>
+                <div style="padding: 12px; background: white; border-radius: 8px; border-left: 3px solid #10b981;">
+                    <label style="display: flex; align-items: start; gap: 10px; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="derechoRevocacion" name="derecho_revocacion" required
+                               style="margin-top: 2px; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer; accent-color: #10b981;">
+                        <span style="font-size: 0.8125rem; color: #374151; line-height: 1.6; flex: 1;">
+                            <strong style="color: #059669;">Derecho de Revocación:</strong> Conozco que tengo el derecho a revocar libremente este consentimiento 
+                            en cualquier momento previo al inicio del tratamiento.
+                        </span>
+                    </label>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 24px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 600; font-size: 0.875rem;">
+                    <i class="fas fa-signature" style="color: #10b981; margin-right: 6px;"></i>Firma del Paciente (Texto) <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="text" id="firmaPaciente" name="firma_paciente" required
+                       placeholder="Escriba su nombre completo como firma"
+                       style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; transition: border-color 0.2s;"
+                       onfocus="this.style.borderColor='#10b981'; this.style.boxShadow='0 0 0 3px rgba(16, 185, 129, 0.1)'"
+                       onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                <p style="font-size: 0.75rem; color: #64748b; margin-top: 8px; margin-bottom: 0; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Escriba su nombre completo para firmar digitalmente
+                </p>
+            </div>
+            
+            <div style="margin-bottom: 24px; padding: 16px; background: #fef3c7; border-radius: 8px; border: 1px solid #fbbf24;">
+                <h5 style="margin: 0 0 12px 0; color: #92400e; font-size: 0.875rem; font-weight: 600;">
+                    <i class="fas fa-user-friends" style="margin-right: 6px;"></i>Información del Testigo (Opcional, recomendado)
+                </h5>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; color: #374151; font-weight: 500; font-size: 0.8125rem;">Nombre del Testigo:</label>
+                        <input type="text" id="nombreTestigo" name="nombre_testigo"
+                               style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8125rem; transition: border-color 0.2s;"
+                               onfocus="this.style.borderColor='#f59e0b'; this.style.boxShadow='0 0 0 3px rgba(245, 158, 11, 0.1)'"
+                               onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; color: #374151; font-weight: 500; font-size: 0.8125rem;">RUT del Testigo:</label>
+                        <input type="text" id="rutTestigo" name="rut_testigo"
+                               placeholder="12.345.678-9"
+                               style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8125rem; transition: border-color 0.2s;"
+                               onfocus="this.style.borderColor='#f59e0b'; this.style.boxShadow='0 0 0 3px rgba(245, 158, 11, 0.1)'"
+                               onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                    </div>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: #374151; font-weight: 500; font-size: 0.8125rem;">Firma del Testigo:</label>
+                    <input type="text" id="firmaTestigo" name="firma_testigo"
+                           placeholder="Nombre completo del testigo"
+                           style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8125rem; transition: border-color 0.2s;"
+                           onfocus="this.style.borderColor='#f59e0b'; this.style.boxShadow='0 0 0 3px rgba(245, 158, 11, 0.1)'"
+                           onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; margin-bottom: 24px; flex-wrap: wrap;">
+                <button type="button" onclick="cerrarModalFirmar()" class="btn" style="background: #6b7280; color: white; padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: background 0.2s;" onmouseover="this.style.background='#4b5563'" onmouseout="this.style.background='#6b7280'">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn" style="background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 500; transition: background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                    <i class="fas fa-check"></i> Firmar
+                </button>
+            </div>
+        </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalFirmar(consentimientoId, nombreCliente, rutCliente) {
+    document.getElementById('consentimientoIdFirmar').value = consentimientoId;
+    document.getElementById('nombreFirmante').value = nombreCliente;
+    document.getElementById('rutFirmante').value = rutCliente || '';
+    document.getElementById('modalFirmar').style.display = 'flex';
+}
+
+function cerrarModalFirmar() {
+    document.getElementById('modalFirmar').style.display = 'none';
+    document.getElementById('formFirmar').reset();
+}
+
+function firmarConsentimientoSubmit(event) {
+    event.preventDefault();
+    const consentimientoId = document.getElementById('consentimientoIdFirmar').value;
+    
+    // Deshabilitar botón mientras se procesa
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Firmando...';
+    
+    // Crear FormData
+    const formData = new FormData();
+    formData.append('firma_paciente', document.getElementById('firmaPaciente').value);
+    formData.append('nombre_firmante', document.getElementById('nombreFirmante').value);
+    formData.append('rut_firmante', document.getElementById('rutFirmante').value);
+    formData.append('nombre_testigo', document.getElementById('nombreTestigo').value);
+    formData.append('rut_testigo', document.getElementById('rutTestigo').value);
+    formData.append('firma_testigo', document.getElementById('firmaTestigo').value);
+    formData.append('declaracion_comprension', document.getElementById('declaracionComprension').checked ? 'on' : '');
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}
+
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}
+
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}
+
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}
+
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}
+
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}
+
+    formData.append('derecho_revocacion', document.getElementById('derechoRevocacion').checked ? 'on' : '');
+    
+    // Enviar petición AJAX
+    fetch(`/trabajadores/consentimientos/${consentimientoId}/firmar/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✓ ' + data.message);
+            cerrarModalFirmar();
+            location.reload();
+        } else {
+            alert('✗ Error: ' + (data.error || 'No se pudo firmar el consentimiento'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Error al firmar el consentimiento. Por favor, intenta nuevamente.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalFirmar').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalFirmar();
+    }
+});
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalFirmar();
+    }
+});
+
+// =========================
+// MENÚ DE OPCIONES - CONSENTIMIENTOS (TABLA)
+// =========================
+var consentimientoTablaAcciones = {
+    id: null,
+    titulo: '',
+    pdfUrl: '',
+    editUrl: null,
+};
+
+function abrirMenuAccionesConsentimientoTabla(id, titulo, pdfUrl, editUrl) {
+    consentimientoTablaAcciones.id = id;
+    consentimientoTablaAcciones.titulo = titulo || 'este consentimiento';
+    consentimientoTablaAcciones.pdfUrl = pdfUrl;
+    consentimientoTablaAcciones.editUrl = editUrl && editUrl !== 'null' ? editUrl : null;
+    
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (!modal) return;
+    
+    var tituloSpan = document.getElementById('accionesConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo;
+    }
+    
+    var btnEditar = document.getElementById('btnAccionEditarConsentimientoTabla');
+    if (btnEditar) {
+        btnEditar.style.display = consentimientoTablaAcciones.editUrl ? 'flex' : 'none';
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarMenuAccionesConsentimientoTabla() {
+    var modal = document.getElementById('modalAccionesConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function accionDescargarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.pdfUrl) return;
+    abrirModalConfirmarDescargaConsentimientoTabla();
+}
+
+function accionEditarConsentimientoTabla() {
+    if (consentimientoTablaAcciones.editUrl) {
+        window.location.href = consentimientoTablaAcciones.editUrl;
+    }
+}
+
+function accionEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+    abrirModalConfirmarEliminarConsentimientoTabla();
+}
+
+// Confirmaciones visuales (gestor)
+function abrirModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarDescargaConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarDescargaConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarDescargaConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarDescargaConsentimientoTabla() {
+    cerrarModalConfirmarDescargaConsentimientoTabla();
+    showNotification('info', 'Preparando descarga del PDF del consentimiento...', 2500);
+    window.open(consentimientoTablaAcciones.pdfUrl, '_blank');
+}
+
+function abrirModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (!modal) return;
+    var tituloSpan = document.getElementById('confirmarEliminarConsentimientoTablaTitulo');
+    if (tituloSpan) {
+        tituloSpan.textContent = consentimientoTablaAcciones.titulo || 'este consentimiento';
+    }
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalConfirmarEliminarConsentimientoTabla() {
+    var modal = document.getElementById('modalConfirmarEliminarConsentimientoTabla');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function confirmarEliminarConsentimientoTabla() {
+    if (!consentimientoTablaAcciones.id) return;
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "eliminar_consentimiento" 0 %}'.replace('0', consentimientoTablaAcciones.id), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message || 'Consentimiento eliminado correctamente.');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showNotification('error', data.error || 'Error al eliminar el consentimiento.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al eliminar el consentimiento.');
+    })
+    .finally(() => {
+        cerrarMenuAccionesConsentimientoTabla();
+        cerrarModalConfirmarEliminarConsentimientoTabla();
+    });
+}
+</script>
+
+{% endblock %}

@@ -18,8 +18,8 @@ class Perfil(models.Model):
         max_length=20,
         validators=[
             RegexValidator(
-                regex=r'^\+?1?\d{9,15}$',
-                message='El número de teléfono debe estar en formato: +999999999. Hasta 15 dígitos permitidos.'
+                regex=r'^\+?1?\d{8,15}$',
+                message='El número de teléfono debe tener entre 8 y 15 dígitos.'
             )
         ]
     )
@@ -151,10 +151,10 @@ class Perfil(models.Model):
                 # Usar ID del cliente como clave para evitar duplicados por email
                 if cita.cliente:
                     cliente = cita.cliente
-                    paciente_key = f"cliente_{cliente.id}"  # Clave única por cliente
+                    email_key = f"cliente_{cliente.id}"  # Clave única por cliente
                     
-                    if paciente_key not in pacientes_dict:
-                        pacientes_dict[paciente_key] = {
+                    if email_key not in pacientes_dict:
+                        pacientes_dict[email_key] = {
                             'id': cliente.id,
                             'nombre_completo': cliente.nombre_completo,  # Nombre completo actualizado
                             'email': cliente.email,  # Email actualizado

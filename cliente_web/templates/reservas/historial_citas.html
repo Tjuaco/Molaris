@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Historial de Citas - Clínica Dental</title>
+    <title>Historial de Citas - Clínica San Felipe</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -15,9 +15,9 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
         }
 
         .container {
@@ -50,13 +50,13 @@
         }
 
         .header h2 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .back-btn {
             background: white;
-            color: #3b82f6;
-            border: 2px solid #3b82f6;
+            color: #14b8a6;
+            border: 2px solid #14b8a6;
             padding: 10px 20px;
             border-radius: 8px;
             text-decoration: none;
@@ -65,13 +65,14 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            font-size: 0.9rem;
         }
 
         .back-btn:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         .stats {
@@ -98,7 +99,7 @@
         .stat-number {
             font-size: 2rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -149,7 +150,7 @@
         }
 
         .cita-fecha i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .cita-estado {
@@ -163,13 +164,15 @@
         }
 
         .cita-estado.reservada {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
         }
 
         .cita-estado.confirmada {
-            background: #d1fae5;
-            color: #065f46;
+            background: #ccfbf1;
+            color: #0f766e;
+            border: 1px solid #5eead4;
         }
 
         .cita-estado.completada {
@@ -236,6 +239,10 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
             .container {
                 padding: 0;
             }
@@ -243,10 +250,16 @@
             .header {
                 flex-direction: column;
                 padding: 15px;
+                align-items: flex-start;
             }
 
             .header h2 {
                 font-size: 1.5rem;
+            }
+
+            .back-btn {
+                width: 100%;
+                justify-content: center;
             }
 
             .cita-detalles {
@@ -254,7 +267,30 @@
             }
 
             .stats {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: 1fr;
+            }
+
+            .cita-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h2 {
+                font-size: 1.25rem;
+            }
+
+            .stat-number {
+                font-size: 1.75rem;
+            }
+
+            .cita-card {
+                padding: 16px;
+            }
+
+            .cita-fecha {
+                font-size: 1rem;
             }
         }
     </style>

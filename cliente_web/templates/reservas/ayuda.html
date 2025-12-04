@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Centro de Ayuda - Clínica Dental</title>
+    <title>Centro de Ayuda - Clínica San Felipe</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -15,9 +15,9 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
         }
 
         .container {
@@ -27,7 +27,7 @@
 
         .back-btn {
             background: rgba(255, 255, 255, 0.9);
-            color: #3b82f6;
+            color: #14b8a6;
             border: 2px solid white;
             padding: 12px 24px;
             border-radius: 25px;
@@ -44,7 +44,7 @@
         .back-btn:hover {
             background: white;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.3);
+            box-shadow: 0 5px 15px rgba(20, 184, 166, 0.3);
         }
 
         .help-card {
@@ -55,7 +55,7 @@
         }
 
         .help-header {
-            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             padding: 40px;
             text-align: center;
@@ -97,7 +97,7 @@
         }
 
         .section h2 i {
-            color: #3b82f6;
+            color: #14b8a6;
         }
 
         .faq-list {
@@ -116,8 +116,8 @@
         }
 
         .faq-item:hover {
-            border-color: #3b82f6;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+            border-color: #14b8a6;
+            box-shadow: 0 2px 8px rgba(20, 184, 166, 0.1);
         }
 
         .faq-question {
@@ -131,7 +131,7 @@
         }
 
         .faq-question i {
-            color: #3b82f6;
+            color: #14b8a6;
             transition: transform 0.3s ease;
         }
 
@@ -171,14 +171,14 @@
         }
 
         .contact-card:hover {
-            border-color: #3b82f6;
+            border-color: #14b8a6;
             transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.1);
+            box-shadow: 0 5px 15px rgba(20, 184, 166, 0.1);
         }
 
         .contact-card i {
             font-size: 2.5rem;
-            color: #3b82f6;
+            color: #14b8a6;
             margin-bottom: 15px;
         }
 
@@ -195,7 +195,7 @@
         }
 
         .contact-card a {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
             color: white;
             padding: 10px 20px;
             border-radius: 8px;
@@ -210,10 +210,14 @@
 
         .contact-card a:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
             .help-header {
                 padding: 30px 20px;
             }
@@ -228,6 +232,33 @@
 
             .contact-options {
                 grid-template-columns: 1fr;
+            }
+
+            .back-btn {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .help-header {
+                padding: 20px 15px;
+            }
+
+            .help-header i {
+                font-size: 3rem;
+            }
+
+            .help-header h1 {
+                font-size: 1.25rem;
+            }
+
+            .help-content {
+                padding: 20px 15px;
+            }
+
+            .section h2 {
+                font-size: 1.25rem;
             }
         }
     </style>
@@ -260,7 +291,7 @@
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                             <div class="faq-answer">
-                                Para reservar una cita, ve a tu panel principal, selecciona un horario disponible y haz click en el botón "Reservar". Recibirás una confirmación por SMS. Recuerda que solo puedes tener una cita activa a la vez.
+                                Para reservar una cita, ve a tu panel principal, selecciona un horario disponible y haz click en el botón "Reservar". Recibirás la informacion de la cita e intrucciones a whatsapp y a tu correo personal. Recuerda que solo puedes tener una cita activa a la vez.
                             </div>
                         </div>
 
@@ -291,16 +322,6 @@
                             </div>
                             <div class="faq-answer">
                                 Contacta con la clínica lo antes posible. Haremos todo lo posible por acomodar tu solicitud de cambio según disponibilidad.
-                            </div>
-                        </div>
-
-                        <div class="faq-item" onclick="toggleFaq(this)">
-                            <div class="faq-question">
-                                <span>¿Cómo evalúo el servicio?</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </div>
-                            <div class="faq-answer">
-                                Después de tu cita, verás la opción "Evaluar Servicio" en el menú lateral. Tu opinión es muy valiosa y nos ayuda a mejorar continuamente.
                             </div>
                         </div>
 

@@ -1,0 +1,880 @@
+{% extends 'citas/base.html' %}
+
+{% block title %}Agregar Personal - Clínica Dental{% endblock %}
+
+{% block page_title %}<i class="fas fa-user-plus"></i> Agregar Personal{% endblock %}
+{% block page_subtitle %}Registra nuevo personal en el sistema{% endblock %}
+
+{% block content %}
+<!-- Progreso del formulario -->
+<div class="section">
+    <div class="progress-container">
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: 0%" id="progressBar"></div>
+        </div>
+        <div class="progress-steps">
+            <div class="step active" data-step="1">
+                <i class="fas fa-user"></i>
+                <span>Usuario</span>
+            </div>
+            <div class="step" data-step="2">
+                <i class="fas fa-id-card"></i>
+                <span>Personal</span>
+            </div>
+            <div class="step" data-step="3">
+                <i class="fas fa-user-md"></i>
+                <span>Profesional</span>
+            </div>
+            <div class="step" data-step="4">
+                <i class="fas fa-check"></i>
+                <span>Confirmar</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2><i class="fas fa-user-plus"></i> Agregar Nuevo Personal</h2>
+            <p class="text-muted">Complete la información para registrar un nuevo miembro del personal</p>
+        </div>
+        <a href="{% url 'gestor_personal' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+    
+    <form method="POST" class="personal-form" id="personalForm">
+        {% csrf_token %}
+        
+        <!-- Paso 1: Información de usuario -->
+        <div class="form-step" id="step1">
+            <div class="form-section">
+                <h3><i class="fas fa-user"></i> Datos de Usuario</h3>
+                <p class="form-description">Configure las credenciales de acceso al sistema</p>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username" class="form-label">Nombre de Usuario *</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="username" name="username" 
+                                   value="{{ form_data.username }}" required>
+                            <div class="input-group-append">
+                                <span class="input-group-text">
+                                    <i class="fas fa-user" id="usernameIcon"></i>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-feedback" id="usernameFeedback"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="password" class="form-label">Contraseña *</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   minlength="8" required>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-outline" onclick="togglePassword()">
+                                    <i class="fas fa-eye" id="passwordToggle"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="password-strength">
+                            <div class="strength-bar">
+                                <div class="strength-fill" id="strengthFill"></div>
+                            </div>
+                            <small class="form-text" id="passwordStrength">Mínimo 8 caracteres</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información personal -->
+        <div class="form-section">
+            <h3><i class="fas fa-id-card"></i> Información Personal</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nombre_completo" class="form-label">Nombre Completo *</label>
+                    <input type="text" class="form-control" id="nombre_completo" name="nombre_completo" 
+                           value="{{ form_data.nombre_completo }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="email" class="form-label">Email *</label>
+                    <input type="email" class="form-control" id="email" name="email" 
+                           value="{{ form_data.email }}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="telefono" class="form-label">Teléfono *</label>
+                    <input type="text" class="form-control" id="telefono" name="telefono" 
+                           value="{{ form_data.telefono }}" 
+                           pattern="[0-9]{8}" 
+                           maxlength="8"
+                           inputmode="numeric"
+                           placeholder="12345678"
+                           autocomplete="off"
+                           required>
+                    <small class="form-text">Ingrese solo 8 dígitos numéricos (ejemplo: 12345678)</small>
+                    <div class="form-feedback" id="telefonoFeedback"></div>
+                </div>
+                <div class="form-group">
+                    <label for="rol" class="form-label">Rol *</label>
+                    <select class="form-control" id="rol" name="rol" required onchange="toggleDentistaFields()">
+                        <option value="">Seleccionar rol</option>
+                        {% for value, label in roles %}
+                            <option value="{{ value }}" {% if form_data.rol == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campos específicos para dentistas -->
+        <div id="dentista-fields" class="form-section" style="display: none;">
+            <h3><i class="fas fa-stethoscope"></i> Información Profesional (Dentista)</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="especialidad" class="form-label">Especialidad *</label>
+                    <input type="text" class="form-control" id="especialidad" name="especialidad" 
+                           value="{{ form_data.especialidad }}" placeholder="Ej: Ortodoncia, Endodoncia...">
+                </div>
+                <div class="form-group">
+                    <label for="numero_colegio" class="form-label">Número de Colegio *</label>
+                    <input type="text" class="form-control" id="numero_colegio" name="numero_colegio" 
+                           value="{{ form_data.numero_colegio }}" 
+                           pattern="[0-9]{8}" 
+                           maxlength="8"
+                           inputmode="numeric"
+                           placeholder="12345678"
+                           required>
+                    <small class="form-text">Ingrese solo 8 dígitos numéricos (ejemplo: 12345678)</small>
+                    <div class="form-feedback" id="numeroColegioFeedback"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'gestor_personal' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+            <button type="submit" class="btn">
+                <i class="fas fa-save"></i> Guardar Personal
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Información adicional -->
+<div class="section">
+    <h2><i class="fas fa-info-circle"></i> Información</h2>
+    <div class="info-grid">
+        <div class="info-card">
+            <h4><i class="fas fa-user-tag"></i> Roles Disponibles</h4>
+            <ul>
+                <li><i class="fas fa-user-tie"></i> <strong>Administrativo:</strong> Gestión de citas, clientes e insumos</li>
+                <li><i class="fas fa-user-md"></i> <strong>Dentista:</strong> Atención de pacientes y calendario personal</li>
+            </ul>
+        </div>
+        
+        <div class="info-card">
+            <h4><i class="fas fa-exclamation-triangle"></i> Campos Obligatorios</h4>
+            <ul>
+                <li>• Nombre de usuario único</li>
+                <li>• Contraseña segura (8+ caracteres)</li>
+                <li>• Información de contacto</li>
+                <li>• Para dentistas: especialidad y número de colegio</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .personal-form {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section {
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .form-section:last-of-type {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .form-section h3 {
+        color: #1e293b;
+        margin-bottom: 16px;
+        font-size: 1.125rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .form-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    
+    .form-group {
+        flex: 1;
+    }
+    
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+        font-size: 0.875rem;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        background: white;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #14b8a6;
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+    
+    .form-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .btn {
+        background: #14b8a6;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn:hover {
+        background: #0d9488;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(20, 184, 166, 0.2);
+    }
+    
+    .btn-secondary {
+        background: #6b7280;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #4b5563;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(107, 114, 128, 0.2);
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .info-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    
+    .info-card h4 {
+        color: #1e293b;
+        margin-bottom: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .info-card ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .info-card li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .info-card li i {
+        color: #14b8a6;
+        width: 16px;
+    }
+    
+    @media (max-width: 768px) {
+        .form-row {
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    /* Progreso del formulario */
+    .progress-container {
+        margin-bottom: 30px;
+    }
+    
+    .progress {
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+        margin-bottom: 20px;
+    }
+    
+    .progress-bar {
+        background: linear-gradient(90deg, #14b8a6 0%, #0d9488 100%);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+    }
+    
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        position: relative;
+    }
+    
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        position: relative;
+        z-index: 2;
+        background: white;
+        padding: 10px;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        transition: all 0.3s ease;
+    }
+    
+    .step i {
+        font-size: 1.2rem;
+        margin-bottom: 4px;
+        color: #6c757d;
+    }
+    
+    .step span {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6c757d;
+    }
+    
+    .step.active {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        transform: scale(1.1);
+    }
+    
+    .step.active i,
+    .step.active span {
+        color: white;
+    }
+    
+    .step.completed {
+        background: #14b8a6;
+        color: white;
+    }
+    
+    .step.completed i,
+    .step.completed span {
+        color: white;
+    }
+    
+    /* Formulario mejorado */
+    .form-step {
+        display: none;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .form-step.active {
+        display: block;
+    }
+    
+    .form-description {
+        color: #6c757d;
+        margin-bottom: 20px;
+        font-size: 0.9rem;
+    }
+    
+    .form-feedback {
+        font-size: 0.75rem;
+        margin-top: 4px;
+        min-height: 16px;
+    }
+    
+    .form-feedback.success {
+        color: #14b8a6;
+    }
+    
+    .form-feedback.error {
+        color: #dc3545;
+    }
+    
+    /* Indicador de fortaleza de contraseña */
+    .password-strength {
+        margin-top: 8px;
+    }
+    
+    .strength-bar {
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 4px;
+    }
+    
+    .strength-fill {
+        height: 100%;
+        transition: all 0.3s ease;
+        border-radius: 2px;
+    }
+    
+    .strength-weak { background: #dc3545; width: 25%; }
+    .strength-fair { background: #ffc107; width: 50%; }
+    .strength-good { background: #14b8a6; width: 75%; }
+    .strength-strong { background: #0d9488; width: 100%; }
+    
+    /* Botones de navegación */
+    .form-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .btn-navigation {
+        min-width: 120px;
+    }
+    
+    /* Validación en tiempo real */
+    .form-control.is-valid {
+        border-color: #14b8a6;
+        box-shadow: 0 0 0 0.2rem rgba(20, 184, 166, 0.25);
+    }
+    
+    .form-control.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    }
+    
+    /* Animaciones */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .progress-steps {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .step {
+            width: 50px;
+            height: 50px;
+        }
+        
+        .step span {
+            font-size: 0.7rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+const totalSteps = 4;
+
+// Inicializar formulario
+document.addEventListener('DOMContentLoaded', function() {
+    showStep(1);
+    setupValidation();
+    setupPasswordStrength();
+    toggleDentistaFields();
+    setupTelefonoValidation();
+});
+
+// Función para mostrar/ocultar campos de dentista
+function toggleDentistaFields() {
+    const rol = document.getElementById('rol').value;
+    const dentistaFields = document.getElementById('dentista-fields');
+    const especialidad = document.getElementById('especialidad');
+    const numeroColegio = document.getElementById('numero_colegio');
+    
+    if (rol === 'dentista') {
+        dentistaFields.style.display = 'block';
+        especialidad.required = true;
+        numeroColegio.required = true;
+    } else {
+        dentistaFields.style.display = 'none';
+        especialidad.required = false;
+        numeroColegio.required = false;
+        especialidad.value = '';
+        numeroColegio.value = '';
+    }
+}
+
+// Configurar validación del campo teléfono (8 dígitos, solo números)
+function setupTelefonoValidation() {
+    const telefonoField = document.getElementById('telefono');
+    if (telefonoField) {
+        // Prevenir cualquier entrada que no sea número
+        telefonoField.addEventListener('keypress', function(e) {
+            // Permitir: backspace, delete, tab, escape, enter
+            if ([8, 9, 27, 13, 46].indexOf(e.keyCode) !== -1 ||
+                // Permitir: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                (e.keyCode === 65 && e.ctrlKey === true) ||
+                (e.keyCode === 67 && e.ctrlKey === true) ||
+                (e.keyCode === 86 && e.ctrlKey === true) ||
+                (e.keyCode === 88 && e.ctrlKey === true)) {
+                return;
+            }
+            // Asegurar que es un número y detener la tecla
+            if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                e.preventDefault();
+            }
+        });
+        
+        // Solo permitir números al escribir
+        telefonoField.addEventListener('input', function(e) {
+            // Eliminar cualquier carácter que no sea número
+            this.value = this.value.replace(/[^0-9]/g, '');
+            
+            // Limitar a 8 dígitos
+            if (this.value.length > 8) {
+                this.value = this.value.slice(0, 8);
+            }
+        });
+        
+        // Validar al perder el foco
+        telefonoField.addEventListener('blur', function() {
+            if (this.value.length !== 8) {
+                showFieldError(this, 'El teléfono debe tener exactamente 8 dígitos');
+            } else {
+                showFieldSuccess(this, 'Teléfono válido');
+            }
+        });
+        
+        // Prevenir pegar texto no numérico
+        telefonoField.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text');
+            const numbers = paste.replace(/[^0-9]/g, '').slice(0, 8);
+            this.value = numbers;
+            // Disparar evento blur para validar
+            this.dispatchEvent(new Event('blur'));
+        });
+        
+        // Prevenir drag and drop
+        telefonoField.addEventListener('drop', function(e) {
+            e.preventDefault();
+        });
+    }
+    
+    // Configurar validación del campo número de colegio (8 dígitos, solo números)
+    const numeroColegioField = document.getElementById('numero_colegio');
+    if (numeroColegioField) {
+        // Solo permitir números
+        numeroColegioField.addEventListener('input', function(e) {
+            // Eliminar cualquier carácter que no sea número
+            this.value = this.value.replace(/[^0-9]/g, '');
+            
+            // Limitar a 8 dígitos
+            if (this.value.length > 8) {
+                this.value = this.value.slice(0, 8);
+            }
+        });
+        
+        // Validar al perder el foco
+        numeroColegioField.addEventListener('blur', function() {
+            if (this.value && this.value.length !== 8) {
+                showFieldError(this, 'El número de colegio debe tener exactamente 8 dígitos');
+            } else if (this.value && this.value.length === 8) {
+                showFieldSuccess(this, 'Número de colegio válido');
+            }
+        });
+        
+        // Prevenir pegar texto no numérico
+        numeroColegioField.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text');
+            const numbers = paste.replace(/[^0-9]/g, '').slice(0, 8);
+            this.value = numbers;
+        });
+    }
+}
+
+// Mostrar paso específico
+function showStep(step) {
+    // Ocultar todos los pasos
+    document.querySelectorAll('.form-step').forEach(stepEl => {
+        stepEl.classList.remove('active');
+    });
+    
+    // Mostrar paso actual
+    const currentStepEl = document.getElementById(`step${step}`);
+    if (currentStepEl) {
+        currentStepEl.classList.add('active');
+    }
+    
+    // Actualizar progreso
+    updateProgress(step);
+    updateStepIndicators(step);
+    
+    currentStep = step;
+}
+
+// Actualizar barra de progreso
+function updateProgress(step) {
+    const progress = (step / totalSteps) * 100;
+    document.getElementById('progressBar').style.width = `${progress}%`;
+}
+
+// Actualizar indicadores de pasos
+function updateStepIndicators(step) {
+    document.querySelectorAll('.step').forEach((stepEl, index) => {
+        stepEl.classList.remove('active', 'completed');
+        
+        if (index + 1 < step) {
+            stepEl.classList.add('completed');
+        } else if (index + 1 === step) {
+            stepEl.classList.add('active');
+        }
+    });
+}
+
+// Navegación entre pasos
+function nextStep() {
+    if (validateCurrentStep()) {
+        if (currentStep < totalSteps) {
+            showStep(currentStep + 1);
+        }
+    }
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        showStep(currentStep - 1);
+    }
+}
+
+// Validar paso actual
+function validateCurrentStep() {
+    const currentStepEl = document.getElementById(`step${currentStep}`);
+    const requiredFields = currentStepEl.querySelectorAll('[required]');
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+            showFieldError(field, 'Este campo es obligatorio');
+            isValid = false;
+        } else {
+            clearFieldError(field);
+        }
+    });
+    
+    return isValid;
+}
+
+// Configurar validación en tiempo real
+function setupValidation() {
+    // Validación de username
+    const usernameField = document.getElementById('username');
+    if (usernameField) {
+        usernameField.addEventListener('blur', function() {
+            validateUsername(this.value);
+        });
+    }
+    
+    // Validación de email
+    const emailField = document.getElementById('email');
+    if (emailField) {
+        emailField.addEventListener('blur', function() {
+            validateEmail(this.value);
+        });
+    }
+}
+
+// Validar username
+function validateUsername(username) {
+    const feedback = document.getElementById('usernameFeedback');
+    const icon = document.getElementById('usernameIcon');
+    
+    if (username.length < 3) {
+        showFieldError(document.getElementById('username'), 'El nombre de usuario debe tener al menos 3 caracteres');
+        return false;
+    }
+    
+    // Simular verificación de disponibilidad
+    setTimeout(() => {
+        showFieldSuccess(document.getElementById('username'), 'Nombre de usuario disponible');
+        icon.className = 'fas fa-check';
+    }, 500);
+    
+    return true;
+}
+
+// Validar email
+function validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const field = document.getElementById('email');
+    
+    if (!emailRegex.test(email)) {
+        showFieldError(field, 'Ingrese un email válido');
+        return false;
+    } else {
+        showFieldSuccess(field, 'Email válido');
+        return true;
+    }
+}
+
+// Configurar indicador de fortaleza de contraseña
+function setupPasswordStrength() {
+    const passwordField = document.getElementById('password');
+    if (passwordField) {
+        passwordField.addEventListener('input', function() {
+            updatePasswordStrength(this.value);
+        });
+    }
+}
+
+// Actualizar indicador de fortaleza de contraseña
+function updatePasswordStrength(password) {
+    const strengthFill = document.getElementById('strengthFill');
+    const strengthText = document.getElementById('passwordStrength');
+    
+    let strength = 0;
+    let strengthClass = '';
+    let strengthLabel = '';
+    
+    if (password.length >= 8) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    
+    if (strength < 2) {
+        strengthClass = 'strength-weak';
+        strengthLabel = 'Débil';
+    } else if (strength < 3) {
+        strengthClass = 'strength-fair';
+        strengthLabel = 'Regular';
+    } else if (strength < 4) {
+        strengthClass = 'strength-good';
+        strengthLabel = 'Buena';
+    } else {
+        strengthClass = 'strength-strong';
+        strengthLabel = 'Fuerte';
+    }
+    
+    strengthFill.className = `strength-fill ${strengthClass}`;
+    strengthText.textContent = strengthLabel;
+}
+
+// Toggle visibilidad de contraseña
+function togglePassword() {
+    const passwordField = document.getElementById('password');
+    const toggleIcon = document.getElementById('passwordToggle');
+    
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        toggleIcon.className = 'fas fa-eye-slash';
+    } else {
+        passwordField.type = 'password';
+        toggleIcon.className = 'fas fa-eye';
+    }
+}
+
+// Mostrar error en campo
+function showFieldError(field, message) {
+    field.classList.add('is-invalid');
+    field.classList.remove('is-valid');
+    
+    const feedback = field.parentNode.querySelector('.form-feedback');
+    if (feedback) {
+        feedback.textContent = message;
+        feedback.className = 'form-feedback error';
+    }
+}
+
+// Mostrar éxito en campo
+function showFieldSuccess(field, message) {
+    field.classList.add('is-valid');
+    field.classList.remove('is-invalid');
+    
+    const feedback = field.parentNode.querySelector('.form-feedback');
+    if (feedback) {
+        feedback.textContent = message;
+        feedback.className = 'form-feedback success';
+    }
+}
+
+// Limpiar error en campo
+function clearFieldError(field) {
+    field.classList.remove('is-invalid', 'is-valid');
+    
+    const feedback = field.parentNode.querySelector('.form-feedback');
+    if (feedback) {
+        feedback.textContent = '';
+        feedback.className = 'form-feedback';
+    }
+}
+</script>
+{% endblock %}
