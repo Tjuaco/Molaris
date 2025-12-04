@@ -58,6 +58,54 @@ class Perfil(models.Model):
     def es_general(self):
         return self.rol == 'general'
     
+    def tiene_permiso(self, permiso):
+        """
+        Verifica si el perfil tiene un permiso específico.
+        Los administradores (rol 'general') tienen TODOS los permisos automáticamente.
+        """
+        if self.es_general():
+            return True
+        return getattr(self, permiso, False)
+    
+    def puede_gestionar_citas_check(self):
+        """Verifica si puede gestionar citas. Administradores siempre pueden."""
+        return self.es_general() or self.puede_gestionar_citas
+    
+    def puede_gestionar_clientes_check(self):
+        """Verifica si puede gestionar clientes. Administradores siempre pueden."""
+        return self.es_general() or self.puede_gestionar_clientes
+    
+    def puede_gestionar_insumos_check(self):
+        """Verifica si puede gestionar insumos. Administradores siempre pueden."""
+        return self.es_general() or self.puede_gestionar_insumos
+    
+    def puede_gestionar_personal_check(self):
+        """Verifica si puede gestionar personal. Administradores siempre pueden."""
+        return self.es_general() or self.puede_gestionar_personal
+    
+    def puede_ver_reportes_check(self):
+        """Verifica si puede ver reportes. Administradores siempre pueden."""
+        return self.es_general() or self.puede_ver_reportes
+    
+    def puede_crear_odontogramas_check(self):
+        """Verifica si puede crear odontogramas. Administradores siempre pueden."""
+        return self.es_general() or self.puede_crear_odontogramas
+    
+    def save(self, *args, **kwargs):
+        """
+        Override del método save para asegurar que los administradores (rol 'general')
+        tengan todos los permisos habilitados automáticamente.
+        """
+        if self.rol == 'general':
+            # El rol 'general' (administrador completo) tiene todos los permisos
+            self.puede_gestionar_citas = True
+            self.puede_gestionar_clientes = True
+            self.puede_gestionar_insumos = True
+            self.puede_gestionar_personal = True
+            self.puede_ver_reportes = True
+            self.puede_crear_odontogramas = True
+        super().save(*args, **kwargs)
+    
     def get_pacientes_asignados(self):
         """
         Retorna todos los pacientes que han tenido citas con este dentista (historial completo).

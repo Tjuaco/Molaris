@@ -4004,15 +4004,24 @@ def agregar_personal(request):
                 logging.info('Creando objeto Perfil...')
                 perfil_nuevo = Perfil(
                     user=user,
-                    nombre_completo=nombre_completo,
-                    telefono=telefono,
-                    email=email,
+                    nombre_completo=nombre_completo.strip(),
+                    telefono=telefono.strip(),
+                    email=email.strip(),
                     rol=rol,
-                    especialidad=especialidad if rol == 'dentista' else '',
-                    numero_colegio=numero_colegio if rol == 'dentista' else '',
+                    especialidad=especialidad.strip() if rol == 'dentista' else '',
+                    numero_colegio=numero_colegio.strip() if rol == 'dentista' else '',
                     requiere_acceso_sistema=requiere_acceso,
                     foto=foto if foto else None
                 )
+                
+                # Si el rol es 'general' (administrador), asegurar todos los permisos
+                if rol == 'general':
+                    perfil_nuevo.puede_gestionar_citas = True
+                    perfil_nuevo.puede_gestionar_clientes = True
+                    perfil_nuevo.puede_gestionar_insumos = True
+                    perfil_nuevo.puede_gestionar_personal = True
+                    perfil_nuevo.puede_ver_reportes = True
+                    perfil_nuevo.puede_crear_odontogramas = True
                 
                 # Validar el modelo antes de guardar
                 logging.info('Validando perfil...')
@@ -4072,10 +4081,11 @@ def editar_personal(request, personal_id):
     personal = get_object_or_404(Perfil, id=personal_id)
     
     if request.method == 'POST':
+        # Obtener datos del formulario - asegurar que nombre_completo se obtiene correctamente
         nombre_completo = request.POST.get('nombre_completo', '').strip()
         email = request.POST.get('email', '').strip()
         telefono = request.POST.get('telefono', '').strip()
-        rol = request.POST.get('rol', '')
+        rol = request.POST.get('rol', '').strip()
         especialidad = request.POST.get('especialidad', '').strip()
         numero_colegio = request.POST.get('numero_colegio', '').strip()
         activo = request.POST.get('activo') == 'on'
@@ -4084,6 +4094,15 @@ def editar_personal(request, personal_id):
         password = request.POST.get('password', '').strip()
         foto = request.FILES.get('foto')
         eliminar_foto = request.POST.get('eliminar_foto') == 'on'
+        
+        # Debug: Log de los datos recibidos
+        import logging
+        logging.info(f'=== EDITAR PERSONAL - Datos recibidos ===')
+        logging.info(f'nombre_completo: "{nombre_completo}"')
+        logging.info(f'email: "{email}"')
+        logging.info(f'telefono: "{telefono}"')
+        logging.info(f'rol: "{rol}"')
+        logging.info(f'POST completo: {dict(request.POST)}')
         
         # Validaciones
         errores = []
@@ -4163,15 +4182,24 @@ def editar_personal(request, personal_id):
                         personal.user = None
                         user_to_delete.delete()
                 
-                # Actualizar perfil
-                personal.nombre_completo = nombre_completo
-                personal.email = email
-                personal.telefono = telefono
+                # Actualizar perfil - IMPORTANTE: Actualizar nombre_completo primero
+                personal.nombre_completo = nombre_completo.strip()
+                personal.email = email.strip()
+                personal.telefono = telefono.strip()
                 personal.rol = rol
-                personal.especialidad = especialidad if rol == 'dentista' else ''
-                personal.numero_colegio = numero_colegio if rol == 'dentista' else ''
+                personal.especialidad = especialidad.strip() if rol == 'dentista' else ''
+                personal.numero_colegio = numero_colegio.strip() if rol == 'dentista' else ''
                 personal.activo = activo
                 personal.requiere_acceso_sistema = requiere_acceso
+                
+                # Si el rol es 'general' (administrador), asegurar todos los permisos
+                if rol == 'general':
+                    personal.puede_gestionar_citas = True
+                    personal.puede_gestionar_clientes = True
+                    personal.puede_gestionar_insumos = True
+                    personal.puede_gestionar_personal = True
+                    personal.puede_ver_reportes = True
+                    personal.puede_crear_odontogramas = True
                 
                 # Gestionar foto
                 if eliminar_foto and personal.foto:
@@ -4183,6 +4211,7 @@ def editar_personal(request, personal_id):
                         personal.foto.delete()
                     personal.foto = foto
                 
+                # Guardar el perfil (el método save() también establecerá permisos si es rol 'general')
                 personal.save()
                 
                 # Registrar en auditoría
