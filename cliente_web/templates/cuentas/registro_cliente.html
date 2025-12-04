@@ -459,35 +459,6 @@
                 {% endif %}
             </div>
 
-            <!-- Método de Verificación -->
-            <div class="form-group" style="background: #f0fdfa; padding: 20px; border-radius: 12px; border: 2px solid #14b8a6; margin: 20px 0;">
-                <label style="display: block; margin-bottom: 15px; font-weight: 600; color: #0f766e;">
-                    <i class="fas fa-shield-alt"></i> Método de Verificación: <span class="required">*</span>
-                </label>
-                {% if form.metodo_verificacion.help_text %}
-                    <div class="help-text" style="margin-bottom: 15px; color: #64748b; font-size: 0.9rem;">
-                        {{ form.metodo_verificacion.help_text }}
-                    </div>
-                {% endif %}
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    {% for choice in form.metodo_verificacion %}
-                        <label style="display: flex; align-items: center; padding: 15px; background: white; border: 2px solid #e0e0e0; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; {% if choice.data.selected %}border-color: #14b8a6; background: #f0fdfa;{% endif %}" 
-                               onmouseover="this.style.borderColor='#14b8a6'; this.style.background='#f0fdfa';" 
-                               onmouseout="{% if not choice.data.selected %}this.style.borderColor='#e0e0e0'; this.style.background='white';{% endif %}">
-                            {{ choice.tag }}
-                            <span style="margin-left: 12px; font-size: 16px; color: #333;">{{ choice.choice_label }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
-                {% if form.metodo_verificacion.errors %}
-                    <ul class="errorlist" style="margin-top: 10px;">
-                        {% for error in form.metodo_verificacion.errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-            </div>
-
             <div class="form-group">
                 <label for="{{ form.nombre_completo.id_for_label }}">
                     <i class="fas fa-user-circle"></i> Nombre Completo: <span class="required">*</span>

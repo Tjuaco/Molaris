@@ -45,20 +45,10 @@ class RegistroClienteForm(UserCreationForm):
         help_text="Lista de alergias conocidas (medicamentos, materiales dentales, anestesia, etc.). MUY IMPORTANTE para su seguridad. Si no tiene alergias, escriba 'Ninguna'.",
         widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Ejemplo: Penicilina, látex, anestesia local... (si no tiene alergias, escriba "Ninguna")'})
     )
-    metodo_verificacion = forms.ChoiceField(
-        choices=[
-            ('email', '📧 Recibir código por Email'),
-            ('whatsapp', '💬 Recibir código por WhatsApp'),
-        ],
-        required=True,
-        label="Método de Verificación",
-        help_text="Elige cómo quieres recibir tu código de verificación",
-        widget=forms.RadioSelect(attrs={'class': 'metodo-verificacion'})
-    )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2', 'nombre_completo', 'telefono', 'rut', 'fecha_nacimiento', 'alergias', 'metodo_verificacion']
+        fields = ['username', 'email', 'password1', 'password2', 'nombre_completo', 'telefono', 'rut', 'fecha_nacimiento', 'alergias']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -89,7 +79,7 @@ class RegistroClienteForm(UserCreationForm):
     def clean_telefono(self):
         tel = self.cleaned_data.get('telefono')
         if not tel:
-            raise forms.ValidationError("El teléfono es obligatorio para la verificación")
+            raise forms.ValidationError("El teléfono es obligatorio")
         
         # Solo permitir 8 dígitos
         tel_limpio = re.sub(r'\D', '', tel)
