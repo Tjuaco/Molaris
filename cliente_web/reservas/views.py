@@ -271,7 +271,13 @@ def panel_cliente(request):
         dentista_id = request.GET.get('dentista_id', '')
         
         # Obtener citas disponibles con filtros
-        citas_disponibles = Cita.objects.filter(estado='disponible')
+        # Filtrar solo citas futuras (fecha_hora >= ahora) y con estado 'disponible'
+        from django.utils import timezone
+        ahora = timezone.now()
+        citas_disponibles = Cita.objects.filter(
+            estado='disponible',
+            fecha_hora__gte=ahora  # Solo citas futuras
+        )
         
         # Aplicar filtros si existen
         if tipo_consulta:
@@ -464,9 +470,12 @@ def obtener_citas_fecha(request):
         if fecha:
             try:
                 fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+                from django.utils import timezone
+                ahora = timezone.now()
                 citas = Cita.objects.filter(
                     fecha_hora__date=fecha_obj,
-                    estado='disponible'
+                    estado='disponible',
+                    fecha_hora__gte=ahora  # Solo citas futuras
                 ).order_by('fecha_hora')
                 
                 citas_data = []

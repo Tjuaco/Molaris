@@ -14,9 +14,8 @@ class Cita(models.Model):
     creada_por = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_creadas'
     )
-    dentista = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='citas_dentista'
-    )
+    # Campo dentista_id - apunta a personal_perfil, no a auth_user
+    dentista_id = models.BigIntegerField(blank=True, null=True)
     estado = models.CharField(max_length=50, default='disponible')
     notas = models.TextField(blank=True, null=True)
     tipo_consulta = models.CharField(max_length=100, blank=True, null=True)
