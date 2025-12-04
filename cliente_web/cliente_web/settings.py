@@ -27,7 +27,9 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-28vh&5z1ku08x3e@gwocp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default='False', cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+# ALLOWED_HOSTS - procesar correctamente con espacios
+ALLOWED_HOSTS_STR = config('ALLOWED_HOSTS', default='localhost,127.0.0.1')
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.split(',') if host.strip()]
 
 
 # Application definition
@@ -165,8 +167,11 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = False  # Railway maneja SSL, no necesitamos redirección
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
-    if not CSRF_TRUSTED_ORIGINS:
+    # CSRF_TRUSTED_ORIGINS - procesar correctamente con espacios
+    CSRF_TRUSTED_ORIGINS_STR = config('CSRF_TRUSTED_ORIGINS', default='')
+    if CSRF_TRUSTED_ORIGINS_STR:
+        CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS_STR.split(',') if origin.strip()]
+    else:
         # Si no está configurado, usar ALLOWED_HOSTS para generar CSRF_TRUSTED_ORIGINS
         CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in ALLOWED_HOSTS if host]
 
