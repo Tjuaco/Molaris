@@ -27,10 +27,13 @@ WORKDIR /app/gestion_clinica
 # Recopilar archivos estáticos
 RUN python manage.py collectstatic --noinput
 
+# Copiar script de inicio
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Exponer el puerto
 EXPOSE $PORT
 
 # Comando de inicio
-CMD python manage.py migrate --noinput && \
-    gunicorn gestion_clinica.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+CMD ["/app/start.sh"]
 
