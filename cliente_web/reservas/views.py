@@ -298,12 +298,19 @@ def panel_cliente(request):
     # Agregar información del dentista y tipo de servicio a cada cita disponible
     citas_con_dentista = []
     for cita in citas_disponibles:
-        dentista_info = obtener_dentista_de_cita(cita.id)
-        servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
-        # Agregar el dentista y servicio como atributo de la cita
-        cita.dentista_info = dentista_info
-        cita.servicio_info = servicio_info
-        citas_con_dentista.append(cita)
+        try:
+            dentista_info = obtener_dentista_de_cita(cita.id)
+            servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
+            # Agregar el dentista y servicio como atributo de la cita
+            cita.dentista_info = dentista_info
+            cita.servicio_info = servicio_info
+            citas_con_dentista.append(cita)
+        except Exception as e:
+            logger.warning(f"Error al obtener información de cita {cita.id}: {e}")
+            # Agregar la cita sin información adicional si hay error
+            cita.dentista_info = None
+            cita.servicio_info = None
+            citas_con_dentista.append(cita)
     
     # Obtener citas reservadas por el usuario actual
     # Buscar por múltiples criterios: email del perfil, cliente_id, o username
@@ -366,10 +373,15 @@ def panel_cliente(request):
     
     # Agregar información del dentista y tipo de servicio a cada cita reservada
     for cita in citas_reservadas:
-        dentista_info = obtener_dentista_de_cita(cita.id)
-        servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
-        cita.dentista_info = dentista_info
-        cita.servicio_info = servicio_info
+        try:
+            dentista_info = obtener_dentista_de_cita(cita.id)
+            servicio_info = obtener_tipo_servicio_de_cita(cita.id, tipo_consulta=cita.tipo_consulta)
+            cita.dentista_info = dentista_info
+            cita.servicio_info = servicio_info
+        except Exception as e:
+            logger.warning(f"Error al obtener información de cita reservada {cita.id}: {e}")
+            cita.dentista_info = None
+            cita.servicio_info = None
     
     # Obtener perfil del usuario
     try:
@@ -379,7 +391,11 @@ def panel_cliente(request):
     
 
     # Obtener lista de dentistas disponibles para el filtro
-    dentistas_disponibles = obtener_todos_dentistas_activos()
+    try:
+        dentistas_disponibles = obtener_todos_dentistas_activos()
+    except Exception as e:
+        logger.warning(f"Error al obtener lista de dentistas: {e}")
+        dentistas_disponibles = []
     
     # Obtener teléfono de la clínica desde settings
     from django.conf import settings
