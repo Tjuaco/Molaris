@@ -13,64 +13,75 @@ from reservas.sms_service import _normalizar_telefono_chile
 from reservas.documentos_models import ClienteDocumento
 
 def registro_cliente(request):
+    """Vista de registro simplificada sin verificación de teléfono."""
     if request.method == 'POST':
         form = RegistroClienteForm(request.POST)
         if form.is_valid():
-            # Guardar datos en sesión para verificación
-            telefono_normalizado = _normalizar_telefono_chile(form.cleaned_data['telefono'])
-            metodo_verificacion = form.cleaned_data.get('metodo_verificacion', 'email')
-            email = form.cleaned_data['email']
-            
-            # Generar código de verificación
             try:
-                codigo_obj = CodigoVerificacion.generar_codigo(telefono_normalizado)
+                from django.contrib.auth.models import User
+                from datetime import datetime
                 
-                # Enviar código según el método seleccionado
+                # Normalizar teléfono
+                telefono_normalizado = _normalizar_telefono_chile(form.cleaned_data['telefono'])
+                
+                # Crear usuario directamente
+                user = User.objects.create_user(
+                    username=form.cleaned_data['username'],
+                    email=form.cleaned_data['email'],
+                    password=form.cleaned_data['password1']
+                )
+                
+                # Convertir fecha_nacimiento si existe
+                fecha_nacimiento = None
+                if form.cleaned_data.get('fecha_nacimiento'):
+                    fecha_nacimiento = form.cleaned_data['fecha_nacimiento']
+                
+                # Crear perfil del cliente
+                perfil_cliente = PerfilCliente.objects.create(
+                    user=user,
+                    nombre_completo=form.cleaned_data.get('nombre_completo', ''),
+                    telefono=telefono_normalizado,
+                    email=form.cleaned_data['email'],
+                    telefono_verificado=False,  # Sin verificación
+                    rut=form.cleaned_data.get('rut'),
+                    fecha_nacimiento=fecha_nacimiento,
+                    alergias=form.cleaned_data.get('alergias')
+                )
+                
+                # Intentar crear Cliente en el sistema de gestión (opcional)
                 try:
-                    from reservas.twilio_service import enviar_codigo_por_whatsapp, enviar_codigo_por_email
-                    
-                    if metodo_verificacion == 'whatsapp':
-                        enviar_codigo_por_whatsapp(telefono_normalizado, codigo_obj.codigo)
-                        mensaje_exito = f'Código de verificación enviado por WhatsApp al {telefono_normalizado}. Por favor, revisa tu WhatsApp e ingresa el código recibido.'
-                    else:  # email
-                        email_enviado = enviar_codigo_por_email(email, codigo_obj.codigo)
-                        if email_enviado:
-                            mensaje_exito = f'Código de verificación enviado por email a {email}. Por favor, revisa tu correo e ingresa el código recibido.'
-                        else:
-                            # Si falla el envío, mostrar el código en un mensaje (solo para desarrollo/producción con problemas de red)
-                            import logging
-                            logger = logging.getLogger(__name__)
-                            logger.warning(f"No se pudo enviar email. Código: {codigo_obj.codigo}")
-                            mensaje_exito = f'⚠️ No se pudo enviar el email debido a problemas de red. Tu código de verificación es: {codigo_obj.codigo}. Por favor, ingrésalo en la siguiente pantalla.'
-                    
+                    from pacientes.models import Cliente
+                    if not Cliente.objects.filter(email=perfil_cliente.email).exists():
+                        Cliente.objects.create(
+                            nombre_completo=perfil_cliente.nombre_completo,
+                            email=perfil_cliente.email,
+                            telefono=perfil_cliente.telefono,
+                            rut=perfil_cliente.rut,
+                            fecha_nacimiento=perfil_cliente.fecha_nacimiento,
+                            alergias=perfil_cliente.alergias,
+                            activo=True,
+                            notas=f'Cliente registrado desde la página web. Usuario: {user.username}'
+                        )
+                except ImportError:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"No se pudo crear Cliente automáticamente para {perfil_cliente.email}")
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.error(f"Error al enviar código de verificación: {str(e)}")
-                    # En caso de error, mostrar el código para que el usuario pueda continuar
-                    mensaje_exito = f'⚠️ No se pudo enviar el código por email debido a: {str(e)}. Tu código de verificación es: {codigo_obj.codigo}. Por favor, ingrésalo en la siguiente pantalla.'
+                    logger.error(f"Error al crear Cliente automáticamente: {str(e)}")
                 
-                # Guardar datos del formulario en sesión
-                request.session['registro_data'] = {
-                    'username': form.cleaned_data['username'],
-                    'email': form.cleaned_data['email'],
-                    'password': form.cleaned_data['password1'],
-                    'nombre_completo': form.cleaned_data['nombre_completo'],
-                    'telefono': form.cleaned_data['telefono'],
-                    'rut': form.cleaned_data.get('rut'),
-                    'fecha_nacimiento': form.cleaned_data.get('fecha_nacimiento').isoformat() if form.cleaned_data.get('fecha_nacimiento') else None,
-                    'alergias': form.cleaned_data.get('alergias'),
-                    'metodo_verificacion': metodo_verificacion,
-                }
+                # Iniciar sesión automáticamente
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 
-                messages.success(request, mensaje_exito)
-                return redirect('verificar_telefono')
+                messages.success(request, f'¡Cuenta creada exitosamente! Bienvenido, {perfil_cliente.nombre_completo or user.username}.')
+                return redirect('panel_cliente')
                 
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.error(f"Error al generar código de verificación: {str(e)}")
-                messages.error(request, f'Error al generar código de verificación: {str(e)}')
+                logger.error(f"Error al crear usuario: {str(e)}")
+                messages.error(request, f'Error al crear la cuenta: {str(e)}. Por favor, intenta nuevamente.')
                 return render(request, 'cuentas/registro_cliente.html', {'form': form})
     else:
         form = RegistroClienteForm()
