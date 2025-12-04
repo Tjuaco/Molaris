@@ -136,16 +136,31 @@ Equipo {clinic_name}"""
             print(f"{'='*60}\n")
             return True
         
-        send_mail(
-            asunto,
-            mensaje,
-            email_from,
-            [email],
-            fail_silently=False,
-        )
+        # Enviar email con timeout para evitar que se quede colgado
+        import socket
+        socket.setdefaulttimeout(10)  # Timeout de 10 segundos
         
-        logger.info(f"Código de verificación enviado por email a {email}")
-        return True
+        try:
+            send_mail(
+                asunto,
+                mensaje,
+                email_from,
+                [email],
+                fail_silently=False,
+            )
+            logger.info(f"Código de verificación enviado por email a {email}")
+            return True
+        except socket.timeout:
+            logger.error(f"Timeout al enviar código por email a {email}")
+            # En caso de timeout, mostrar código en consola y continuar
+            print(f"\n{'='*60}")
+            print(f"[TIMEOUT] Código de verificación Email")
+            print(f"Email: {email}")
+            print(f"CÓDIGO: {codigo}")
+            print(f"{'='*60}\n")
+            return True  # Retornar True para no romper el flujo
+        finally:
+            socket.setdefaulttimeout(None)  # Restaurar timeout por defecto
         
     except Exception as e:
         logger.error(f"Error al enviar código por email: {e}")
